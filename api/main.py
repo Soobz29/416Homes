@@ -273,21 +273,22 @@ async def get_listings(
     property_types: Optional[str] = None,
 ):
     """
-    Get property listings with optional filters, backed by the same
-    enriched last-scan data that the Telegram /listings command uses.
+    Get property listings with optional filters.
+
+    Preference order:
+    1. Supabase `listings` table (shared across hosts and Telegram/API).
+    2. Local last-scan JSON snapshot if Supabase is empty/unavailable.
     """
     try:
         # Treat GTA / empty as no city filter (All GTA).
         city_filter = None if (not city or city.lower() == "gta") else city
 
-        # Pull from listing_agent's persisted last scan so API + Telegram match.
-        scan_at, total, all_listings = get_last_scan_listings(
-            limit=1000, offset=0, city=city_filter, region=None
-        )
-        rows = all_listings or []
+        rows: list[dict] = []
+        scan_at: Optional[str] = None
 
-        # Railway/ephemeral: when no last-scan file (scraper not run on this host), fall back to Supabase.
-        if not rows and supabase_client:
+        # 1) Prefer Supabase `listings` table so API works even when the
+        #    last-scan JSON file is missing on this host.
+        if supabase_client:
             try:
                 min_beds = float(bedrooms) if bedrooms and str(bedrooms).strip() else None
                 min_baths = float(bathrooms) if bathrooms and str(bathrooms).strip() else None
@@ -299,10 +300,28 @@ async def get_listings(
                     min_beds=min_beds,
                     min_baths=min_baths,
                 )
-                if rows and not scan_at:
+                if rows:
                     scan_at = (rows[0].get("scraped_at") or "").strip() or None
+                    logger.info(
+                        "Listings API using Supabase source: %d rows (city=%s)",
+                        len(rows),
+                        city_filter or "ALL",
+                    )
             except Exception as e:
-                logger.warning("Supabase listings fallback failed: %s", e)
+                logger.warning("Supabase listings query failed: %s", e)
+
+        # 2) Fallback to last-scan JSON snapshot if Supabase had no usable rows.
+        if not rows:
+            scan_at, total, all_listings = get_last_scan_listings(
+                limit=1000, offset=0, city=city_filter, region=None
+            )
+            rows = all_listings or []
+            if rows:
+                logger.info(
+                    "Listings API using last-scan JSON source: %d rows (city=%s)",
+                    len(rows),
+                    city_filter or "ALL",
+                )
 
         def _num(v) -> Optional[float]:
             try:
