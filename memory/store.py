@@ -27,10 +27,11 @@ class MemoryStore:
     """Supabase-backed memory store with pgvector embeddings"""
     
     def __init__(self):
-        self.supabase: Client = create_client(
-            os.getenv("SUPABASE_URL"),
-            os.getenv("SUPABASE_KEY")
-        )
+        supabase_url = os.getenv("SUPABASE_URL")
+        # Prefer service_role for server-side reads/writes (RLS-safe),
+        # fall back to anon key if needed.
+        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+        self.supabase: Client = create_client(supabase_url, supabase_key)
         
         # Initialize Gemini for embeddings
         self.embedding_model_id = "text-embedding-004"
