@@ -23,6 +23,8 @@ video_pipeline/output/
 # Logs / runtime artifacts
 *.log
 listing_agent/activity.log
+listing_agent/memory.json
+listing_agent/seen_listings.json
 last_scan_listings.json
 veo_spend_tracking.json
 temp/
