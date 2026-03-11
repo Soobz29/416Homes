@@ -25,7 +25,8 @@ scikit-learn==1.4.0
 scipy==1.12.0
 lightgbm==4.3.0
 
-# Scraping
+# Scraping (lxml<5 for scrapling compatibility)
+lxml>=4.8.2,<5
 scrapling==0.4.1
 DrissionPage==4.1.1.2
 

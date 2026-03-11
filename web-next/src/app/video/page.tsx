@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || (typeof window !== "undefined" ? window.location.origin : "http://localhost:8000");
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || (typeof window !== "undefined" ? window.location.origin : "http://localhost:8000")).replace(/\/$/, "");
 const STEP_ORDER = ["scrape", "script", "audio", "animate", "assemble"] as const;
 const STEP_MAP: Record<string, [string, string]> = {
   scrape: ["iScrape", "mScrape"],
@@ -271,7 +271,7 @@ function ProgressPanel({
     { key: "animate", label: "Animating listing photos", icon: "🎬", msgKey: "animate" },
     { key: "assemble", label: "Assembling final video", icon: "📽️", msgKey: "assemble" },
   ];
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || (typeof window !== "undefined" ? window.location.origin : "http://localhost:8000");
+  const apiBase = (process.env.NEXT_PUBLIC_API_URL || (typeof window !== "undefined" ? window.location.origin : "http://localhost:8000")).replace(/\/$/, "");
   return (
     <div className="progress-panel border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] p-10">
       <div className="prog-title mb-1 text-[1rem] font-bold">Generating your video...</div>
