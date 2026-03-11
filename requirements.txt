@@ -8,8 +8,8 @@ pgvector==0.4.2
 # Telegram
 python-telegram-bot==22.6
 
-# LLM/Embeddings
-google-generativeai==0.8.6
+# LLM/Embeddings (prefer new SDK; legacy google-generativeai is deprecated)
+google-genai>=1.0.0
 
 # Video/Audio
 elevenlabs==1.54.0
