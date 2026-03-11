@@ -247,8 +247,8 @@ class MemoryStore:
             logger.error(f"Failed to get sold comps for {neighborhood}: {e}")
             return []
     
-    async def get_listings(self, city: str = None, cities: List[str] = None, limit: int = 20, min_price: int = None, max_price: int = None, min_beds: float = None, min_baths: float = None) -> List[Dict[str, Any]]:
-        """Get listings with filters. Pass city (single) or cities (list) for location."""
+    async def get_listings(self, city: str = None, cities: List[str] = None, limit: int = 20, offset: int = 0, min_price: int = None, max_price: int = None, min_beds: float = None, min_baths: float = None) -> List[Dict[str, Any]]:
+        """Get listings with filters. Pass city (single) or cities (list) for location. offset/limit for pagination."""
         try:
             query = self.supabase.table("listings").select("*")
             if cities:
@@ -263,8 +263,9 @@ class MemoryStore:
                 query = query.gte("bedrooms", min_beds)
             if min_baths:
                 query = query.gte("bathrooms", min_baths)
-            
-            result = query.order("scraped_at", desc=True).limit(limit).execute()
+            # range is 0-indexed inclusive: range(offset, offset+limit-1) gives `limit` rows
+            end = offset + limit - 1
+            result = query.order("scraped_at", desc=True).range(offset, end).execute()
             return result.data or []
             
         except Exception as e:

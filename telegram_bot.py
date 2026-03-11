@@ -12,6 +12,7 @@ from telegram.ext import ApplicationBuilder, CallbackQueryHandler, CommandHandle
 from dotenv import load_dotenv
 from listing_agent.activity_log import log_activity
 from memory.store import memory_store
+from scraper.listing_utils import is_badge_or_headline_only
 
 # Import our agent components
 # from listing_agent import agent as listing_agent (Removed to prevent circular import)
@@ -598,7 +599,9 @@ class TelegramBot:
         last_group = None
 
         for i, L in enumerate(listings_sorted, start=offset + 1):
-            addr = (L.get("address") or "Unknown")[:55]
+            raw_addr = (L.get("address") or "Unknown").strip()
+            addr = "Address not available" if is_badge_or_headline_only(raw_addr) else (raw_addr or "Unknown")
+            addr = addr[:55]
             price = L.get("price") or 0
             price_str = f"${int(price):,}" if isinstance(price, (int, float)) else str(price)
             src = L.get("source", "?")
@@ -640,9 +643,12 @@ class TelegramBot:
         """Escape for Telegram HTML."""
         return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
+    # Toronto = city + boroughs (match API behaviour)
+    TORONTO_BOROUGHS = ("Toronto", "Downtown", "North York", "Scarborough", "Etobicoke")
+
     async def h_listings(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Browse last scan listings with pagination."""
-        from listing_agent import get_last_scan_listings, LISTINGS_PAGE_SIZE
+        """Browse last scan listings with pagination. Prefer Supabase when scan file missing (e.g. Railway)."""
+        from listing_agent import get_last_scan_listings, LISTINGS_PAGE_SIZE, LAST_SCAN_LISTINGS_FILE
 
         # Parse args:
         # /listings
@@ -698,25 +704,36 @@ class TelegramBot:
             if not city and phrase:
                 region = phrase
 
-        scan_at, total, slice_list = get_last_scan_listings(
-            limit=LISTINGS_PAGE_SIZE, offset=0, city=city, region=region
-        )
+        # Prefer Supabase when scan file is missing (e.g. on Railway worker) so /listings always has data.
+        use_supabase_first = not (LAST_SCAN_LISTINGS_FILE.exists() and LAST_SCAN_LISTINGS_FILE.stat().st_size > 0)
+        scan_at, total, slice_list = None, 0, []
 
-        # Fallback: if the JSON file is missing/empty in this environment,
-        # pull from Supabase so Telegram matches the API dashboard behaviour.
-        if (not scan_at or not slice_list) and memory_store is not None:
+        if not use_supabase_first:
+            scan_at, total, slice_list = get_last_scan_listings(
+                limit=LISTINGS_PAGE_SIZE, offset=0, city=city, region=region
+            )
+
+        if (use_supabase_first or not scan_at or not slice_list) and memory_store is not None:
             try:
-                supabase_rows = await memory_store.get_listings(
-                    city=city.capitalize() if city else None,
-                    limit=LISTINGS_PAGE_SIZE * 5,
+                city_param = None
+                cities_param = None
+                if city and str(city).strip().lower() == "toronto":
+                    cities_param = list(self.TORONTO_BOROUGHS)
+                elif city:
+                    city_param = city.strip().capitalize() if city else None
+                all_rows = await memory_store.get_listings(
+                    city=city_param,
+                    cities=cities_param,
+                    limit=1000,
+                    offset=0,
                 )
             except Exception as e:
-                logger.warning(f"Supabase fallback for /listings failed: {e}")
-                supabase_rows = []
+                logger.warning(f"Supabase for /listings failed: {e}")
+                all_rows = []
 
-            if supabase_rows:
-                total = len(supabase_rows)
-                slice_list = supabase_rows[:LISTINGS_PAGE_SIZE]
+            if all_rows:
+                total = len(all_rows)
+                slice_list = all_rows[:LISTINGS_PAGE_SIZE]
                 scan_at = datetime.utcnow().isoformat()
 
         if not scan_at:
@@ -743,14 +760,13 @@ class TelegramBot:
         await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
 
     async def h_listings_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle Prev/Next button clicks for listings pagination."""
-        from listing_agent import get_last_scan_listings, LISTINGS_PAGE_SIZE
+        """Handle Prev/Next button clicks for listings pagination. Uses Supabase when scan file missing."""
+        from listing_agent import get_last_scan_listings, LISTINGS_PAGE_SIZE, LAST_SCAN_LISTINGS_FILE
 
         query = update.callback_query
         await query.answer()
 
         data = query.data
-        # listings:page=2;city=toronto;region=downtown
         payload = data.replace("listings:", "", 1)
         parts = {}
         for chunk in payload.split(";"):
@@ -769,24 +785,37 @@ class TelegramBot:
 
         page_size = LISTINGS_PAGE_SIZE
         offset = (page - 1) * page_size
-        scan_at, total, slice_list = get_last_scan_listings(
-            limit=page_size, offset=offset, city=city, region=region
-        )
+        scan_at, total, slice_list = None, 0, []
+        use_supabase = not (LAST_SCAN_LISTINGS_FILE.exists() and LAST_SCAN_LISTINGS_FILE.stat().st_size > 0)
 
-        if (not scan_at or not slice_list) and memory_store is not None:
+        if not use_supabase:
+            scan_at, total, slice_list = get_last_scan_listings(
+                limit=page_size, offset=offset, city=city, region=region
+            )
+
+        if (use_supabase or not scan_at or not slice_list) and memory_store is not None:
             try:
-                supabase_rows = await memory_store.get_listings(
-                    city=city.capitalize() if city else None,
-                    limit=page_size * 5,
+                city_param = None
+                cities_param = None
+                if city and str(city).strip().lower() == "toronto":
+                    cities_param = list(self.TORONTO_BOROUGHS)
+                elif city:
+                    city_param = city.strip().capitalize() if city else None
+                all_rows = await memory_store.get_listings(
+                    city=city_param,
+                    cities=cities_param,
+                    limit=1000,
+                    offset=0,
                 )
             except Exception as e:
-                logger.warning(f"Supabase fallback for listings pagination failed: {e}")
-                supabase_rows = []
+                logger.warning(f"Supabase for listings pagination failed: {e}")
+                all_rows = []
 
-            if supabase_rows:
-                total = len(supabase_rows)
-                slice_list = supabase_rows[offset : offset + page_size]
+            if all_rows:
+                total = len(all_rows)
+                slice_list = all_rows[offset : offset + page_size]
                 scan_at = datetime.utcnow().isoformat()
+
         if not scan_at or not slice_list:
             await query.edit_message_text("📋 Scan data no longer available.")
             return
