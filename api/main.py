@@ -60,37 +60,56 @@ app.add_middleware(
 
 # Static + HTML pages
 WEB_ROOT = Path("web")
-app.mount("/static", StaticFiles(directory=str(WEB_ROOT / "static")), name="static")
+_static_dir = WEB_ROOT / "static"
+if _static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
+else:
+    logger.warning("Static directory missing (%s). Skipping /static mount.", _static_dir)
 
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_landing():
     """Serve main landing page."""
-    return FileResponse(str(WEB_ROOT / "index.html"))
+    path = WEB_ROOT / "index.html"
+    if path.exists():
+        return FileResponse(str(path))
+    return HTMLResponse("<h1>416Homes API</h1><p>Frontend not bundled on this deployment.</p>")
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def serve_dashboard():
     """Serve buyer dashboard (requires auth in future)."""
-    return FileResponse(str(WEB_ROOT / "dashboard.html"))
+    path = WEB_ROOT / "dashboard.html"
+    if path.exists():
+        return FileResponse(str(path))
+    return HTMLResponse("<h1>416Homes</h1><p>Dashboard is deployed separately (Vercel).</p>")
 
 
 @app.get("/video", response_class=HTMLResponse)
 async def serve_video_order():
     """Serve video order page."""
-    return FileResponse(str(WEB_ROOT / "video.html"))
+    path = WEB_ROOT / "video.html"
+    if path.exists():
+        return FileResponse(str(path))
+    return HTMLResponse("<h1>416Homes</h1><p>Video page is deployed separately.</p>")
 
 
 @app.get("/agent", response_class=HTMLResponse)
 async def serve_agent_dashboard():
     """Serve agent dashboard."""
-    return FileResponse(str(WEB_ROOT / "agent.html"))
+    path = WEB_ROOT / "agent.html"
+    if path.exists():
+        return FileResponse(str(path))
+    return HTMLResponse("<h1>416Homes</h1><p>Agent dashboard is deployed separately.</p>")
 
 
 @app.get("/login", response_class=HTMLResponse)
 async def serve_login():
     """Serve login page."""
-    return FileResponse(str(WEB_ROOT / "login.html"))
+    path = WEB_ROOT / "login.html"
+    if path.exists():
+        return FileResponse(str(path))
+    return HTMLResponse("<h1>416Homes</h1><p>Login is handled by the frontend.</p>")
 
 # Pydantic models
 class ListingResponse(BaseModel):
