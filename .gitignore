@@ -8,12 +8,14 @@ __pycache__/
 *$py.class
 *.so
 .Python
+.venv/
 venv/
 env/
 ENV/
 
 # Video temp files / outputs
 video_pipeline/temp/
+video_pipeline/output/
 *.mp4
 *.wav
 *.mp3
@@ -23,11 +25,19 @@ video_pipeline/temp/
 listing_agent/activity.log
 last_scan_listings.json
 veo_spend_tracking.json
+temp/
 
 # Next.js
 .next/
 out/
 node_modules/
+
+# Cursor/agent scaffolding (local)
+.cursor/
+.agent/
+
+# Embedded reference repo (local)
+mls-real-estate-scraper-for-realtor.ca/
 
 # OS
 .DS_Store
