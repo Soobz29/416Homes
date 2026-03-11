@@ -28,6 +28,7 @@ lightgbm==4.3.0
 # Scraping (scrapling pulls lxml>=6.0.2)
 scrapling==0.4.1
 DrissionPage==4.1.1.2
+browserforge>=0.11.0
 
 # Scheduling
 APScheduler==3.11.2

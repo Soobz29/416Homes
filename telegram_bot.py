@@ -11,6 +11,7 @@ from telegram import Bot, BotCommand, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
 from dotenv import load_dotenv
 from listing_agent.activity_log import log_activity
+from memory.store import memory_store
 
 # Import our agent components
 # from listing_agent import agent as listing_agent (Removed to prevent circular import)
@@ -700,6 +701,24 @@ class TelegramBot:
         scan_at, total, slice_list = get_last_scan_listings(
             limit=LISTINGS_PAGE_SIZE, offset=0, city=city, region=region
         )
+
+        # Fallback: if the JSON file is missing/empty in this environment,
+        # pull from Supabase so Telegram matches the API dashboard behaviour.
+        if (not scan_at or not slice_list) and memory_store is not None:
+            try:
+                supabase_rows = await memory_store.get_listings(
+                    city=city.capitalize() if city else None,
+                    limit=LISTINGS_PAGE_SIZE * 5,
+                )
+            except Exception as e:
+                logger.warning(f"Supabase fallback for /listings failed: {e}")
+                supabase_rows = []
+
+            if supabase_rows:
+                total = len(supabase_rows)
+                slice_list = supabase_rows[:LISTINGS_PAGE_SIZE]
+                scan_at = datetime.utcnow().isoformat()
+
         if not scan_at:
             await update.message.reply_text(
                 "📋 No scan data yet.\n\nRun a scan first (or wait for the next scheduled scan every 30 min)."
@@ -753,6 +772,21 @@ class TelegramBot:
         scan_at, total, slice_list = get_last_scan_listings(
             limit=page_size, offset=offset, city=city, region=region
         )
+
+        if (not scan_at or not slice_list) and memory_store is not None:
+            try:
+                supabase_rows = await memory_store.get_listings(
+                    city=city.capitalize() if city else None,
+                    limit=page_size * 5,
+                )
+            except Exception as e:
+                logger.warning(f"Supabase fallback for listings pagination failed: {e}")
+                supabase_rows = []
+
+            if supabase_rows:
+                total = len(supabase_rows)
+                slice_list = supabase_rows[offset : offset + page_size]
+                scan_at = datetime.utcnow().isoformat()
         if not scan_at or not slice_list:
             await query.edit_message_text("📋 Scan data no longer available.")
             return
