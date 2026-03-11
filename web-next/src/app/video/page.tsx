@@ -72,18 +72,17 @@ export default function VideoPage() {
           </button>
         </div>
 
-        {/* Video preview mock */}
+        {/* Video preview — Vimeo sample */}
         <div className="video-preview relative aspect-[16/9] overflow-hidden border border-[rgba(200,169,110,0.2)] bg-black">
-          <div className="video-preview-inner relative flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,#1a1a15_0%,#0d0d0a_100%)]">
-            <div className="vp-bars absolute left-0 right-0 top-0 h-[6%] bg-black" />
-            <div className="vp-bars-b absolute bottom-0 left-0 right-0 h-[6%] bg-black" />
-            <div className="vp-content z-10 text-center">
-              <button className="vp-play mb-3 flex h-[60px] w-[60px] items-center justify-center rounded-full border-2 border-[#c8a96e] transition-all hover:scale-105 hover:bg-[rgba(200,169,110,0.1)]">
-                ▶
-              </button>
-              <div className="vp-label font-['DM Mono',monospace] text-[0.68rem] uppercase tracking-[0.1em] text-[#6b6b60]">
-                Sample Output — 30 Sec
-              </div>
+          <div className="video-preview-inner relative h-full w-full overflow-hidden bg-black">
+            <div className="relative w-full" style={{ paddingTop: "56.25%" }}>
+              <iframe
+                src="https://player.vimeo.com/video/1172407404?badge=0&autopause=0&player_id=0&app_id=58479&autoplay=1&loop=1"
+                className="absolute left-0 top-0 h-full w-full border-0"
+                allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
+                referrerPolicy="strict-origin-when-cross-origin"
+                title="416Homes Sample — 30 Sec"
+              />
             </div>
             <div className="vp-caption absolute bottom-[8%] left-0 right-0 px-6">
               <div className="vp-headline mb-1 text-[1.1rem] font-bold">
