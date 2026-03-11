@@ -8,7 +8,14 @@ from dotenv import load_dotenv
 
 from memory.store import memory_store
 # from elevenlabs import ElevenLabs  # Commented out for now
-from google import genai
+try:
+    # New Gemini SDK (package: google-genai)
+    from google import genai as _genai  # type: ignore
+    _GENAI_SDK = "google-genai"
+except Exception:  # pragma: no cover
+    # Legacy Gemini SDK (package: google-generativeai)
+    import google.generativeai as _genai  # type: ignore
+    _GENAI_SDK = "google-generativeai"
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -23,7 +30,12 @@ class VideoJobManager:
         # self.elevenlabs = ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))  # Commented out
         
         # Initialize Gemini
-        self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        api_key = os.getenv("GEMINI_API_KEY")
+        self.client = None
+        if _GENAI_SDK == "google-genai":
+            self.client = _genai.Client(api_key=api_key)
+        else:
+            _genai.configure(api_key=api_key)
         self.model_id = "gemini-2.5-flash"
     
     async def create_video_job(self, listing_url: str, customer_email: str, 
@@ -217,7 +229,13 @@ class VideoJobManager:
             - key_features: List of 3-4 key selling points
             """
             
-            response = self.client.models.generate_content(model=self.model_id, contents=prompt)
+            if _GENAI_SDK == "google-genai":
+                if not self.client:
+                    raise RuntimeError("Gemini client not initialized")
+                _ = self.client.models.generate_content(model=self.model_id, contents=prompt)
+            else:
+                model = _genai.GenerativeModel(self.model_id)
+                _ = model.generate_content(prompt)
             
             # Parse response (simplified for demo)
             script_data = {

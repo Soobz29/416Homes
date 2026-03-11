@@ -15,7 +15,14 @@ from dotenv import load_dotenv
 from supabase import create_client
 from memory.store import search_listings
 from valuation.model import ValuationModel
-from google import genai
+try:
+    # New Gemini SDK (package: google-genai)
+    from google import genai as _genai  # type: ignore
+    _GENAI_SDK = "google-genai"
+except Exception:  # pragma: no cover
+    # Legacy Gemini SDK (package: google-generativeai)
+    import google.generativeai as _genai  # type: ignore
+    _GENAI_SDK = "google-generativeai"
 import resend
 
 load_dotenv()
@@ -31,7 +38,12 @@ class PropertyAgent:
         )
         
         # Initialize Gemini
-        self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        api_key = os.getenv("GEMINI_API_KEY")
+        self.client = None
+        if _GENAI_SDK == "google-genai":
+            self.client = _genai.Client(api_key=api_key)
+        else:
+            _genai.configure(api_key=api_key)
         self.model_id = "gemini-2.5-flash"
         
         # Initialize Resend
@@ -171,9 +183,15 @@ class PropertyAgent:
             Keep it under 200 words.
             """
             
-            response = self.client.models.generate_content(model=self.model_id, contents=prompt)
-            
-            return response.text
+            if _GENAI_SDK == "google-genai":
+                if not self.client:
+                    raise RuntimeError("Gemini client not initialized")
+                response = self.client.models.generate_content(model=self.model_id, contents=prompt)
+                return response.text
+            else:
+                model = _genai.GenerativeModel(self.model_id)
+                response = model.generate_content(prompt)
+                return getattr(response, "text", "") or ""
             
         except Exception as e:
             logger.error(f"Error generating email: {e}")
