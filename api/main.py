@@ -186,6 +186,7 @@ class AlertUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 from listing_agent import get_last_scan_listings
+from scraper.listing_utils import is_badge_or_headline_only
 
 
 # Health check
@@ -281,7 +282,13 @@ async def get_listings(
     """
     try:
         # Treat GTA / empty as no city filter (All GTA).
-        city_filter = None if (not city or city.lower() == "gta") else city
+        city_filter = None if (not city or city.lower() == "gta") else city.strip()
+        # When dashboard selects "Toronto", include boroughs stored as separate cities.
+        TORONTO_BOROUGHS = ("Toronto", "Downtown", "North York", "Scarborough", "Etobicoke")
+        if city_filter and city_filter.lower() == "toronto":
+            cities_filter: Optional[List[str]] = list(TORONTO_BOROUGHS)
+        else:
+            cities_filter = None
 
         rows: list[dict] = []
         scan_at: Optional[str] = None
@@ -293,7 +300,8 @@ async def get_listings(
                 min_beds = float(bedrooms) if bedrooms and str(bedrooms).strip() else None
                 min_baths = float(bathrooms) if bathrooms and str(bathrooms).strip() else None
                 rows = await memory_store.get_listings(
-                    city=city_filter,
+                    city=city_filter if not cities_filter else None,
+                    cities=cities_filter,
                     limit=1000,
                     min_price=min_price,
                     max_price=max_price,
@@ -664,9 +672,13 @@ def _normalise_listing(row: dict) -> dict:
     if isinstance(raw_area, (int, float)) and raw_area <= 0:
         raw_area = None
 
+    addr = (row.get("address") or "").strip()
+    if is_badge_or_headline_only(addr):
+        addr = "Address not available"
+
     return {
         "id":          row.get("id", ""),
-        "address":     row.get("address", ""),
+        "address":     addr,
         "price":       row.get("price") or 0,
         "bedrooms":    str(row.get("bedrooms") or ""),
         "bathrooms":   str(row.get("bathrooms") or ""),

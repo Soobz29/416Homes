@@ -247,12 +247,13 @@ class MemoryStore:
             logger.error(f"Failed to get sold comps for {neighborhood}: {e}")
             return []
     
-    async def get_listings(self, city: str = None, limit: int = 20, min_price: int = None, max_price: int = None, min_beds: float = None, min_baths: float = None) -> List[Dict[str, Any]]:
-        """Get listings with filters"""
+    async def get_listings(self, city: str = None, cities: List[str] = None, limit: int = 20, min_price: int = None, max_price: int = None, min_beds: float = None, min_baths: float = None) -> List[Dict[str, Any]]:
+        """Get listings with filters. Pass city (single) or cities (list) for location."""
         try:
             query = self.supabase.table("listings").select("*")
-            
-            if city:
+            if cities:
+                query = query.in_("city", cities)
+            elif city:
                 query = query.eq("city", city)
             if min_price:
                 query = query.gte("price", min_price)

@@ -28,6 +28,7 @@ jobs:
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
         AGENT_EMAIL: ${{ secrets.AGENT_EMAIL }}
@@ -40,6 +41,7 @@ jobs:
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       run: |
         echo "Training valuation model..."
@@ -50,6 +52,7 @@ jobs:
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
         AGENT_EMAIL: ${{ secrets.AGENT_EMAIL }}

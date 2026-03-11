@@ -486,6 +486,17 @@ class ListingAgent:
                 # Persist for /listings command (cap at 500 to keep file small)
                 _persist_last_scan_listings(listings)
 
+                # Push same listings to Supabase so dashboard + Telegram show latest (like local)
+                try:
+                    from memory.store import embed_and_store_listings
+                    regular = [L for L in listings if L.get("source") != "housesigma" and "sold_price" not in L]
+                    if regular:
+                        stored = await embed_and_store_listings(regular)
+                        log_activity("SCAN", f"Pushed {stored}/{len(regular)} listings to Supabase")
+                except Exception as e:
+                    logger.warning(f"Failed to push listings to Supabase: {e}")
+                    log_activity("ERROR", f"Supabase push failed: {e}")
+
                 for listing in listings:
                     if self._matches_criteria(listing) and self._is_new(listing, listing.get("source", "unknown")):
                         new_listings.append((listing, listing.get("source", "unknown")))
