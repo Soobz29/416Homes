@@ -525,82 +525,21 @@ async def search_listings_endpoint(q: str, limit: int = 10):
         # Return mock results for demo
         return []
 
-# Valuation endpoint
-@app.post("/api/valuate", response_model=ValuationResponse)
-async def valuate_property(request: ValuationRequest):
-    """Valuate a property using recent sold comps as baseline."""
-    
+# Valuation endpoint (minimal Railway deployment)
+@app.post("/api/valuate")
+async def valuate_property(data: dict):
+    """Temporary mock valuation - full model disabled for Railway deployment"""
+    sqft = 1500
     try:
-        # Pull comparable sales for this neighbourhood
-        comparable_sales = _get_comps(request.neighbourhood)
-
-        # If we have comps, derive price-per-sqft from them; otherwise fallback to coarse defaults.
-        ppsf = None
-        if comparable_sales:
-            total_ppsf = 0.0
-            count_ppsf = 0
-            for comp in comparable_sales:
-                sold_price = comp.get("sold_price") or comp.get("sold_price".upper())
-                sqft = comp.get("sqft") or comp.get("area")
-                try:
-                    if sold_price and sqft and float(sqft) > 0:
-                        total_ppsf += float(sold_price) / float(sqft)
-                        count_ppsf += 1
-                except Exception:
-                    continue
-            if count_ppsf:
-                ppsf = total_ppsf / count_ppsf
-
-        # Fallback baseline when no reliable comps
-        base_price_per_sqft = {
-            "Toronto": 850.0,
-            "Mississauga": 700.0,
-        }
-        property_type_multiplier = {
-            "Condo Apt": 1.0,
-            "Detached": 1.3,
-            "Semi-Detached": 1.15,
-            "Townhouse": 1.1,
-        }
-
-        fallback_ppsf = base_price_per_sqft.get(request.city, 750.0)
-        price_per_sqft = ppsf or fallback_ppsf
-        type_multiplier = property_type_multiplier.get(request.property_type, 1.0)
-
-        estimated_value = int(request.sqft * price_per_sqft * type_multiplier)
-
-        # Calculate confidence based on comps availability + sqft
-        if ppsf and comparable_sales:
-            confidence = min(0.95, 0.85 + (len(comparable_sales) / 40.0))
-        else:
-            confidence = 0.65
-
-        # Generate market analysis vs list_price if provided (>0)
-        analysis = "No list price provided — showing fair value estimate."
-        if request.list_price and request.list_price > 0:
-            delta = request.list_price - estimated_value
-            pct = delta / estimated_value if estimated_value else 0
-            if pct <= -0.1:
-                analysis = "Priced below market value — strong opportunity."
-            elif pct <= -0.03:
-                analysis = "Slightly under market value — worth a close look."
-            elif pct >= 0.1:
-                analysis = "Significantly above market value — negotiate hard."
-            elif pct >= 0.03:
-                analysis = "Slightly above market value — room for negotiation."
-            else:
-                analysis = "In line with recent market activity."
-
-        return ValuationResponse(
-            estimated_value=estimated_value,
-            confidence=confidence,
-            market_analysis=analysis,
-            comparable_sales=comparable_sales
-        )
-        
-    except Exception as e:
-        logger.error(f"Error valuing property: {e}")
-        raise HTTPException(status_code=500, detail="Failed to valuate property")
+        sqft = int(data.get("sqft", sqft) or sqft)
+    except Exception:
+        sqft = 1500
+    return {
+        "estimated_value": sqft * 600,  # Simple $600/sqft estimate
+        "confidence": 0.7,
+        "market_analysis": "Full valuation model temporarily disabled. Using simple price estimation.",
+        "note": "Upgrade to full LightGBM model coming soon",
+    }
 
 # Video job endpoints
 @app.post("/api/video-jobs", response_model=VideoJobResponse)

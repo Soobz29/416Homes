@@ -5,17 +5,28 @@
 LightGBM model for property valuation based on sold comps.
 """
 
-import pandas as pd
-import numpy as np
+# Temporarily disabled for Railway deployment (data science stack removed)
+try:
+    import pandas as pd  # type: ignore
+    import numpy as np  # type: ignore
+    import lightgbm as lgb  # type: ignore
+    from sklearn.model_selection import train_test_split  # type: ignore
+    from sklearn.metrics import mean_absolute_percentage_error  # type: ignore
+    from sklearn.preprocessing import LabelEncoder  # type: ignore
+    _DS_ENABLED = True
+except Exception:  # pragma: no cover
+    pd = None  # type: ignore
+    np = None  # type: ignore
+    lgb = None  # type: ignore
+    train_test_split = None  # type: ignore
+    mean_absolute_percentage_error = None  # type: ignore
+    LabelEncoder = None  # type: ignore
+    _DS_ENABLED = False
 from typing import List, Dict, Any
 import joblib
 import os
 from dotenv import load_dotenv
 import logging
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_absolute_percentage_error
-import lightgbm as lgb
-from sklearn.preprocessing import LabelEncoder
 import warnings
 
 from supabase import create_client
@@ -37,6 +48,8 @@ class ValuationModel:
     
     def load_data(self) -> pd.DataFrame:
         """Load training data from Supabase"""
+        if not _DS_ENABLED:
+            raise RuntimeError("Valuation model disabled for minimal Railway deployment")
         try:
             client = create_client(
                 os.getenv("SUPABASE_URL"),
