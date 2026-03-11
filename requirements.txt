@@ -25,8 +25,7 @@ scikit-learn==1.4.0
 scipy==1.12.0
 lightgbm==4.3.0
 
-# Scraping (lxml 4.9.x for scrapling + wheel-friendly on Railway)
-lxml==4.9.2
+# Scraping (scrapling pulls lxml>=6.0.2)
 scrapling==0.4.1
 DrissionPage==4.1.1.2
 
