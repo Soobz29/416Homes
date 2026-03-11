@@ -55,7 +55,8 @@ DEFAULT_CRITERIA = {
     "max_baths": 10,
     "property_types": ["Condo", "House", "Townhouse", "Semi-Detached"],
     "neighborhoods": [],  # empty = all
-    "cities": ["toronto"],
+    # empty cities list = all GTA cities; Telegram + API can still filter by city.
+    "cities": [],
     "sources": ["browser_use_realtor", "zoocasa", "condos_ca"],
 }
 

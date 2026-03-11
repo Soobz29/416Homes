@@ -264,7 +264,7 @@ def _generate_link_code(length: int = 6) -> str:
 # Listings endpoints
 @app.get("/api/listings", response_model=List[ListingResponse])
 async def get_listings(
-    city: str = "Toronto",
+    city: str = "GTA",
     limit: int = 20,
     min_price: Optional[int] = None,
     max_price: Optional[int] = None,
