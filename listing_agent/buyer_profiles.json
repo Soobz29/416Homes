@@ -1,0 +1,18 @@
+[
+    {
+        "name": "Toronto Luxury Buyer",
+        "min": 1500000,
+        "max": 3500000,
+        "beds": 3,
+        "neighbourhood": "Toronto Downtown",
+        "status": "Active"
+    },
+    {
+        "name": "Brampton First Home",
+        "min": 600000,
+        "max": 900000,
+        "beds": 2,
+        "neighbourhood": "Brampton",
+        "status": "Active"
+    }
+]

@@ -1,0 +1,29 @@
+{
+  "agent_name": "416 Agent",
+  "agent_persona": "Your 24/7 Toronto Downtown real estate assistant",
+  "brokerage_name": "416Homes",
+  "brokerage_logo_url": "",
+  "agent_email": "hello@416homes.com",
+  "primary_colour": "#C9A84C",
+  "telegram_welcome": "Hello! I'm 416 Agent, your personal real estate assistant for 416Homes.",
+  "regions": [
+    "Toronto Downtown",
+    "Toronto East (Scarborough)",
+    "Toronto West (Etobicoke)",
+    "Toronto North (North York)",
+    "Mississauga",
+    "Brampton",
+    "Vaughan",
+    "Markham",
+    "Richmond Hill",
+    "Oakville",
+    "Burlington",
+    "Ajax & Pickering"
+  ],
+  "price_range": [
+    400000,
+    5000000
+  ],
+  "monthly_fee": 300,
+  "setup_fee": 3000
+}

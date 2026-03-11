@@ -1,0 +1,150 @@
+name: 416Homes Nightly Scraper
+
+on:
+  schedule:
+    # Run every night at 2 AM EST (7 AM UTC)
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        
+    - name: Run nightly scraper
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        AGENT_EMAIL: ${{ secrets.AGENT_EMAIL }}
+      run: |
+        echo "Starting nightly scraper run..."
+        python -m scraper.run_all --source all --area gta
+        echo "Scraper run completed"
+        
+    - name: Run valuation model training
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      run: |
+        echo "Training valuation model..."
+        python valuation/model.py
+        echo "Model training completed"
+        
+    - name: Run agent matching loop
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        AGENT_EMAIL: ${{ secrets.AGENT_EMAIL }}
+      run: |
+        echo "Running agent matching loop..."
+        python agent/main.py
+        echo "Agent loop completed"
+        
+    - name: Send success notification
+      if: success()
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: smtp.gmail.com
+        server_port: 587
+        username: ${{ secrets.EMAIL_USERNAME }}
+        password: ${{ secrets.EMAIL_PASSWORD }}
+        subject: "✅ 416Homes Nightly Scraper Completed"
+        to: ${{ secrets.AGENT_EMAIL }}
+        from: "416Homes Bot <noreply@416homes.ca>"
+        body: |
+          The 416Homes nightly scraper has completed successfully.
+          
+          Time: Workflow run time
+          Workflow: ${{ github.workflow }}
+          Run ID: ${{ github.run_id }}
+          
+          All systems are operating normally.
+          
+          View detailed logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          
+          This is an automated notification from the 416Homes system.
+        
+    - name: Send failure notification
+      if: failure()
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: smtp.gmail.com
+        server_port: 587
+        username: ${{ secrets.EMAIL_USERNAME }}
+        password: ${{ secrets.EMAIL_PASSWORD }}
+        subject: "🚨 416Homes Nightly Scraper Failed"
+        to: ${{ secrets.AGENT_EMAIL }}
+        from: "416Homes Bot <noreply@416homes.ca>"
+        body: |
+          The 416Homes nightly scraper has failed.
+          
+          Workflow: ${{ github.workflow }}
+          Run ID: ${{ github.run_id }}
+          Time: Workflow run time
+          Repository: ${{ github.repository }}
+          
+          Please check the GitHub Actions logs for details:
+          ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          
+          This is an automated alert from the 416Homes monitoring system.
+        
+    - name: Create issue on critical failure
+      if: failure()
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const issue = {
+            title: '🚨 Critical Nightly Scraper Failure',
+            body: `
+              ## 416Homes Nightly Scraper Critical Failure
+              
+              **Workflow**: ${{ github.workflow }}
+              **Run ID**: ${{ github.run_id }}
+              **Time**: ${{ github.event.head_commit.timestamp }}
+              **Repository**: ${{ github.repository }}
+              
+              ### What Happened
+              The nightly scraper workflow has encountered a critical failure.
+              
+              ### Immediate Actions Required
+              1. Review the [workflow logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+              2. Check scraper performance and data quality
+              3. Verify database connectivity
+              4. Test individual components manually
+              
+              ### Investigation Checklist
+              - [ ] Review error logs
+              - [ ] Check database status
+              - [ ] Verify API endpoints
+              - [ ] Test individual scrapers
+              - [ ] Check data quality metrics
+              
+              This issue was automatically created due to a critical failure in the production pipeline.
+            `,
+            labels: ['bug', 'critical', 'scrapers', 'nightly-failure']
+          };
+          
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            ...issue
+          });
+        github-token: ${{ secrets.GITHUB_TOKEN }}

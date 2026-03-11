@@ -1,0 +1,77 @@
+
+LineNumber Line
+---------- ----
+         5   1. Download listing photos from the URL
+        59 def _secure_download_drission(img_urls: List[str], photos_dir: Path) -> List[Path]:
+        65     for i, url in enumerate(img_urls[:15]):
+        68             res = page.download(url, str(photos_dir), f"photo_{i+1}.jpg")
+        71                 logger.info(f"  ✅ Securely downloaded photo {i+1}: {url[:60]}...")
+        75             logger.warning(f"  Drission download failed for {url}: {e}")
+        80 async def download_listing_photos(url: str, job_dir: Path, address: Optional[str] = None, provided_urls: Optional[List[…
+        83     Uses DrissionPage to load the page, find image URLs, and download them securely.
+        89         if provided_urls:
+        90             logger.info(f"Using {len(provided_urls)} pre-provided photo URLs...")
+        91             photo_urls = provided_urls
+        92         elif "condos.ca" in url:
+        94             downloaded_files = await asyncio.to_thread(_scrape_and_download_images_condos, url, str(photos_dir))
+        97             photo_urls = await asyncio.to_thread(_scrape_photo_urls, url)
+        99             if len(photo_urls) < 4 and address:
+       100                 logger.info(f"Found {len(photo_urls)} photos from URL. Trying Google Image Search for {address}...")
+       101                 google_urls = await asyncio.to_thread(_scrape_google_images, address)
+       102                 for g_url in google_urls:
+       103                     if g_url not in photo_urls:
+       104                         photo_urls.append(g_url)
+       106         if not photo_urls:
+       111         downloaded = await asyncio.to_thread(_secure_download_drission, photo_urls, photos_dir)
+       117                 for i, img_url in enumerate(photo_urls[:15]):
+       119                         resp = await client.get(img_url)
+       134 def _scrape_and_download_images_condos(listing_url: str, output_dir: str) -> List[str]:
+       136     Extracts high-res image URLs from condos.ca JSON payload and downloads them securely.
+       143     print(f"🔍 Loading listing: {listing_url}")
+       145     page.get(listing_url)
+       166         base_url = listing_data.get('photo_base_url') 
+       170         if not all([mls, base_url, count]):
+       171             print("⚠️ Missing data required to build URLs.")
+       179             img_url = f"{base_url}{mls}_{i}.jpg?width=1920&v={version}"
+       184                     img_url, 
+       202                 print(f"  ⚠️ Error downloading {img_url}: {e}")
+       213 def _scrape_photo_urls(url: str) -> List[str]:
+       214     """Use DrissionPage to find listing photo URLs."""
+       219         if "realtor.ca" in url.lower() and "view=imagelist" not in url:
+       220             if "?" in url:
+       221                 url += "&view=imagelist"
+       223                 url += "?view=imagelist"
+       224             logger.info(f"Converting Realtor.ca URL to image list view: {url}")
+       227         page.get(url, retry=2, interval=2, timeout=25)
+       231         img_urls = []
+       244                     img_urls.append(best)
+       254                 img_urls.append(src)
+       257         if "realtor.ca" in url.lower():
+       267                     if src not in img_urls:
+       268                         img_urls.append(src)
+       271         if len(img_urls) < 3:
+       275                     if src not in img_urls:
+       276                         img_urls.append(src)
+       283         for u in img_urls:
+       304         import urllib.parse
+       306         query = urllib.parse.quote(f"{address} site:strata.ca OR site:zoocasa.com OR site:condos.ca")
+       307         search_url = f"https://www.google.com/search?tbm=isch&q={query}"
+       310         page.get(search_url, retry=1, interval=1, timeout=15)
+       314         img_urls = []
+       318             # Google often embeds the original high-res URL in the data-src or src if we click it,
+       324                 img_urls.append(actual_src)
+       329         for u in img_urls:
+       334         final_urls = [u.replace('&s', '') for u in unique[:6]]
+       335         return final_urls
+       488                         # Get audio URL from the response
+       491                             audio_url = suno_data[0].get("audioUrl", "")
+       492                             if audio_url:
+       493                                 audio_resp = await client.get(audio_url)
+      1035     listing_url: str,
+      1045         listing_url: URL to scrape photos from
+      1057     log_activity("VIDEO", f"Job started: {job_id} for {listing_url}")
+      1073         if not photos and listing_url and listing_url != "custom_upload":
+      1076                 listing_url, 
+      1079                 provided_urls=listing_data.get("photos")
+      1212         log_activity("ERROR", f"produce_video failed for {url}: {e}")
+

@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>416Homes Agent — 24/7 Listing Monitor</title>
+    <meta name="description" content="AI-powered 24/7 Canadian real estate listing monitor for the GTA market">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-card: #14141f;
+            --bg-card-hover: #1a1a2e;
+            --accent: #c8a96e;
+            --accent-glow: rgba(200, 169, 110, 0.15);
+            --green: #22c55e;
+            --green-glow: rgba(34, 197, 94, 0.2);
+            --red: #ef4444;
+            --red-glow: rgba(239, 68, 68, 0.2);
+            --blue: #3b82f6;
+            --text-primary: #f5f4ef;
+            --text-secondary: #9ca3af;
+            --border: rgba(200, 169, 110, 0.12);
+            --radius: 16px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        /* ── Header ────────────────────────────────── */
+        .header {
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 24px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent), #e8d5a8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header .subtitle {
+            color: var(--text-secondary);
+            font-size: 13px;
+            margin-top: 4px;
+        }
+
+        .header-nav a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 14px;
+            margin-left: 24px;
+            transition: color 0.2s;
+        }
+
+        .header-nav a:hover {
+            color: var(--accent);
+        }
+
+        /* ── Layout ────────────────────────────────── */
+        .main {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 32px 40px;
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 32px;
+        }
+
+        /* ── Sidebar ───────────────────────────────── */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            transition: all 0.3s ease;
+        }
+
+        .card h3 {
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--accent);
+            margin-bottom: 16px;
+        }
+
+        /* ── Agent status ──────────────────────────── */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .status-badge.running {
+            background: var(--green-glow);
+            color: var(--green);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .status-badge.stopped {
+            background: var(--red-glow);
+            color: var(--red);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .status-badge .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .stat {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .stat .value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .stat .label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 4px;
+        }
+
+        /* ── Controls ──────────────────────────────── */
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 12px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-top: 8px;
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, var(--green), #15803d);
+            color: white;
+            box-shadow: 0 4px 20px var(--green-glow);
+        }
+
+        .btn-start:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 30px var(--green-glow);
+        }
+
+        .btn-stop {
+            background: linear-gradient(135deg, var(--red), #b91c1c);
+            color: white;
+            box-shadow: 0 4px 20px var(--red-glow);
+        }
+
+        .btn-stop:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+        }
+
+        /* ── Criteria form ─────────────────────────── */
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px 14px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        /* ── Alert feed ─────────────────────────────── */
+        .feed {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .feed-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .feed-header h2 {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .alert-count {
+            background: var(--accent-glow);
+            color: var(--accent);
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .alert-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 16px;
+            align-items: start;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .alert-card:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .alert-card.unseen {
+            border-left: 3px solid var(--accent);
+        }
+
+        .alert-address {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .alert-details {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+
+        .alert-detail {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .alert-price {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--accent);
+            white-space: nowrap;
+        }
+
+        .alert-meta {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .alert-tag {
+            font-size: 11px;
+            padding: 3px 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+        }
+
+        .alert-tag.source {
+            color: var(--blue);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .alert-tag.time {
+            color: var(--text-secondary);
+        }
+
+        .alert-tag.video {
+            color: var(--green);
+            background: rgba(34, 197, 94, 0.1);
+        }
+
+        .alert-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: flex-end;
+        }
+
+        .btn-sm {
+            padding: 6px 14px;
+            font-size: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-family: inherit;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+
+        .btn-sm:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .btn-sm.video-btn {
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .btn-sm.video-btn:hover {
+            background: var(--accent-glow);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state .emoji {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .empty-state p {
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        /* ── Responsive ────────────────────────────── */
+        @media (max-width: 900px) {
+            .main {
+                grid-template-columns: 1fr;
+                padding: 16px;
+            }
+
+            .header {
+                padding: 16px 20px;
+                flex-direction: column;
+                gap: 8px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header class="header">
+        <div>
+            <h1>🤖 416Homes Agent</h1>
+            <p class="subtitle">24/7 AI-Powered Canadian Real Estate Monitor</p>
+        </div>
+        <nav class="header-nav">
+            <a href="dashboard.html">Dashboard</a>
+            <a href="416homes-video.html">Video Studio</a>
+            <a href="416homes-agent.html">Agent</a>
+        </nav>
+    </header>
+
+    <main class="main">
+        <!-- Sidebar: Controls -->
+        <aside class="sidebar">
+            <!-- Agent Status -->
+            <div class="card" id="statusCard">
+                <h3>Agent Status</h3>
+                <div id="statusBadge" class="status-badge stopped">
+                    <span class="dot"></span>
+                    <span id="statusText">Stopped</span>
+                </div>
+                <div class="stat-grid">
+                    <div class="stat">
+                        <div class="value" id="statScans">0</div>
+                        <div class="label">Scans</div>
+                    </div>
+                    <div class="stat">
+                        <div class="value" id="statAlerts">0</div>
+                        <div class="label">New Alerts</div>
+                    </div>
+                    <div class="stat">
+                        <div class="value" id="statTotal">0</div>
+                        <div class="label">Total Found</div>
+                    </div>
+                    <div class="stat">
+                        <div class="value" id="statKnown">0</div>
+                        <div class="label">Known</div>
+                    </div>
+                </div>
+                <p style="font-size:12px;color:var(--text-secondary);margin-top:12px" id="lastScan">Last scan: —</p>
+            </div>
+
+            <!-- Controls -->
+            <div class="card">
+                <h3>Controls</h3>
+                <button class="btn btn-start" id="btnStart" onclick="startAgent()">▶ Start Monitoring</button>
+                <button class="btn btn-stop" id="btnStop" onclick="stopAgent()" style="display:none">■ Stop
+                    Agent</button>
+                <button class="btn btn-secondary" onclick="refreshAlerts()">↻ Refresh Alerts</button>
+            </div>
+
+            <!-- Search Criteria -->
+            <div class="card">
+                <h3>Search Criteria</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Min Price ($)</label>
+                        <input type="number" id="minPrice" value="0" step="50000">
+                    </div>
+                    <div class="form-group">
+                        <label>Max Price ($)</label>
+                        <input type="number" id="maxPrice" value="2000000" step="50000">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Min Beds</label>
+                        <input type="number" id="minBeds" value="0" min="0" max="10">
+                    </div>
+                    <div class="form-group">
+                        <label>Min Baths</label>
+                        <input type="number" id="minBaths" value="0" min="0" max="10">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Scan Interval (min)</label>
+                    <input type="number" id="scanInterval" value="30" min="5" max="1440">
+                </div>
+                <div class="form-group">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                        <input type="checkbox" id="autoVideo" style="width:auto">
+                        Auto-generate video for $1M+ listings
+                    </label>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main: Alert Feed -->
+        <section>
+            <div class="feed-header">
+                <h2>📡 Live Listing Feed</h2>
+                <span class="alert-count" id="alertCount">0 alerts</span>
+            </div>
+            <div class="feed" id="alertFeed">
+                <div class="empty-state">
+                    <div class="emoji">🏠</div>
+                    <p>No alerts yet. Start the agent to begin<br>monitoring Canadian real estate listings.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Email Modal -->
+    <div id="emailModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:99; align-items:center; justify-content:center; padding:20px;">
+        <div style="background:var(--bg-card); max-width:800px; width:100%; border-radius:16px; padding:32px; border:1px solid var(--border); max-height:90vh; overflow-y:auto; position:relative;">
+            <button onclick="document.getElementById('emailModal').style.display='none'" style="position:absolute; top:20px; right:20px; background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:24px;">×</button>
+            <h2 style="margin-bottom:24px; color:var(--accent);">Drafted Outreach Emails</h2>
+            
+            <h3 style="color:var(--text-secondary); margin-bottom:12px; font-size:14px; text-transform:uppercase;">To Buyer / Client</h3>
+            <div id="buyerEmailContent" style="background:rgba(255,255,255,0.05); padding:16px; border-radius:12px; margin-bottom:24px; white-space:pre-wrap; font-size:14px; line-height:1.6;"></div>
+            
+            <h3 style="color:var(--text-secondary); margin-bottom:12px; font-size:14px; text-transform:uppercase;">To Seller / Listing Agent</h3>
+            <div id="sellerEmailContent" style="background:rgba(255,255,255,0.05); padding:16px; border-radius:12px; white-space:pre-wrap; font-size:14px; line-height:1.6;"></div>
+        </div>
+    </div>
+
+    <script>
+        const API = 'http://localhost:8000';
+        let pollInterval = null;
+        window.currentAlerts = [];
+
+        // ── Start Agent ──────────────────────────────
+        async function startAgent() {
+            const body = {
+                criteria: {
+                    min_price: parseInt(document.getElementById('minPrice').value) || 0,
+                    max_price: parseInt(document.getElementById('maxPrice').value) || 5000000,
+                    min_beds: parseInt(document.getElementById('minBeds').value) || 0,
+                    min_baths: parseInt(document.getElementById('minBaths').value) || 0,
+                },
+                interval_minutes: parseInt(document.getElementById('scanInterval').value) || 30,
+                auto_video: document.getElementById('autoVideo').checked,
+                auto_video_min_price: 1000000,
+            };
+
+            try {
+                const resp = await fetch(`${API}/agent/start`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                const data = await resp.json();
+                console.log('Agent started:', data);
+                updateUI(true);
+                startPolling();
+            } catch (err) {
+                console.error('Start failed:', err);
+                alert('Failed to start agent. Is the API running?');
+            }
+        }
+
+        // ── Stop Agent ───────────────────────────────
+        async function stopAgent() {
+            try {
+                const resp = await fetch(`${API}/agent/stop`, { method: 'POST' });
+                const data = await resp.json();
+                console.log('Agent stopped:', data);
+                updateUI(false);
+                stopPolling();
+            } catch (err) {
+                console.error('Stop failed:', err);
+            }
+        }
+
+        // ── Refresh Status + Alerts ──────────────────
+        async function refreshStatus() {
+            try {
+                const resp = await fetch(`${API}/agent/status`);
+                const data = await resp.json();
+
+                document.getElementById('statScans').textContent = data.scan_count || 0;
+                document.getElementById('statAlerts').textContent = data.active_alerts || 0;
+                document.getElementById('statTotal').textContent = data.total_listings_found || 0;
+                document.getElementById('statKnown').textContent = data.known_listings || 0;
+
+                if (data.last_scan) {
+                    const d = new Date(data.last_scan + 'Z');
+                    document.getElementById('lastScan').textContent = `Last scan: ${d.toLocaleTimeString()}`;
+                }
+
+                updateUI(data.running);
+            } catch (err) {
+                console.error('Status fetch failed:', err);
+            }
+        }
+
+        async function refreshAlerts() {
+            try {
+                const resp = await fetch(`${API}/agent/alerts?limit=50`);
+                const data = await resp.json();
+                window.currentAlerts = data.alerts || [];
+                renderAlerts(window.currentAlerts);
+            } catch (err) {
+                console.error('Alerts fetch failed:', err);
+            }
+        }
+
+        // ── Render Alerts ────────────────────────────
+        function renderAlerts(alerts) {
+            const feed = document.getElementById('alertFeed');
+            const count = document.getElementById('alertCount');
+            count.textContent = `${alerts.length} alert${alerts.length !== 1 ? 's' : ''}`;
+
+            if (alerts.length === 0) {
+                feed.innerHTML = `
+          <div class="empty-state">
+            <div class="emoji">🏠</div>
+            <p>No alerts yet. Start the agent to begin<br>monitoring Canadian real estate listings.</p>
+          </div>`;
+                return;
+            }
+
+            feed.innerHTML = alerts.reverse().map(a => {
+                const l = a.listing || {};
+                const tags = [];
+                tags.push(`<span class="alert-tag source">${a.source}</span>`);
+                if (a.timestamp) {
+                    const t = new Date(a.timestamp + 'Z');
+                    tags.push(`<span class="alert-tag time">${t.toLocaleTimeString()}</span>`);
+                }
+                if (a.video_job_id) {
+                    tags.push(`<span class="alert-tag video">🎬 Video queued</span>`);
+                }
+
+                return `
+          <div class="alert-card ${a.seen ? '' : 'unseen'}" data-id="${a.id}">
+            <div>
+              <div class="alert-address">${l.address || 'Unknown Address'}</div>
+              <div class="alert-details">
+                ${l.bedrooms || l.beds ? `<span class="alert-detail">🛏 ${l.bedrooms || l.beds} beds</span>` : ''}
+                ${l.bathrooms || l.baths ? `<span class="alert-detail">🚿 ${l.bathrooms || l.baths} baths</span>` : ''}
+                ${l.sqft ? `<span class="alert-detail">📐 ${l.sqft} sqft</span>` : ''}
+                ${l.property_type ? `<span class="alert-detail">🏗 ${l.property_type}</span>` : ''}
+              </div>
+              <div class="alert-meta">${tags.join('')}</div>
+            </div>
+            <div class="alert-actions">
+              <div class="alert-price">${l.price ? '$' + Number(l.price).toLocaleString() : '—'}</div>
+              <button class="btn-sm video-btn" onclick="orderVideo('${l.url || ''}')">🎬 Make Video</button>
+              ${a.buyer_email ? `<button class="btn-sm" onclick="showEmails('${a.id}')" style="color: #60a5fa; border-color: #60a5fa;">✉ View Emails</button>` : ''}
+              <button class="btn-sm" onclick="markSeen('${a.id}', this)">✓ Dismiss</button>
+            </div>
+          </div>`;
+            }).join('');
+        }
+
+        // ── Mark alert as seen ───────────────────────
+        async function markSeen(alertId, btn) {
+            try {
+                await fetch(`${API}/agent/alerts/${alertId}/seen`, { method: 'POST' });
+                const card = btn.closest('.alert-card');
+                card.classList.remove('unseen');
+                card.style.opacity = '0.5';
+            } catch (err) {
+                console.error('Mark seen failed:', err);
+            }
+        }
+
+        // ── Order video for listing ──────────────────
+        function orderVideo(url) {
+            if (!url) {
+                alert('No listing URL available for this alert.');
+                return;
+            }
+            window.open(`416homes-video.html?url=${encodeURIComponent(url)}`, '_blank');
+        }
+
+        // ── View Emails Modal ─────────────────────────
+        function showEmails(alertId) {
+            const alert = window.currentAlerts.find(a => a.id === alertId);
+            if (!alert) return;
+            document.getElementById('buyerEmailContent').textContent = alert.buyer_email || 'No draft available.';
+            document.getElementById('sellerEmailContent').textContent = alert.seller_email || 'No draft available.';
+            document.getElementById('emailModal').style.display = 'flex';
+        }
+
+        // ── UI state ─────────────────────────────────
+        function updateUI(running) {
+            const badge = document.getElementById('statusBadge');
+            const text = document.getElementById('statusText');
+            const btnStart = document.getElementById('btnStart');
+            const btnStop = document.getElementById('btnStop');
+
+            if (running) {
+                badge.className = 'status-badge running';
+                text.textContent = 'Scanning...';
+                btnStart.style.display = 'none';
+                btnStop.style.display = 'block';
+            } else {
+                badge.className = 'status-badge stopped';
+                text.textContent = 'Stopped';
+                btnStart.style.display = 'block';
+                btnStop.style.display = 'none';
+            }
+        }
+
+        // ── Polling ──────────────────────────────────
+        function startPolling() {
+            stopPolling();
+            pollInterval = setInterval(() => {
+                refreshStatus();
+                refreshAlerts();
+            }, 5000);
+        }
+
+        function stopPolling() {
+            if (pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
+        }
+
+        // ── Init ─────────────────────────────────────
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshStatus();
+            refreshAlerts();
+            startPolling();
+        });
+    </script>
+</body>
+
+</html>

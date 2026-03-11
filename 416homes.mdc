@@ -1,0 +1,33 @@
+---
+description: 416Homes project rules - applied to every file in this repo
+globs: ["**/*.py", "**/*.html", "**/*.yml", "**/*.md"]
+alwaysApply: true
+---
+
+# 416Homes Cursor Rules
+
+Read CLAUDE.md before touching any file. It contains the full project map, tech
+stack, coding rules, and the ordered task queue.
+
+## Behaviour
+
+- **Run code after every edit.** Never leave an untested change.
+- **Fix what's broken before adding anything new.**
+- When fixing a scraper: use Playwright to navigate the live URL, print the actual
+  rendered HTML of a listing card, identify real selectors, update the code, test it.
+- Commit after every completed task: `git add . && git commit -m "task: description"`
+- If a command fails: read the full traceback, fix root cause, re-run. Never skip.
+
+## Scraper Pattern
+
+Every scraper must follow the strategy-chain pattern from `scraper/realtor_ca.py`:
+1. Try Scrapling `AsyncDynamicSession(stealth=True)` first
+2. Fall back to Playwright
+3. Return `[]` on total failure, never raise
+
+## Never
+
+- Hardcode credentials or API keys
+- Use `time.sleep()` in async code — use `await asyncio.sleep()`
+- Import from root-level files — always use module paths (`from memory.store import ...`)
+- Break the `python -m scraper.run_all` CLI interface

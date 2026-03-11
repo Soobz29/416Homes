@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>416Homes — Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --black: #0a0a08;
+      --white: #f5f4ef;
+      --gold: #c8a96e;
+      --grey: #6b6b60;
+      --border: rgba(200,169,110,0.25);
+    }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body {
+      min-height:100vh;
+      background:var(--black);
+      color:var(--white);
+      font-family:'Syne',system-ui,sans-serif;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:2rem;
+    }
+    .card {
+      width:100%;
+      max-width:420px;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,0.02);
+      padding:2.5rem 2.25rem;
+    }
+    h1 {
+      font-size:1.6rem;
+      font-weight:800;
+      margin-bottom:0.25rem;
+    }
+    .sub {
+      font-family:'DM Mono',monospace;
+      font-size:0.74rem;
+      color:var(--grey);
+      margin-bottom:1.75rem;
+    }
+    label {
+      display:block;
+      font-family:'DM Mono',monospace;
+      font-size:0.62rem;
+      letter-spacing:0.14em;
+      text-transform:uppercase;
+      color:var(--grey);
+      margin-bottom:0.4rem;
+    }
+    input[type="email"] {
+      width:100%;
+      padding:0.85rem 0.9rem;
+      background:rgba(255,255,255,0.04);
+      border:1px solid var(--border);
+      color:var(--white);
+      font-family:'DM Mono',monospace;
+      font-size:0.82rem;
+      outline:none;
+      margin-bottom:1rem;
+    }
+    input[type="email"]:focus {
+      border-color:var(--gold);
+    }
+    button {
+      width:100%;
+      padding:0.95rem;
+      border:none;
+      background:var(--gold);
+      color:var(--black);
+      font-family:'Syne',sans-serif;
+      font-size:0.9rem;
+      font-weight:700;
+      letter-spacing:0.08em;
+      text-transform:uppercase;
+      cursor:pointer;
+    }
+    button:disabled {
+      opacity:0.6;
+      cursor:not-allowed;
+    }
+    .note {
+      margin-top:1rem;
+      font-family:'DM Mono',monospace;
+      font-size:0.62rem;
+      color:var(--grey);
+      line-height:1.7;
+    }
+    .msg {
+      margin-top:0.75rem;
+      font-family:'DM Mono',monospace;
+      font-size:0.68rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Sign in to 416Homes</h1>
+    <p class="sub">Use your email to receive a secure magic link.</p>
+    <label for="email">Email Address</label>
+    <input id="email" type="email" placeholder="you@example.com" />
+    <button id="sendBtn" onclick="sendMagicLink()">Send Magic Link</button>
+    <div id="msg" class="msg"></div>
+    <p class="note">
+      This is a placeholder login page. In production we would integrate Supabase Auth
+      magic links and store a session token used by the dashboard and video pages.
+    </p>
+  </div>
+  <script>
+    function sendMagicLink() {
+      const emailInput = document.getElementById('email');
+      const msg = document.getElementById('msg');
+      const btn = document.getElementById('sendBtn');
+      const email = (emailInput.value || '').trim();
+      if (!email || !email.includes('@')) {
+        msg.style.color = '#c0392b';
+        msg.textContent = '⚠ Please enter a valid email address.';
+        return;
+      }
+      btn.disabled = true;
+      msg.style.color = '#c8a96e';
+      msg.textContent = '⏳ Simulating magic link send...';
+      setTimeout(() => {
+        msg.style.color = '#2ed573';
+        msg.textContent = '✅ Magic link sent (demo). Check your email.';
+      }, 1200);
+    }
+  </script>
+</body>
+</html>

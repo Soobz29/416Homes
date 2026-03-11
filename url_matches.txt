@@ -1,0 +1,26 @@
+
+LineNumber Line
+---------- ----
+         5   1. Download listing photos from the URL
+        65     for i, url in enumerate(img_urls[:15]):
+        68             res = page.download(url, str(photos_dir), f"photo_{i+1}.jpg")
+        71                 logger.info(f"  ✅ Securely downloaded photo {i+1}: {url[:60]}...")
+        75             logger.warning(f"  Drission download failed for {url}: {e}")
+        80 async def download_listing_photos(url: str, job_dir: Path, address: Optional[str] = None, provided_urls: Optional[List[…
+        92         elif "condos.ca" in url:
+        94             downloaded_files = await asyncio.to_thread(_scrape_and_download_images_condos, url, str(photos_dir))
+        97             photo_urls = await asyncio.to_thread(_scrape_photo_urls, url)
+       100                 logger.info(f"Found {len(photo_urls)} photos from URL. Trying Google Image Search for {address}...")
+       213 def _scrape_photo_urls(url: str) -> List[str]:
+       219         if "realtor.ca" in url.lower() and "view=imagelist" not in url:
+       220             if "?" in url:
+       221                 url += "&view=imagelist"
+       223                 url += "?view=imagelist"
+       224             logger.info(f"Converting Realtor.ca URL to image list view: {url}")
+       227         page.get(url, retry=2, interval=2, timeout=25)
+       257         if "realtor.ca" in url.lower():
+       318             # Google often embeds the original high-res URL in the data-src or src if we click it,
+       488                         # Get audio URL from the response
+      1045         listing_url: URL to scrape photos from
+      1212         log_activity("ERROR", f"produce_video failed for {url}: {e}")
+
