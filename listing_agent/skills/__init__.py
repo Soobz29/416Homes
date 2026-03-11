@@ -5,14 +5,20 @@ import json
 import asyncio
 from pathlib import Path
 from typing import List, Callable, Dict, Any
+_genai = None
+_GENAI_SDK = "none"
 try:
     # New Gemini SDK (package: google-genai)
     from google import genai as _genai  # type: ignore
     _GENAI_SDK = "google-genai"
 except Exception:  # pragma: no cover
-    # Legacy Gemini SDK (package: google-generativeai)
-    import google.generativeai as _genai  # type: ignore
-    _GENAI_SDK = "google-generativeai"
+    try:
+        # Legacy Gemini SDK (package: google-generativeai)
+        import google.generativeai as _genai  # type: ignore
+        _GENAI_SDK = "google-generativeai"
+    except Exception:  # pragma: no cover
+        _genai = None
+        _GENAI_SDK = "none"
 
 logger = logging.getLogger(__name__)
 
@@ -66,15 +72,17 @@ async def generate_and_save_skill(prompt_text: str) -> str:
         return 'pool' in desc or 'swimming' in desc
     """
 
-    if _GENAI_SDK == "google-genai":
+    if _GENAI_SDK == "google-genai" and _genai is not None:
         client = _genai.Client(api_key=api_key)
         response = await asyncio.to_thread(client.models.generate_content, model=model_id, contents=prompt)
         code = (getattr(response, "text", None) or "").strip()
-    else:
+    elif _GENAI_SDK == "google-generativeai" and _genai is not None:
         _genai.configure(api_key=api_key)
         model = _genai.GenerativeModel(model_id)
         response = await asyncio.to_thread(model.generate_content, prompt)
         code = (getattr(response, "text", None) or "").strip()
+    else:
+        raise RuntimeError("No Gemini SDK available (install google-generativeai or google-genai)")
     
     # Simple cleanup to remove potential Markdown fences
     if code.startswith("```python"):

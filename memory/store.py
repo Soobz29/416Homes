@@ -5,14 +5,20 @@ from datetime import datetime
 from supabase import create_client, Client
 from dotenv import load_dotenv
 import os
+_genai = None
+_GENAI_SDK = "none"
 try:
     # New Gemini SDK (package: google-genai)
     from google import genai as _genai  # type: ignore
     _GENAI_SDK = "google-genai"
 except Exception:  # pragma: no cover
-    # Legacy Gemini SDK (package: google-generativeai)
-    import google.generativeai as _genai  # type: ignore
-    _GENAI_SDK = "google-generativeai"
+    try:
+        # Legacy Gemini SDK (package: google-generativeai)
+        import google.generativeai as _genai  # type: ignore
+        _GENAI_SDK = "google-generativeai"
+    except Exception:  # pragma: no cover
+        _genai = None
+        _GENAI_SDK = "none"
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -31,9 +37,9 @@ class MemoryStore:
         self.client = None
         try:
             api_key = os.getenv("GEMINI_API_KEY")
-            if _GENAI_SDK == "google-genai":
+            if _GENAI_SDK == "google-genai" and _genai is not None:
                 self.client = _genai.Client(api_key=api_key)
-            else:
+            elif _GENAI_SDK == "google-generativeai" and _genai is not None:
                 # google-generativeai uses global configure()
                 _genai.configure(api_key=api_key)
         except Exception as e:
@@ -118,13 +124,15 @@ class MemoryStore:
                     contents=text,
                 )
                 embedding = response.embeddings[0].values
-            else:
+            elif _GENAI_SDK == "google-generativeai" and _genai is not None:
                 # google-generativeai API
                 resp = _genai.embed_content(
                     model=f"models/{self.embedding_model_id}",
                     content=text,
                 )
                 embedding = (resp.get("embedding") if isinstance(resp, dict) else None) or []
+            else:
+                return [0.0] * 768
 
             # Ensure 768 dimensions by truncating or padding if needed
             if len(embedding) > 768:
