@@ -5,7 +5,14 @@ import json
 import asyncio
 from pathlib import Path
 from typing import List, Callable, Dict, Any
-from google import genai
+try:
+    # New Gemini SDK (package: google-genai)
+    from google import genai as _genai  # type: ignore
+    _GENAI_SDK = "google-genai"
+except Exception:  # pragma: no cover
+    # Legacy Gemini SDK (package: google-generativeai)
+    import google.generativeai as _genai  # type: ignore
+    _GENAI_SDK = "google-generativeai"
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +48,6 @@ async def generate_and_save_skill(prompt_text: str) -> str:
     if not api_key:
         raise ValueError("GEMINI_API_KEY not found in .env")
 
-    client = genai.Client(api_key=api_key)
     model_id = "gemini-2.5-flash"
 
     prompt = f"""
@@ -60,8 +66,15 @@ async def generate_and_save_skill(prompt_text: str) -> str:
         return 'pool' in desc or 'swimming' in desc
     """
 
-    response = await asyncio.to_thread(client.models.generate_content, model=model_id, contents=prompt)
-    code = response.text.strip()
+    if _GENAI_SDK == "google-genai":
+        client = _genai.Client(api_key=api_key)
+        response = await asyncio.to_thread(client.models.generate_content, model=model_id, contents=prompt)
+        code = (getattr(response, "text", None) or "").strip()
+    else:
+        _genai.configure(api_key=api_key)
+        model = _genai.GenerativeModel(model_id)
+        response = await asyncio.to_thread(model.generate_content, prompt)
+        code = (getattr(response, "text", None) or "").strip()
     
     # Simple cleanup to remove potential Markdown fences
     if code.startswith("```python"):
