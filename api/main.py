@@ -286,6 +286,24 @@ async def get_listings(
         )
         rows = all_listings or []
 
+        # Railway/ephemeral: when no last-scan file (scraper not run on this host), fall back to Supabase.
+        if not rows and supabase_client:
+            try:
+                min_beds = float(bedrooms) if bedrooms and str(bedrooms).strip() else None
+                min_baths = float(bathrooms) if bathrooms and str(bathrooms).strip() else None
+                rows = await memory_store.get_listings(
+                    city=city_filter,
+                    limit=1000,
+                    min_price=min_price,
+                    max_price=max_price,
+                    min_beds=min_beds,
+                    min_baths=min_baths,
+                )
+                if rows and not scan_at:
+                    scan_at = (rows[0].get("scraped_at") or "").strip() or None
+            except Exception as e:
+                logger.warning("Supabase listings fallback failed: %s", e)
+
         def _num(v) -> Optional[float]:
             try:
                 if v is None:

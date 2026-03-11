@@ -84,6 +84,7 @@ export default function DashboardPage() {
   const [linkLoading, setLinkLoading] = useState(false);
   const [telegramLinked, setTelegramLinked] = useState(false);
   const [checkingLinked, setCheckingLinked] = useState(false);
+  const [meError, setMeError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -205,10 +206,13 @@ export default function DashboardPage() {
 
   async function loadMe(email: string) {
     try {
+      setMeError(null);
       const me = await fetchMe(email);
       setTelegramLinked(!!me?.telegram_chat_id);
-    } catch (e) {
+    } catch (e: unknown) {
       console.error("Failed to load /api/me", e);
+      const msg = e instanceof Error ? e.message : "Could not reach backend";
+      setMeError(msg.includes("401") || msg.includes("Missing") ? "Sign in required." : `${msg}. Set NEXT_PUBLIC_API_URL to your Railway API URL in Vercel.`);
     }
   }
 
@@ -221,6 +225,7 @@ export default function DashboardPage() {
     try {
       setLinkLoading(true);
       setLinkMessage(null);
+      setMeError(null);
       const { code, expires_at } = await generateLinkCode(email);
       setLinkCode(code);
       setLinkExpiresAt(expires_at ?? null);
@@ -241,6 +246,7 @@ export default function DashboardPage() {
     if (!sessionEmail) return;
     try {
       setCheckingLinked(true);
+      setMeError(null);
       const me = await fetchMe(sessionEmail);
       setTelegramLinked(!!me?.telegram_chat_id);
       if (me?.telegram_chat_id) {
@@ -248,8 +254,9 @@ export default function DashboardPage() {
         setLinkExpiresAt(null);
         setLinkMessage(null);
       }
-    } catch (e) {
+    } catch (e: unknown) {
       console.error("Failed to check link status", e);
+      setMeError(e instanceof Error ? e.message : "Could not reach backend");
     } finally {
       setCheckingLinked(false);
     }
@@ -540,9 +547,9 @@ export default function DashboardPage() {
                         >
                           {linkLoading ? "Generating…" : "Connect Telegram"}
                         </button>
-                        {linkMessage && !linkCode && (
+                        {(linkMessage || meError) && !linkCode && (
                           <p className="text-[0.65rem] font-['DM Mono',monospace] text-[#e4a84a]">
-                            {linkMessage}
+                            {meError ?? linkMessage}
                           </p>
                         )}
                       </div>

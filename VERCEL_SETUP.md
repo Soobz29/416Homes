@@ -56,6 +56,14 @@ Once deploy is complete:
 
 ---
 
+## Listings & Telegram with Railway backend
+
+- **Listings**: The API serves listings from the last in-memory scan when available. On Railway (no persistent disk), it **falls back to the Supabase `listings` table**. Ensure your nightly scraper (e.g. GitHub Actions) runs and writes to Supabase so the dashboard shows data.
+- **Telegram**: "Connect Telegram" needs the dashboard to call your Railway API (`/api/me`, `/api/link-code`). Set **`NEXT_PUBLIC_API_URL`** in Vercel to your Railway API URL (e.g. `https://your-app.up.railway.app`). Sign in on the dashboard with the same email you use for alerts; if the API is unreachable you’ll see a message to check `NEXT_PUBLIC_API_URL`.
+- **Railway**: On the API service, set `SUPABASE_URL` and `SUPABASE_KEY` (or `SUPABASE_SERVICE_ROLE_KEY`) so the API can read/write users and listings.
+
+---
+
 ## Updating the deployment
 
 Any push to `main` on `Soobz29/416Homes` will trigger a new Vercel deployment for the `web-next` app automatically.
