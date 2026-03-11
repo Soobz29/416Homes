@@ -121,5 +121,9 @@ def _scrape_zillow_sync(area: str) -> List[Dict[str, Any]]:
 
 
 async def scrape_zillow(area: str = "gta") -> List[Dict[str, Any]]:
-    """Async wrapper around the sync DrissionPage scraper."""
+    """For area=gta, scrape both Toronto and Mississauga for more city coverage."""
+    if area.lower() == "gta":
+        toronto = await asyncio.to_thread(_scrape_zillow_sync, "toronto")
+        mississauga = await asyncio.to_thread(_scrape_zillow_sync, "mississauga")
+        return toronto + mississauga
     return await asyncio.to_thread(_scrape_zillow_sync, area)

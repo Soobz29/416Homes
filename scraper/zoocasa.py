@@ -88,6 +88,11 @@ async def _scrape_zoocasa_page(client, url: str) -> list:
             if item.get("image_root_storage_key"):
                 photo = f"https://cdn.zoocasa.com/{item['image_root_storage_key']}-1.jpg"
             
+            region = _detect_region(
+                (item.get("neighbourhood") or "") + " " + (item.get("address") or "")
+            )
+            # Map region to city for DB/dashboard (Toronto boroughs -> Toronto)
+            city = "Toronto" if region.startswith("Toronto") else region.split(" ")[0]
             listings.append({
                 "id": f"zoocasa_{item.get('id', item.get('slug', ''))}",
                 "address": address,
@@ -100,10 +105,8 @@ async def _scrape_zoocasa_page(client, url: str) -> list:
                 "photo": photo,
                 "source": "zoocasa",
                 "scraped_at": datetime.utcnow().isoformat(),
-                "region": _detect_region(
-                    (item.get("neighbourhood") or "") + " " + 
-                    (item.get("address") or "")
-                )
+                "region": region,
+                "city": city,
             })
         return listings
     except Exception as e:

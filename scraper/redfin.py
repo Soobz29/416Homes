@@ -17,8 +17,12 @@ REDFIN_URLS = {
 }
 
 async def scrape_redfin(area: str = "toronto") -> List[Dict[str, Any]]:
-    """Scrape Redfin listings with Scrapling v0.3."""
+    """Scrape Redfin listings with Scrapling v0.3. For area=gta, scrape both Toronto and Mississauga."""
     try:
+        if area.lower() == "gta":
+            toronto = await scrape_with_scrapling("toronto")
+            mississauga = await scrape_with_scrapling("mississauga")
+            return toronto + mississauga
         return await scrape_with_scrapling(area)
     except Exception as e:
         logger.error(f"Redfin scraping failed: {e}")

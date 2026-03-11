@@ -143,6 +143,8 @@ def _normalize_condos_api_payload(payload: dict) -> List[Dict[str, Any]]:
         )
         price = item.get("price") or item.get("list_price") or ""
         mls = item.get("mls_number") or item.get("mls") or hashlib.md5((url or address).encode()).hexdigest()[:12]
+        region = _detect_region(address)
+        city = "Toronto" if region.startswith("Toronto") else region.split(" ")[0]
         listings.append(
             {
                 "id": f"condos_ca_{mls}",
@@ -154,7 +156,8 @@ def _normalize_condos_api_payload(payload: dict) -> List[Dict[str, Any]]:
                 "photo": "",
                 "source": "condos_ca",
                 "scraped_at": datetime.utcnow().isoformat(),
-                "region": _detect_region(address),
+                "region": region,
+                "city": city,
             }
         )
     return listings
@@ -264,6 +267,8 @@ async def _fetch_condos_page(client, url: str) -> list:
                 version = item.get("photo_version", 1)
                 photo = f"{base_url}{mls}_1.jpg?width=1920&v={version}" if all([mls, base_url, count]) else ""
                 
+                region = _detect_region(item.get("neighbourhood") or "")
+                city = "Toronto" if region.startswith("Toronto") else region.split(" ")[0]
                 listings.append({
                     "id": f"condos_ca_{mls}",
                     "address": addr,
@@ -274,7 +279,8 @@ async def _fetch_condos_page(client, url: str) -> list:
                     "photo": photo,
                     "source": "condos_ca",
                     "scraped_at": datetime.utcnow().isoformat(),
-                    "region": _detect_region(item.get("neighbourhood") or "")
+                    "region": region,
+                    "city": city,
                 })
         return listings
     except Exception as e:
@@ -325,7 +331,9 @@ async def scrape_listings() -> list:
             for city in ("toronto", "mississauga"):
                 status, payload = await asyncio.to_thread(_condos_api_via_curl_cffi, city, 50)
                 if status == 200 and isinstance(payload, dict):
-                    api_results.extend(_normalize_condos_api_payload(payload))
+                    for L in _normalize_condos_api_payload(payload):
+                        L["city"] = city.title()
+                        api_results.append(L)
             if api_results:
                 logger.info(f"Condos.ca (API): scraped {len(api_results)} listings")
                 return api_results

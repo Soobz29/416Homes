@@ -17,8 +17,12 @@ KIJIJI_URLS = {
 }
 
 async def scrape_kijiji(area: str = "toronto") -> List[Dict[str, Any]]:
-    """Scrape Kijiji real estate listings with Scrapling v0.3."""
+    """Scrape Kijiji. For area=gta, scrape both GTA and Mississauga so DB has city=Mississauga listings."""
     try:
+        if area.lower() == "gta":
+            gta_list = await scrape_with_scrapling("gta")
+            miss_list = await scrape_with_scrapling("mississauga")
+            return gta_list + miss_list
         return await scrape_with_scrapling(area)
     except Exception as e:
         logger.error(f"Kijiji scraping failed: {e}")
