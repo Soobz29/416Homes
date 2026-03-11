@@ -14,6 +14,7 @@ import httpx
 from scraper.rate_limiter import async_retry, get_rate_limiter, get_request_stats
 from scraper.stealth_headers import get_stealth_header_generator
 from scraper.browser_util import create_browser
+from scraper.listing_utils import is_sold_or_inactive, pick_display_address, looks_like_real_address
 
 logger = logging.getLogger(__name__)
 
@@ -129,16 +130,23 @@ def _normalize_condos_api_payload(payload: dict) -> List[Dict[str, Any]]:
     for item in items:
         if not isinstance(item, dict):
             continue
+        status = item.get("status") or item.get("listing_status") or ""
+        if is_sold_or_inactive(status):
+            continue
         url = item.get("url") or item.get("permalink") or ""
         if url and url.startswith("/"):
             url = f"https://condos.ca{url}"
-        address = item.get("address") or item.get("full_address") or item.get("display_address") or ""
+        address = pick_display_address(
+            item.get("address"),
+            item.get("full_address"),
+            item.get("display_address"),
+        )
         price = item.get("price") or item.get("list_price") or ""
         mls = item.get("mls_number") or item.get("mls") or hashlib.md5((url or address).encode()).hexdigest()[:12]
         listings.append(
             {
                 "id": f"condos_ca_{mls}",
-                "address": address or "Unknown",
+                "address": address,
                 "price": price,
                 "bedrooms": item.get("bedrooms", ""),
                 "bathrooms": item.get("bathrooms", ""),
@@ -241,6 +249,15 @@ async def _fetch_condos_page(client, url: str) -> list:
             if not items:
                 continue
             for item in items:
+                status = item.get("status") or item.get("listing_status") or ""
+                if is_sold_or_inactive(status):
+                    continue
+                addr = pick_display_address(
+                    item.get("address"),
+                    item.get("full_address"),
+                    item.get("display_address"),
+                    item.get("neighbourhood"),
+                )
                 mls = item.get("mls_number", "")
                 base_url = item.get("photo_base_url", "")
                 count = item.get("photo_count", 0)
@@ -249,7 +266,7 @@ async def _fetch_condos_page(client, url: str) -> list:
                 
                 listings.append({
                     "id": f"condos_ca_{mls}",
-                    "address": item.get("address", ""),
+                    "address": addr,
                     "price": item.get("price", item.get("list_price", "")),
                     "bedrooms": item.get("bedrooms", ""),
                     "bathrooms": item.get("bathrooms", ""),
@@ -432,19 +449,16 @@ def _scrape_condos_browser_sync() -> List[Dict[str, Any]]:
                                 m = re.search(r"[\$C]*\$([\d,]+)", text)
                                 if m:
                                     price = int(m.group(1).replace(",", ""))
-                            # Address heuristics
-                            elif ("," in text and ("ON" in text or "Ontario" in text)) or re.search(
-                                r"\d+\s+\w+\s+(st|ave|rd|dr|blvd|cres|way|ct|ter|pl|ln|trail|circ)",
-                                text,
-                                re.IGNORECASE,
-                            ):
+                            # Address heuristics: only use text that looks like a real address
+                            elif looks_like_real_address(text):
                                 address = text
 
                         lid = hashlib.md5(href.encode()).hexdigest()[:12]
                         if price <= 0:
-                            # If we couldn't extract price/address from DOM text, still return a stub.
+                            continue
+                        if not address or not looks_like_real_address(address):
                             slug = href.rstrip("/").split("/")[-1]
-                            address = address or slug.replace("-", " ").title()
+                            address = slug.replace("-", " ").title() if slug else "Unknown"
                         region = _detect_region(address)
 
                         listings.append(
@@ -527,15 +541,23 @@ async def _scrape_condos_scrapling() -> List[Dict[str, Any]]:
                         if not items:
                             continue
                         for item in items:
+                            status = item.get("status") or item.get("listing_status") or ""
+                            if is_sold_or_inactive(status):
+                                continue
                             mls = item.get("mls_number", "")
                             href = item.get("url", "") or ""
                             full_url = f"https://condos.ca{href}" if href.startswith("/") else href
-                            addr = item.get("address", "") or ""
+                            addr = pick_display_address(
+                                item.get("address"),
+                                item.get("full_address"),
+                                item.get("display_address"),
+                                item.get("neighbourhood"),
+                            )
                             price = item.get("price", item.get("list_price", "")) or ""
                             listings.append(
                                 {
                                     "id": f"condos_ca_{mls or hashlib.md5(full_url.encode()).hexdigest()[:12]}",
-                                    "address": addr or "Unknown",
+                                    "address": addr,
                                     "price": price,
                                     "bedrooms": item.get("bedrooms", ""),
                                     "bathrooms": item.get("bathrooms", ""),
@@ -576,19 +598,18 @@ async def _scrape_condos_scrapling() -> List[Dict[str, Any]]:
                             m = re.search(r"[\$C]*\$([\d,]+)", text)
                             if m:
                                 price = int(m.group(1).replace(",", ""))
-                        elif ("," in text and ("ON" in text or "Ontario" in text)) or re.search(
-                            r"\d+\s+\w+\s+(st|ave|rd|dr|blvd|cres|way|ct|ter|pl|ln|trail|circ)",
-                            text,
-                            re.IGNORECASE,
-                        ):
+                        elif looks_like_real_address(text):
                             address = text
                     if price <= 0:
                         continue
+                    if not address or not looks_like_real_address(address):
+                        slug = href.rstrip("/").split("/")[-1]
+                        address = slug.replace("-", " ").title() if slug else "Unknown"
                     lid = hashlib.md5(href.encode()).hexdigest()[:12]
                     region = _detect_region(address)
                     listings.append({
                         "id": f"condos_ca_{lid}",
-                        "address": address or "Unknown",
+                        "address": address,
                         "price": price,
                         "bedrooms": "",
                         "bathrooms": "",

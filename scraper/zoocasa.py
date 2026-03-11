@@ -7,6 +7,7 @@ from typing import List, Dict, Any
 from datetime import datetime
 
 from scraper.stealth_headers import get_stealth_header_generator
+from scraper.listing_utils import is_sold_or_inactive, pick_display_address
 
 logger = logging.getLogger(__name__)
 HEADER_GEN = get_stealth_header_generator()
@@ -73,13 +74,23 @@ async def _scrape_zoocasa_page(client, url: str) -> list:
         
         listings = []
         for item in raw:
+            status = item.get("status") or item.get("listing_status") or item.get("listing_status_label") or ""
+            if is_sold_or_inactive(status):
+                continue
+            address = pick_display_address(
+                item.get("address"),
+                item.get("street_address"),
+                item.get("full_address"),
+                item.get("display_address"),
+                item.get("formatted_address"),
+            )
             photo = ""
             if item.get("image_root_storage_key"):
                 photo = f"https://cdn.zoocasa.com/{item['image_root_storage_key']}-1.jpg"
             
             listings.append({
                 "id": f"zoocasa_{item.get('id', item.get('slug', ''))}",
-                "address": item.get("address", ""),
+                "address": address,
                 "price": item.get("price", ""),
                 "bedrooms": item.get("bedrooms", ""),
                 "bathrooms": item.get("bathrooms", ""),

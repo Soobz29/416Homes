@@ -5,6 +5,7 @@ from scraper.realtor_ca import scrape_realtor_ca
 from scraper.zoocasa import scrape_zoocasa
 from scraper.condos_ca import scrape_condos_ca as scrape_condos
 from scraper.kijiji import scrape_kijiji
+from scraper.listing_utils import is_badge_or_headline_only, is_sold_or_inactive
 from listing_agent.activity_log import log_activity
 
 logger = logging.getLogger(__name__)
@@ -75,20 +76,26 @@ async def scrape_all_sources(regions=None) -> List[Dict[str, Any]]:
             
         count = 0
         for listing in result:
+            addr = str(listing.get("address", "") or "").strip()
+            if is_badge_or_headline_only(addr):
+                continue
+            if is_sold_or_inactive(addr) or is_sold_or_inactive(listing.get("description") or listing.get("status")):
+                continue
+            if not addr:
+                continue
             # Standardize region if missing
             if not listing.get("region"):
-                listing["region"] = _detect_region(listing.get("address", ""))
-                
+                listing["region"] = _detect_region(addr)
             # Deduplication key
-            addr = str(listing.get('address','')).strip().lower()
-            price = str(listing.get('price',''))
-            key = f"{addr}_{price}"
-            
-            if key not in seen and addr:
-                seen.add(key)
-                listing["source"] = name
-                listings.append(listing)
-                count += 1
+            addr_lower = addr.lower()
+            price = str(listing.get("price", ""))
+            key = f"{addr_lower}_{price}"
+            if key in seen:
+                continue
+            seen.add(key)
+            listing["source"] = name
+            listings.append(listing)
+            count += 1
                 
         source_counts[name] = count
         log_activity("SCAN", f"{name}: {count} listings")

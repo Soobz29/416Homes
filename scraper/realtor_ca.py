@@ -14,6 +14,7 @@ from scraper.rate_limiter import async_retry, get_rate_limiter, get_request_stat
 from scraper.stealth_headers import get_stealth_header_generator
 from scraper.browser_use import AREA_URLS as REALTOR_MAP_URLS
 from scraper.browser_util import create_browser
+from scraper.listing_utils import pick_display_address, looks_like_real_address
 
 logger = logging.getLogger(__name__)
 
@@ -323,7 +324,7 @@ async def _scrape_region(client, headers: dict, name: str, coords: dict, min_pri
                                     "source": "realtor_ca",
                                     "region": name,
                                     "url": f"https://www.realtor.ca{item.get('RelativeDetailsURL', '')}",
-                                    "address": address_text.replace("Just listed", "").strip(),
+                                    "address": pick_display_address(address_text.replace("Just listed", "").strip() or None),
                                     "city": name.split(" (")[0] if " (" in name else name,
                                     "price": price,
                                     "bedrooms": item.get("Building", {}).get("Bedrooms", ""),
@@ -359,7 +360,7 @@ async def _scrape_region(client, headers: dict, name: str, coords: dict, min_pri
                     "source": "realtor_ca",
                     "region": name,
                     "url": f"https://www.realtor.ca{item.get('RelativeDetailsURL', '')}",
-                    "address": address_text.replace("Just listed", "").strip(),
+                    "address": pick_display_address(address_text.replace("Just listed", "").strip() or None),
                     "city": name.split(' (')[0] if ' (' in name else name,
                     "price": price,
                     "bedrooms": item.get("Building", {}).get("Bedrooms", ""),
@@ -419,7 +420,7 @@ async def _scrape_region(client, headers: dict, name: str, coords: dict, min_pri
                                     "source": "realtor_ca",
                                     "region": name,
                                     "url": f"https://www.realtor.ca{item.get('RelativeDetailsURL', '')}",
-                                    "address": address_text.replace("Just listed", "").strip(),
+                                    "address": pick_display_address(address_text.replace("Just listed", "").strip() or None),
                                     "city": name.split(" (")[0] if " (" in name else name,
                                     "price": price,
                                     "bedrooms": item.get("Building", {}).get("Bedrooms", ""),
@@ -562,22 +563,18 @@ def _scrape_realtor_browser_sync(area: str) -> List[Dict[str, Any]]:
                         m = re.search(r"[\$C]*\$([\d,]+)", text)
                         if m:
                             price = int(m.group(1).replace(",", ""))
-                    # Address link typically contains comma + province
-                    elif ("," in text and ("ON" in text or "Ontario" in text)) or re.search(
-                        r"\d+\s+\w+\s+(st|ave|rd|dr|blvd|cres|way|ct|ter|pl|ln|trail|circ)",
-                        text,
-                        re.IGNORECASE,
-                    ):
+                    elif looks_like_real_address(text):
                         address = text
 
                 if price <= 0:
                     continue
+                display_addr = pick_display_address(address) if address else "Unknown"
 
                 full_url = href if href.startswith("http") else f"https://www.realtor.ca{href}"
                 mls = hashlib.md5(full_url.encode()).hexdigest()[:12]
 
                 city = "Toronto"
-                if "mississauga" in (address + href).lower():
+                if "mississauga" in (display_addr + href).lower():
                     city = "Mississauga"
 
                 listings.append(
@@ -585,7 +582,7 @@ def _scrape_realtor_browser_sync(area: str) -> List[Dict[str, Any]]:
                         "id": f"realtor_ca_{mls}",
                         "source": "realtor_ca",
                         "url": full_url,
-                        "address": address or "Unknown",
+                        "address": display_addr,
                         "city": city,
                         "price": price,
                         "bedrooms": beds,
@@ -658,22 +655,19 @@ async def _scrape_realtor_scrapling(area: str) -> List[Dict[str, Any]]:
                         m = re.search(r"[\$C]*\$([\d,]+)", text)
                         if m:
                             price = int(m.group(1).replace(",", ""))
-                    elif ("," in text and ("ON" in text or "Ontario" in text)) or re.search(
-                        r"\d+\s+\w+\s+(st|ave|rd|dr|blvd|cres|way|ct|ter|pl|ln|trail|circ)",
-                        text,
-                        re.IGNORECASE,
-                    ):
+                    elif looks_like_real_address(text):
                         address = text
                 if price <= 0:
                     continue
+                display_addr = pick_display_address(address) if address else "Unknown"
                 full_url = href if href.startswith("http") else f"https://www.realtor.ca{href}"
                 mls = hashlib.md5(full_url.encode()).hexdigest()[:12]
-                city = "Mississauga" if "mississauga" in (address + href).lower() else "Toronto"
+                city = "Mississauga" if "mississauga" in (display_addr + href).lower() else "Toronto"
                 listings.append({
                     "id": f"realtor_ca_{mls}",
                     "source": "realtor_ca",
                     "url": full_url,
-                    "address": address or "Unknown",
+                    "address": display_addr,
                     "city": city,
                     "price": price,
                     "bedrooms": "",
