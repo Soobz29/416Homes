@@ -20,10 +20,11 @@ export async function fetchListings(params?: {
     throw new Error("Failed to fetch listings");
   }
 
-  // FastAPI returns listings with bedrooms/bathrooms/area strings.
+  // API returns { listings, total, scan_time } or legacy array.
   const data = await response.json();
+  const rawListings = Array.isArray(data) ? data : (data?.listings ?? []);
   return {
-    listings: (data as any[]).map((l) => ({
+    listings: rawListings.map((l: any) => ({
       id: l.id,
       address: l.address,
       price: Number(l.price) || 0,
@@ -38,6 +39,8 @@ export async function fetchListings(params?: {
       photos: [],
       created_at: l.scraped_at,
     })),
+    total: typeof data?.total === "number" ? data.total : rawListings.length,
+    scan_time: data?.scan_time ?? null,
   };
 }
 

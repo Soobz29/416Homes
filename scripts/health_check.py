@@ -26,10 +26,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class ScraperHealthCheck:
-    """Health checker for all 416Homes scrapers"""
+    """Health checker for all 416Homes scrapers. Set API_BASE_URL in CI to hit production (e.g. Railway)."""
     
     def __init__(self):
-        self.base_url = "http://localhost:8000"
+        base = os.getenv("API_BASE_URL", "http://localhost:8000").strip().rstrip("/")
+        self.base_url = base
         self.results = {
             'realtor_ca': {'status': 'unknown', 'response_time': 0, 'listings_count': 0, 'error': None},
             'kijiji': {'status': 'unknown', 'response_time': 0, 'listings_count': 0, 'error': None},
@@ -43,7 +44,7 @@ class ScraperHealthCheck:
         """Test if API is responding"""
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(f"{self.base_url}/health", timeout=10) as response:
+                async with session.get(f"{self.base_url}/api/health", timeout=10) as response:
                     if response.status == 200:
                         data = await response.json()
                         logger.info(f"API Health Check: {data.get('status', 'unknown')}")
@@ -62,7 +63,7 @@ class ScraperHealthCheck:
         
         try:
             # Test scraper endpoint
-            url = f"{self.base_url}/listings?city={area}&limit=5&source={source}"
+            url = f"{self.base_url}/api/listings?city={area}&limit=5&source={source}"
             
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
                 headers = {
@@ -184,7 +185,7 @@ class ScraperHealthCheck:
                     'User-Agent': '416Homes-Health-Check/1.0'
                 }
                 
-                async with session.post(f"{self.base_url}/valuate", json=test_data, headers=headers) as response:
+                async with session.post(f"{self.base_url}/api/valuate", json=test_data, headers=headers) as response:
                     response_time = round((time.time() - start_time) * 1000)
                     
                     if response.status == 200:
@@ -273,7 +274,7 @@ class ScraperHealthCheck:
                     'User-Agent': '416Homes-Health-Check/1.0'
                 }
                 
-                async with session.post(f"{self.base_url}/video-jobs", json=test_data, headers=headers) as response:
+                async with session.post(f"{self.base_url}/api/video-jobs", json=test_data, headers=headers) as response:
                     response_time = round((time.time() - start_time) * 1000)
                     
                     if response.status == 200:

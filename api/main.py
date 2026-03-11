@@ -263,10 +263,11 @@ def _generate_link_code(length: int = 6) -> str:
     return f"TG-{suffix}"
 
 # Listings endpoints
-@app.get("/api/listings", response_model=List[ListingResponse])
+@app.get("/api/listings")
 async def get_listings(
     city: str = "GTA",
     limit: int = 20,
+    offset: int = 0,
     min_price: Optional[int] = None,
     max_price: Optional[int] = None,
     bedrooms: Optional[str] = None,
@@ -369,9 +370,16 @@ async def get_listings(
 
             filtered.append(r)
 
-        # Respect limit and normalise shape for dashboard
-        limited = filtered[:limit]
-        return [_normalise_listing(r) for r in limited]
+        total = len(filtered)
+        limited = filtered[offset : offset + limit]
+        normalised = [_normalise_listing(r) for r in limited]
+        return {
+            "listings": normalised,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "scan_time": scan_at,
+        }
 
     except Exception as e:
         logger.error(f"Error fetching listings: {e}")
@@ -684,6 +692,7 @@ def _normalise_listing(row: dict) -> dict:
         "bathrooms":   str(row.get("bathrooms") or ""),
         # Dashboard expects 'area'; source data may use 'sqft' (Supabase) or 'area' (last_scan JSON).
         "area":        ("" if raw_area is None else str(raw_area)),
+        "city":        str(row.get("city") or ""),
         "lat":         row.get("lat"),
         "lng":         row.get("lng"),
         "source":      row.get("source", "unknown"),

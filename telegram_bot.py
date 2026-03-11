@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from listing_agent.activity_log import log_activity
 from memory.store import memory_store
 from scraper.listing_utils import is_badge_or_headline_only
+from scraper.api_client import APIClient
 
 # Import our agent components
 # from listing_agent import agent as listing_agent (Removed to prevent circular import)
@@ -87,6 +88,7 @@ class TelegramBot:
         self.is_running = False
         # photo-upload jobs keyed by chat_id
         self.pending_photo_jobs: Dict[int, Dict[str, Any]] = {}
+        self.api_client = APIClient()
         self.supabase: Optional[Client] = None
         if create_client and SUPABASE_URL and SUPABASE_KEY:
             try:
@@ -610,8 +612,9 @@ class TelegramBot:
             group = _group_key(L)
             if group != last_group:
                 city_label, region_label = group
-                lines.append(f"<b>— {self._escape_html(city_label)} / {self._escape_html(region_label)} —</b>")
-                lines.append("")
+                if city_label or region_label:
+                    lines.append(f"<b>— {self._escape_html(city_label)} / {self._escape_html(region_label)} —</b>")
+                    lines.append("")
                 last_group = group
 
             lines.append(f"<b>{i}.</b> {self._escape_html(addr)}")
@@ -643,131 +646,59 @@ class TelegramBot:
         """Escape for Telegram HTML."""
         return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-    # Toronto = city + boroughs (match API behaviour)
-    TORONTO_BOROUGHS = ("Toronto", "Downtown", "North York", "Scarborough", "Etobicoke")
+    # Page size for /listings (must match API limit used per request)
+    LISTINGS_PAGE_SIZE = 10
 
     async def h_listings(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Browse last scan listings with pagination. Prefer Supabase when scan file missing (e.g. Railway)."""
-        from listing_agent import get_last_scan_listings, LISTINGS_PAGE_SIZE, LAST_SCAN_LISTINGS_FILE
-
-        # Parse args:
-        # /listings
-        # /listings markham
-        # /listings richmond hill
-        # /listings north york
-        # /listings region downtown
-        # /listings markham region unionville
+        """Show listings from the API (same source as dashboard). Usage: /listings [city]"""
         args = [a.strip() for a in (context.args or []) if a.strip()]
-
-        def _normalize_city_arg(s: str | None) -> str | None:
-            if not s:
-                return None
-            k = " ".join(s.split()).strip().lower()
-            aliases = {
-                "toronto": "toronto",
-                "downtown": "downtown",
-                "downtown toronto": "downtown",
-                "north york": "north york",
-                "scarborough": "scarborough",
-                "etobicoke": "etobicoke",
-                "mississauga": "mississauga",
-                "brampton": "brampton",
-                "vaughan": "vaughan",
-                "markham": "markham",
-                "richmond hill": "richmond hill",
-                "oakville": "oakville",
-                "burlington": "burlington",
-                "ajax": "ajax",
-                "pickering": "pickering",
-                "whitby": "whitby",
-                "oshawa": "oshawa",
-                "milton": "milton",
-                "gta": "gta",
-                "greater toronto area": "gta",
-            }
-            return aliases.get(k)
-
-        city = None
-        region = None
-
-        # If user provided "region ..." split on that; everything before is city phrase.
-        if args and any(a.lower() == "region" for a in args):
-            idx = next(i for i, a in enumerate(args) if a.lower() == "region")
-            city_phrase = " ".join(args[:idx]).strip()
-            region_phrase = " ".join(args[idx + 1 :]).strip()
-            city = _normalize_city_arg(city_phrase)
-            region = region_phrase or None
+        phrase = " ".join(args).strip().lower() if args else ""
+        # API expects "GTA" for all, or city name capitalized (e.g. Mississauga, Toronto).
+        if not phrase or phrase in ("gta", "greater toronto area"):
+            city_param = None
         else:
-            phrase = " ".join(args).strip()
-            city = _normalize_city_arg(phrase)
-            # If it wasn't a known city, fall back to treating the phrase as a region filter.
-            if not city and phrase:
-                region = phrase
+            city_param = phrase.strip().title()
 
-        # Prefer Supabase when scan file is missing (e.g. on Railway worker) so /listings always has data.
-        use_supabase_first = not (LAST_SCAN_LISTINGS_FILE.exists() and LAST_SCAN_LISTINGS_FILE.stat().st_size > 0)
-        scan_at, total, slice_list = None, 0, []
+        result = await self.api_client.get_listings(
+            city=city_param,
+            limit=self.LISTINGS_PAGE_SIZE,
+            offset=0,
+        )
+        listings = result.get("listings") or []
+        total = result.get("total") or 0
+        scan_time = result.get("scan_time")
 
-        if not use_supabase_first:
-            scan_at, total, slice_list = get_last_scan_listings(
-                limit=LISTINGS_PAGE_SIZE, offset=0, city=city, region=region
+        if result.get("error"):
+            await update.message.reply_text(
+                "⚠️ Unable to fetch listings from the API. "
+                "The service might be temporarily unavailable. Try again later."
             )
-
-        if (use_supabase_first or not scan_at or not slice_list) and memory_store is not None:
-            try:
-                city_param = None
-                cities_param = None
-                if city and str(city).strip().lower() == "toronto":
-                    cities_param = list(self.TORONTO_BOROUGHS)
-                elif city:
-                    city_param = city.strip().capitalize() if city else None
-                all_rows = await memory_store.get_listings(
-                    city=city_param,
-                    cities=cities_param,
-                    limit=1000,
-                    offset=0,
+            return
+        if not listings:
+            if city_param:
+                await update.message.reply_text(
+                    f"📋 No listings found for **{city_param}**.\n\n"
+                    "Try:\n• /listings (all cities)\n• /listings Toronto\n• /listings GTA",
+                    parse_mode="Markdown",
                 )
-            except Exception as e:
-                logger.warning(f"Supabase for /listings failed: {e}")
-                all_rows = []
-
-            if all_rows:
-                total = len(all_rows)
-                slice_list = all_rows[:LISTINGS_PAGE_SIZE]
-                scan_at = datetime.utcnow().isoformat()
-
-        if not scan_at:
-            await update.message.reply_text(
-                "📋 No scan data yet.\n\nRun a scan first (or wait for the next scheduled scan every 30 min)."
-            )
-            return
-        if not slice_list:
-            filt = []
-            if city:
-                filt.append(f"city={city}")
-            if region:
-                filt.append(f"region={region}")
-            filt_str = (" (" + ", ".join(filt) + ")") if filt else ""
-            await update.message.reply_text(
-                f"📋 No listings matched your filter{filt_str}.\n\nTry `/listings` without filters.",
-                parse_mode="Markdown",
-            )
+            else:
+                await update.message.reply_text(
+                    "📋 No listings available yet.\n\nThe scraper runs periodically. Check back soon!"
+                )
             return
 
+        scan_at = scan_time or datetime.utcnow().isoformat()
         text, reply_markup = self._format_listings_page(
-            scan_at, total, slice_list, page=1, city=city, region=region
+            scan_at, total, listings, page=1, city=city_param, region=None
         )
         await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
 
     async def h_listings_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle Prev/Next button clicks for listings pagination. Uses Supabase when scan file missing."""
-        from listing_agent import get_last_scan_listings, LISTINGS_PAGE_SIZE, LAST_SCAN_LISTINGS_FILE
-
+        """Handle Prev/Next button clicks for listings pagination (API-based)."""
         query = update.callback_query
         await query.answer()
 
-        data = query.data
-        payload = data.replace("listings:", "", 1)
+        payload = (query.data or "").replace("listings:", "", 1)
         parts = {}
         for chunk in payload.split(";"):
             if "=" in chunk:
@@ -778,50 +709,32 @@ class TelegramBot:
         except ValueError:
             return
         city = parts.get("city") or None
-        region = parts.get("region") or None
+        if city and city.strip().lower() in ("gta", "greater toronto area"):
+            city = None
+        elif city:
+            city = city.strip().title()
 
         if page < 1:
             return
 
-        page_size = LISTINGS_PAGE_SIZE
+        page_size = self.LISTINGS_PAGE_SIZE
         offset = (page - 1) * page_size
-        scan_at, total, slice_list = None, 0, []
-        use_supabase = not (LAST_SCAN_LISTINGS_FILE.exists() and LAST_SCAN_LISTINGS_FILE.stat().st_size > 0)
+        result = await self.api_client.get_listings(
+            city=city,
+            limit=page_size,
+            offset=offset,
+        )
+        listings = result.get("listings") or []
+        total = result.get("total") or 0
+        scan_time = result.get("scan_time")
 
-        if not use_supabase:
-            scan_at, total, slice_list = get_last_scan_listings(
-                limit=page_size, offset=offset, city=city, region=region
-            )
-
-        if (use_supabase or not scan_at or not slice_list) and memory_store is not None:
-            try:
-                city_param = None
-                cities_param = None
-                if city and str(city).strip().lower() == "toronto":
-                    cities_param = list(self.TORONTO_BOROUGHS)
-                elif city:
-                    city_param = city.strip().capitalize() if city else None
-                all_rows = await memory_store.get_listings(
-                    city=city_param,
-                    cities=cities_param,
-                    limit=1000,
-                    offset=0,
-                )
-            except Exception as e:
-                logger.warning(f"Supabase for listings pagination failed: {e}")
-                all_rows = []
-
-            if all_rows:
-                total = len(all_rows)
-                slice_list = all_rows[offset : offset + page_size]
-                scan_at = datetime.utcnow().isoformat()
-
-        if not scan_at or not slice_list:
-            await query.edit_message_text("📋 Scan data no longer available.")
+        if result.get("error") or not listings:
+            await query.edit_message_text("📋 Listings no longer available or API error. Try /listings again.")
             return
 
+        scan_at = scan_time or datetime.utcnow().isoformat()
         text, reply_markup = self._format_listings_page(
-            scan_at, total, slice_list, page=page, city=city, region=region
+            scan_at, total, listings, page=page, city=city, region=None
         )
         try:
             await query.edit_message_text(text, parse_mode="HTML", reply_markup=reply_markup)
