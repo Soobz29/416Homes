@@ -538,26 +538,41 @@ class TelegramBot:
             await update.message.reply_text("❌ Failed to link this chat. Please try again.")
 
     async def h_sources(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Breakdown of last scan results by source."""
+        """Breakdown of last scan results by source. Falls back to API listing count when no log."""
         log_path = os.path.join("listing_agent", "activity.log")
-        if not os.path.exists(log_path):
-            await update.message.reply_text("❌ No activity log found.")
+        last_summary = None
+
+        if os.path.exists(log_path):
+            try:
+                with open(log_path, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+                for line in reversed(lines):
+                    if "SCAN | Total:" in line:
+                        last_summary = line.split("|")[-1].strip()
+                        break
+            except Exception:
+                pass
+
+        if last_summary:
+            await update.message.reply_text(f"📊 *Scraper Aggregator Status*\n\n{last_summary}", parse_mode="Markdown")
             return
 
-        try:
-            with open(log_path, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-            
-            # Look for the last SCAN: Total: ... line
-            last_summary = "No scan data found yet."
-            for line in reversed(lines):
-                if "SCAN | Total:" in line:
-                    last_summary = line.split("|")[-1].strip()
-                    break
-            
-            await update.message.reply_text(f"📊 *Scraper Aggregator Status*\n\n{last_summary}", parse_mode="Markdown")
-        except Exception as e:
-            await update.message.reply_text(f"❌ Failed to parse sources: {e}")
+        # No scan log (e.g. on Railway worker that didn't run the scan) — show API count
+        result = await self.api_client.get_listings(limit=1, offset=0)
+        total = result.get("total") or 0
+        err = result.get("error")
+        if err:
+            await update.message.reply_text(
+                f"📊 *Scraper Aggregator Status*\n\nNo scan log on this server. API unreachable: {err}",
+                parse_mode="Markdown",
+            )
+            return
+        msg = (
+            f"📊 *Scraper Aggregator Status*\n\n"
+            f"No scan log on this server. *Listings in database:* {total}\n"
+            "Use /listings to browse. Trigger a scan (API or Railway) to refresh."
+        )
+        await update.message.reply_text(msg, parse_mode="Markdown")
 
     def _format_listings_page(
         self,
@@ -1145,20 +1160,23 @@ class TelegramBot:
 
     async def h_regions(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         events = agent_memory.data.get("event_log", [])
-        # Get recent scanner alerts to aggregate region stats
-        recent_alerts = [e for e in events if e['type'] == 'alert_fired'][-100:]
-        
+        recent_alerts = [e for e in events if e.get("type") == "alert_fired"][-100:]
         from collections import Counter
-        counts = Counter(e['data'].get('region', 'Unknown') for e in recent_alerts)
-        
+        counts = Counter(e.get("data", {}).get("region", "Unknown") for e in recent_alerts)
+
         msg = "📍 *GTA Regional Activity (Recent Alerts)*\n"
-        if not counts:
-            msg += "No recent listings processed yet."
-        else:
+        if counts:
             for region, count in sorted(counts.items()):
                 msg += f"• *{region}*: {count}\n"
-        
-        await update.message.reply_text(msg, parse_mode='Markdown')
+        else:
+            msg += "No recent alerts yet. "
+            result = await self.api_client.get_listings(limit=1, offset=0)
+            total = result.get("total") or 0
+            if total:
+                msg += f"*{total}* listings in database — use /listings to browse."
+            else:
+                msg += "Use /listings to check database."
+        await update.message.reply_text(msg, parse_mode="Markdown")
 
 
 async def _generate_video_script(listing: dict) -> dict:
