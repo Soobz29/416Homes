@@ -1,6 +1,5 @@
-# Trigger the nightly-style scan on Railway every 3 hours (Option B: API trigger).
-# The scan runs on the API server; this workflow only calls the endpoint.
-name: Refresh Listings (Trigger Scan)
+# Run scrapers on GitHub Actions every 3 hours and write to Supabase.
+name: Refresh Listings (Run Scraper)
 
 on:
   schedule:
@@ -9,28 +8,33 @@ on:
   workflow_dispatch:
 
 jobs:
-  trigger-scan:
+  scrape-and-store:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 30
     steps:
-      - name: Trigger listing refresh
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
         run: |
-          API_URL="${API_BASE_URL%/}"
-          if [ -z "$API_URL" ]; then
-            echo "::error::API_BASE_URL secret is not set. Add it in repo Settings → Secrets."
-            exit 1
-          fi
-          echo "Calling POST $API_URL/api/initiate-scan ..."
-          response=$(curl -s -w "\n%{http_code}" -X POST "$API_URL/api/initiate-scan")
-          http_code=$(echo "$response" | tail -n1)
-          body=$(echo "$response" | sed '$d')
-          echo "Response ($http_code): $body"
-          if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
-            echo "Scan triggered successfully."
-          else
-            echo "::warning::Unexpected status $http_code. Scan may still have started (202 = accepted)."
-            if [ "$http_code" -eq 202 ]; then exit 0; fi
-            exit 1
-          fi
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run scrapers and store to Supabase
         env:
-          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          # Keep embedding model stable; embedding failures are handled gracefully.
+          GEMINI_EMBEDDING_MODEL: ${{ secrets.GEMINI_EMBEDDING_MODEL }}
+        run: |
+          python -m scraper.run_all --source all --area gta
