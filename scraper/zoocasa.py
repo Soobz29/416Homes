@@ -13,12 +13,18 @@ logger = logging.getLogger(__name__)
 HEADER_GEN = get_stealth_header_generator()
 
 ZOOCASA_URLS = [
+    # Core GTA cities we care about
     "https://www.zoocasa.com/toronto-on-real-estate",
     "https://www.zoocasa.com/mississauga-on-real-estate",
     "https://www.zoocasa.com/brampton-on-real-estate",
     "https://www.zoocasa.com/vaughan-on-real-estate",
     "https://www.zoocasa.com/markham-on-real-estate",
     "https://www.zoocasa.com/oakville-on-real-estate",
+    # Realtor.ca previously covered these regions; mirror them via Zoocasa
+    "https://www.zoocasa.com/richmond-hill-on-real-estate",
+    "https://www.zoocasa.com/burlington-on-real-estate",
+    "https://www.zoocasa.com/ajax-on-real-estate",
+    "https://www.zoocasa.com/pickering-on-real-estate",
 ]
 
 def _detect_region(location_str: str) -> str:

@@ -4,7 +4,6 @@ from typing import List, Dict, Any
 from datetime import datetime
 import hashlib
 
-from .realtor_ca import scrape_realtor_ca
 from .kijiji import scrape_kijiji
 from .redfin import scrape_redfin
 from .zoocasa import scrape_zoocasa
@@ -35,13 +34,14 @@ def dedupe_listings(listings: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 async def run_all_sources(area: str = "gta") -> List[Dict[str, Any]]:
     """Run all scrapers concurrently and return deduplicated results"""
     
+    # Prioritize Zoocasa for GTA and temporarily exclude realtor.ca
+    # (realtor.ca has been returning persistent 403s in CI).
     sources = {
         "zoocasa": scrape_zoocasa,
         "housesigma": scrape_housesigma,
         "condos_ca": scrape_condos_ca,
         "zillow": scrape_zillow,
-        "realtor_ca": scrape_realtor_ca,
-        "kijiji": scrape_kijiji, 
+        "kijiji": scrape_kijiji,
         "redfin": scrape_redfin,
     }
     
