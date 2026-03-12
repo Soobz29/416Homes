@@ -33,8 +33,10 @@ class MemoryStore:
         supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
         self.supabase: Client = create_client(supabase_url, supabase_key)
         
-        # Initialize Gemini for embeddings
-        self.embedding_model_id = "text-embedding-004"
+        # Initialize Gemini for embeddings. New SDK (google-genai) uses gemini-embedding-001; legacy uses text-embedding-004.
+        self.embedding_model_id = os.getenv("GEMINI_EMBEDDING_MODEL") or (
+            "gemini-embedding-001" if _GENAI_SDK == "google-genai" else "text-embedding-004"
+        )
         self.client = None
         try:
             api_key = os.getenv("GEMINI_API_KEY")
@@ -46,6 +48,29 @@ class MemoryStore:
         except Exception as e:
             logger.warning("Gemini client init failed (%s): %s", _GENAI_SDK, e)
     
+    @staticmethod
+    def _safe_scalar(value: Any, default: Any = None, prefer_int: bool = False) -> Any:
+        """Coerce value to a scalar for DB (no dicts/lists). For int columns use prefer_int=True."""
+        if value is None:
+            return default
+        if isinstance(value, dict):
+            # e.g. {"gt":0,"gte":2500} from a range filter - take a number if present
+            for k in ("gte", "lte", "gt", "lt"):
+                if k in value and isinstance(value[k], (int, float)):
+                    return int(value[k]) if prefer_int else value[k]
+            return default
+        if isinstance(value, (list, tuple)):
+            return value[0] if value and prefer_int else (int(value[0]) if value and isinstance(value[0], (int, float)) else default)
+        if isinstance(value, (int, float)):
+            return int(value) if prefer_int and isinstance(value, float) and value == int(value) else value
+        if isinstance(value, str) and value.strip():
+            try:
+                n = int(value.replace(",", "").strip())
+                return n if prefer_int else value
+            except ValueError:
+                pass
+        return value if not prefer_int else default
+
     def _extract_neighbourhood(self, address: str) -> str:
         """Extract neighbourhood from address string"""
         if not address:
@@ -67,27 +92,53 @@ class MemoryStore:
         return "Unknown"
     
     def _normalise_for_listings(self, listing: Dict[str, Any]) -> Dict[str, Any]:
-        """Translate scraper dict to exact Supabase listings column names"""
+        """Translate scraper dict to exact Supabase listings column names. Coerce scalars so no dicts hit DB."""
+        price = self._safe_scalar(listing.get("price"), 0, prefer_int=True)
+        if price is None:
+            price = 0
+        try:
+            price = int(price)
+        except (TypeError, ValueError):
+            price = 0
+        bedrooms = self._safe_scalar(listing.get("bedrooms"), "")
+        bathrooms = self._safe_scalar(listing.get("bathrooms"), "")
+        sqft_raw = listing.get("area") or listing.get("sqft")
+        sqft = self._safe_scalar(sqft_raw, 0, prefer_int=True)
+        if isinstance(sqft, dict):
+            sqft = 0
+        if sqft is None:
+            sqft = 0
+        try:
+            sqft = int(sqft)
+        except (TypeError, ValueError):
+            sqft = 0
+        days_on_market = self._safe_scalar(listing.get("days_on_market"), 0, prefer_int=True)
+        if days_on_market is None:
+            days_on_market = 0
+        try:
+            days_on_market = int(days_on_market)
+        except (TypeError, ValueError):
+            days_on_market = 0
         return {
-            "id": listing.get("id", ""),
-            "source": listing.get("source", ""),
-            "url": listing.get("url", ""),
-            "address": listing.get("address", ""),
-            "neighbourhood": listing.get("neighbourhood") or self._extract_neighbourhood(listing.get("address", "")),
-            "city": listing.get("city", "Toronto"),
-            "price": listing.get("price", 0),
-            "bedrooms": listing.get("bedrooms", ""),
-            "bathrooms": listing.get("bathrooms", ""),
-            "sqft": listing.get("area", listing.get("sqft", "0")),  # Map area → sqft
-            "property_type": listing.get("property_type", "Unknown"),
-            "days_on_market": listing.get("days_on_market", 0),
+            "id": str(listing.get("id", "")),
+            "source": str(listing.get("source", "")),
+            "url": str(listing.get("url", "")),
+            "address": str(listing.get("address", "") or ""),
+            "neighbourhood": str(listing.get("neighbourhood") or self._extract_neighbourhood(listing.get("address", "") or "")),
+            "city": str(listing.get("city", "Toronto") or "Toronto"),
+            "price": price,
+            "bedrooms": bedrooms if not isinstance(bedrooms, dict) else "",
+            "bathrooms": bathrooms if not isinstance(bathrooms, dict) else "",
+            "sqft": sqft,
+            "property_type": str(listing.get("property_type", "Unknown") or "Unknown"),
+            "days_on_market": days_on_market,
             "listing_agent_email": listing.get("listing_agent_email"),
             "listing_agent_name": listing.get("listing_agent_name"),
             "lat": listing.get("lat"),
             "lng": listing.get("lng"),
             "raw_data": listing,
             "embedding": None,  # Will be filled later
-            "scraped_at": listing.get("scraped_at", ""),
+            "scraped_at": listing.get("scraped_at", "") or "",
             "is_active": True
         }
     
@@ -120,11 +171,11 @@ class MemoryStore:
             if _GENAI_SDK == "google-genai":
                 if not self.client:
                     raise RuntimeError("Gemini client not initialized")
-                response = self.client.models.embed_content(
-                    model=self.embedding_model_id,
-                    contents=text,
-                )
-                embedding = response.embeddings[0].values
+                kwargs = {"model": self.embedding_model_id, "contents": text}
+                if self.embedding_model_id == "gemini-embedding-001":
+                    kwargs["output_dimensionality"] = 768
+                response = self.client.models.embed_content(**kwargs)
+                embedding = list(response.embeddings[0].values) if response.embeddings else []
             elif _GENAI_SDK == "google-generativeai" and _genai is not None:
                 # google-generativeai API
                 resp = _genai.embed_content(
