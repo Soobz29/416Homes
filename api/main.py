@@ -187,6 +187,13 @@ class AlertUpdate(BaseModel):
 
 from listing_agent import get_last_scan_listings
 from scraper.listing_utils import is_badge_or_headline_only
+from scraper.crawler import (
+    CrawlRequest,
+    CrawlResult,
+    CrawlBackend,
+    crawl_site,
+    get_default_backend,
+)
 
 
 # Health check
@@ -666,6 +673,46 @@ async def get_video_job(job_id: str):
     except Exception as e:
         logger.error(f"Error getting video job: {e}")
         raise HTTPException(status_code=500, detail="Failed to get video job status")
+
+
+@app.post("/api/crawl", response_model=CrawlResult)
+async def crawl_endpoint(body: CrawlRequest):
+    """
+    Crawl a website using Cloudflare or Firecrawl.
+
+    Body:
+        url: Website URL to crawl
+        backend: "cloudflare" or "firecrawl" (default: from env DEFAULT_CRAWL_BACKEND)
+        max_depth: Maximum crawl depth (1-3, default: 2)
+        max_pages: Maximum pages to crawl (1-100, default: 50)
+        include_patterns: URL patterns to include (optional)
+        exclude_patterns: URL patterns to exclude (optional)
+
+    Example:
+        POST /api/crawl
+        {"url": "https://www.realtor.ca/map", "backend": "cloudflare", "max_depth": 2, "max_pages": 20}
+    """
+    max_depth = min(max(body.max_depth, 1), 3)
+    max_pages = min(max(body.max_pages, 1), 100)
+
+    request = CrawlRequest(
+        url=body.url,
+        backend=body.backend,
+        max_depth=max_depth,
+        max_pages=max_pages,
+        include_patterns=body.include_patterns,
+        exclude_patterns=body.exclude_patterns,
+        format=body.format,
+        timeout_seconds=body.timeout_seconds,
+    )
+
+    try:
+        result = await crawl_site(request)
+        return result
+    except Exception as e:
+        logger.exception(f"Crawl failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Crawl failed: {str(e)}")
+
 
 # API root helper
 @app.get("/api")

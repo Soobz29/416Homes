@@ -15,6 +15,10 @@ from scraper.stealth_headers import get_stealth_header_generator
 from scraper.browser_use import AREA_URLS as REALTOR_MAP_URLS
 from scraper.browser_util import create_browser
 from scraper.listing_utils import pick_display_address, looks_like_real_address
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from scraper.crawler import CrawlPage
 
 logger = logging.getLogger(__name__)
 
@@ -719,4 +723,80 @@ async def scrape_realtor_ca(area: str = "gta") -> list:
         except Exception as e:
             logger.error(f"Realtor.ca browser fallback failed: {e}")
 
+    if not listings:
+        try:
+            crawler_listings = await _scrape_realtor_via_crawler(area)
+            if crawler_listings:
+                listings = crawler_listings
+                logger.info(f"Realtor.ca crawler fallback: {len(listings)} listings")
+        except Exception as e:
+            logger.warning(f"Realtor.ca crawler fallback failed: {e}")
+
     return listings
+
+
+async def _scrape_realtor_via_crawler(area: str) -> List[Dict[str, Any]]:
+    """Fallback: crawl Realtor.ca map via Cloudflare/Firecrawl and parse listing pages."""
+    from .crawler import CrawlRequest, CrawlBackend, crawl_site
+
+    url = REALTOR_MAP_URLS.get(area.lower(), REALTOR_MAP_URLS.get("gta"))
+    request = CrawlRequest(
+        url=url,
+        backend=CrawlBackend.CLOUDFLARE,
+        max_depth=1,
+        max_pages=20,
+        include_patterns=["/real-estate/"],
+        format="html",
+        timeout_seconds=120,
+    )
+    result = await crawl_site(request)
+    if not result.stats.success or not result.pages:
+        return []
+    listings = []
+    for page in result.pages:
+        parsed = _parse_realtor_crawled_page(page)
+        if parsed:
+            listings.append(parsed)
+    return listings
+
+
+def _parse_realtor_crawled_page(page: "CrawlPage") -> Optional[Dict[str, Any]]:
+    """Extract listing dict from a crawled Realtor.ca page (HTML or markdown)."""
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        return None
+    html = page.html
+    if not html:
+        return None
+    soup = BeautifulSoup(html, "html.parser")
+    # Realtor.ca listing page: look for address, price, beds/baths
+    address_el = soup.select_one(".addressLine1, [data-testid='listing-address'], .listingAddress")
+    price_el = soup.select_one(".listingPrice, [data-testid='listing-price'], .price")
+    if not address_el or not price_el:
+        return None
+    address = address_el.get_text(strip=True)
+    price_text = price_el.get_text(strip=True)
+    price = int("".join(c for c in price_text if c.isdigit())) if price_text else 0
+    if price <= 0:
+        return None
+    beds_el = soup.select_one(".bedrooms, .bed, [data-testid='bedrooms']")
+    baths_el = soup.select_one(".bathrooms, .bath, [data-testid='bathrooms']")
+    beds = int(beds_el.get_text(strip=True)) if beds_el and beds_el.get_text(strip=True).isdigit() else 0
+    baths = int(baths_el.get_text(strip=True)) if baths_el and baths_el.get_text(strip=True).isdigit() else 0
+    city = "Mississauga" if "mississauga" in (address + page.url).lower() else "Toronto"
+    mls = hashlib.md5(page.url.encode()).hexdigest()[:12]
+    return {
+        "id": f"realtor_ca_{mls}",
+        "source": "realtor_ca",
+        "url": page.url,
+        "address": address[:300],
+        "city": city,
+        "price": price,
+        "bedrooms": str(beds) if beds else "",
+        "bathrooms": str(baths) if baths else "",
+        "sqft": "",
+        "lat": None,
+        "lng": None,
+        "scraped_at": datetime.utcnow().isoformat(),
+    }
