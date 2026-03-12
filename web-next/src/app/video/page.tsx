@@ -256,6 +256,9 @@ function ProgressPanel({
   downloadVisible,
   downloadSubtitle,
   jobId,
+  videoUrl,
+  videoLoadError,
+  onVideoError,
 }: {
   progressAddr: string;
   stepMessages: Record<string, string>;
@@ -263,6 +266,9 @@ function ProgressPanel({
   downloadVisible: boolean;
   downloadSubtitle: string;
   jobId: string | null;
+  videoUrl: string | null;
+  videoLoadError: boolean;
+  onVideoError: () => void;
 }) {
   const steps = [
     { key: "scrape", label: "Fetching listing & photos", icon: "🔗", msgKey: "scrape" },
@@ -303,8 +309,23 @@ function ProgressPanel({
         <div className="download-block mt-8 border border-[rgba(46,213,115,0.2)] bg-[rgba(46,213,115,0.05)] p-6">
           <div className="dl-title text-[#2ed573] text-[1rem] font-bold">✅ Your video is ready!</div>
           <div className="dl-sub mb-4 font-['DM Mono',monospace] text-[0.7rem] text-[#6b6b60]">{downloadSubtitle}</div>
+          {videoUrl && (
+            <div className="mb-4 max-w-[640px] overflow-hidden rounded-lg bg-black">
+              <video
+                src={videoUrl}
+                controls
+                playsInline
+                preload="metadata"
+                className="w-full"
+                onError={onVideoError}
+              />
+              {videoLoadError && (
+                <p className="py-4 text-center text-sm text-[#6b6b60]">Video could not be loaded. Use the Download button below.</p>
+              )}
+            </div>
+          )}
           <a
-            href={jobId ? `${apiBase}/video/download/${jobId}` : "#"}
+            href={videoUrl || (jobId ? `${apiBase}/video/download/${jobId}` : "#") || "#"}
             download
             className="dl-btn inline-block bg-[#2ed573] px-6 py-3 font-['Syne',sans-serif] text-[0.85rem] font-bold text-[#0a0a08] no-underline"
           >
@@ -328,6 +349,8 @@ export default function VideoPage() {
   const [stepStates, setStepStates] = useState<Record<string, "pending" | "active" | "done">>({});
   const [downloadVisible, setDownloadVisible] = useState(false);
   const [downloadSubtitle, setDownloadSubtitle] = useState("");
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoLoadError, setVideoLoadError] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [formListingUrl, setFormListingUrl] = useState("");
@@ -357,9 +380,11 @@ export default function VideoPage() {
     setStepMessages({});
     setStepStates({ scrape: "active", script: "pending", audio: "pending", animate: "pending", assemble: "pending" });
     setDownloadVisible(false);
+    setVideoUrl(null);
+    setVideoLoadError(false);
   }, []);
 
-  const updateProgressFromApi = useCallback((data: { status?: string; progress_step?: string; progress_message?: string; listing_address?: string; error?: string }) => {
+  const updateProgressFromApi = useCallback((data: { status?: string; progress_step?: string; progress_message?: string; listing_address?: string; error?: string; video_url?: string }, jobId: string | null) => {
     const step = data.progress_step || "scrape";
     const idx = STEP_ORDER.indexOf(step as typeof STEP_ORDER[number]);
     const next: Record<string, "pending" | "active" | "done"> = {};
@@ -375,6 +400,9 @@ export default function VideoPage() {
       setStepStates(next);
       setDownloadVisible(true);
       setDownloadSubtitle(data.listing_address || "Your listing video is ready");
+      const playUrl = data.video_url || (jobId ? `${API_BASE}/video/download/${jobId}` : null);
+      setVideoUrl(playUrl);
+      setVideoLoadError(false);
       if (pollRef.current) {
         clearInterval(pollRef.current);
         pollRef.current = null;
@@ -395,7 +423,7 @@ export default function VideoPage() {
       try {
         const res = await fetch(`${API_BASE}/video/status/${currentJobId}`);
         const data = await res.json();
-        updateProgressFromApi(data);
+        updateProgressFromApi(data, currentJobId);
       } catch (e) {
         console.error("Poll error:", e);
       }
@@ -572,18 +600,20 @@ export default function VideoPage() {
           </button>
         </div>
 
-        {/* Video preview — Vimeo sample */}
+        {/* Video preview — HTML5 sample (use NEXT_PUBLIC_HERO_VIDEO_URL for your own sample) */}
         <div className="video-preview relative aspect-[16/9] overflow-hidden border border-[rgba(200,169,110,0.2)] bg-black">
           <div className="video-preview-inner relative h-full w-full overflow-hidden bg-black">
-            <div className="relative w-full" style={{ paddingTop: "56.25%" }}>
-              <iframe
-                src="https://player.vimeo.com/video/1172407404?badge=0&autopause=0&player_id=0&app_id=58479&autoplay=1&loop=1"
-                className="absolute left-0 top-0 h-full w-full border-0"
-                allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
-                referrerPolicy="strict-origin-when-cross-origin"
-                title="416Homes Sample — 30 Sec"
-              />
-            </div>
+            <video
+              className="absolute left-0 top-0 h-full w-full object-cover"
+              src={process.env.NEXT_PUBLIC_HERO_VIDEO_URL || "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"}
+              controls
+              playsInline
+              loop
+              muted
+              autoPlay
+              preload="metadata"
+              title="416Homes sample — listing video"
+            />
             <div className="vp-caption absolute bottom-[8%] left-0 right-0 px-6">
               <div className="vp-headline mb-1 text-[1.1rem] font-bold">
                 Where Heritage Meets Modern Luxury
@@ -767,6 +797,9 @@ export default function VideoPage() {
             downloadVisible={downloadVisible}
             downloadSubtitle={downloadSubtitle}
             jobId={currentJobId}
+            videoUrl={videoUrl}
+            videoLoadError={videoLoadError}
+            onVideoError={() => setVideoLoadError(true)}
           />
         )}
       </section>

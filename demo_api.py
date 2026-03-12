@@ -16,7 +16,7 @@ Endpoints:
     GET  /health             → health check
 """
 
-from fastapi import FastAPI, Query, File, Form, UploadFile
+from fastapi import FastAPI, Query, File, Form, UploadFile, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from pydantic import BaseModel
@@ -471,13 +471,13 @@ async def create_video_job_custom(
 
 
 @app.get("/video/status/{job_id}")
-async def get_video_status(job_id: str):
+async def get_video_status(job_id: str, request: Request):
     """Return current status of a video job for the frontend to poll."""
     job = VIDEO_JOBS.get(job_id)
     if not job:
         return JSONResponse(status_code=404, content={"error": "Job not found"})
 
-    return {
+    out = {
         "job_id": job["job_id"],
         "status": job["status"],
         "progress_step": job["progress_step"],
@@ -487,6 +487,12 @@ async def get_video_status(job_id: str):
         "cinematic_prompts": job.get("cinematic_prompts", []),
         "error": job.get("error"),
     }
+    # When complete and we have a file, include a playable video_url (same origin so <video src> works)
+    video_path = job.get("video_path")
+    if job["status"] == "complete" and video_path and Path(video_path).exists():
+        base = str(request.base_url).rstrip("/")
+        out["video_url"] = f"{base}/video/download/{job_id}"
+    return out
 
 
 @app.get("/video/download/{job_id}")
@@ -497,11 +503,13 @@ async def download_video(job_id: str):
         return JSONResponse(status_code=404, content={"error": "Job not found"})
     video_path = job.get("video_path")
     if video_path and Path(video_path).exists():
-        return FileResponse(
+        resp = FileResponse(
             path=video_path,
             media_type="video/mp4",
             filename=f"416homes_{job_id}.mp4",
         )
+        resp.headers["Accept-Ranges"] = "bytes"
+        return resp
     return JSONResponse(status_code=202, content={"message": "Video still processing or not available",
                          "script": job.get("script_data", {})})
 

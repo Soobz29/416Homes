@@ -691,6 +691,18 @@
       margin-bottom: 1rem;
     }
 
+    .dl-video-wrap {
+      margin-bottom: 1rem;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #0a0a08;
+      max-width: 640px;
+    }
+    .dl-video-wrap video {
+      width: 100%;
+      display: block;
+    }
+
     .dl-btn {
       background: var(--green);
       color: var(--black);
@@ -1113,6 +1125,10 @@
       <div class="download-block" id="downloadBlock">
         <div class="dl-title">✅ Your video is ready!</div>
         <div class="dl-sub" id="dlSubtitle">Cinematic listing video — 1920×1080 MP4</div>
+        <div class="dl-video-wrap" id="dlVideoWrap">
+          <video id="dlVideo" controls playsinline preload="metadata" style="width:100%;display:block;"></video>
+          <div id="dlVideoError" style="display:none;background:#1a1a1a;color:#888;padding:2rem;font-size:0.9rem;text-align:center;border-radius:8px;">Video could not be loaded. Use the Download button below.</div>
+        </div>
         <a class="dl-btn" id="dlBtn" href="#" download>⬇ Download Video</a>
       </div>
     </div>
@@ -1433,7 +1449,16 @@
         const dl = document.getElementById('downloadBlock');
         dl.classList.add('visible');
         document.getElementById('dlSubtitle').textContent = data.listing_address || 'Your listing video is ready';
-        document.getElementById('dlBtn').href = `${API_BASE}/video/download/${currentJobId}`;
+        const downloadUrl = data.video_url || `${API_BASE}/video/download/${currentJobId}`;
+        document.getElementById('dlBtn').href = downloadUrl;
+        const videoEl = document.getElementById('dlVideo');
+        const errEl = document.getElementById('dlVideoError');
+        if (videoEl) {
+          if (errEl) errEl.style.display = 'none';
+          videoEl.style.display = 'block';
+          videoEl.onerror = function() { videoEl.style.display = 'none'; if (errEl) errEl.style.display = 'block'; };
+          videoEl.src = downloadUrl;
+        }
       }
 
       if (data.status === 'failed') {
@@ -1477,6 +1502,10 @@
         });
         const dl = document.getElementById('downloadBlock');
         dl.classList.add('visible');
+        const downloadUrl = `${API_BASE}/video/download/${currentJobId}`;
+        document.getElementById('dlBtn').href = downloadUrl;
+        const videoEl = document.getElementById('dlVideo');
+        if (videoEl) videoEl.src = downloadUrl;
         document.getElementById('dlSubtitle').textContent = 'Demo mode — connect API for real video generation';
         document.getElementById('dlBtn').href = '#';
         document.getElementById('dlBtn').onclick = () => alert('Connect the 416Homes Video API to enable real downloads.');
