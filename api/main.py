@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 import random
 import string
 
-from memory.store import memory_store, search_listings, replace_listings
+from memory.store import memory_store, search_listings, replace_listings, embed_and_store_listings
 from video_pipeline.pipeline import create_video_job, get_video_job_status
 
 load_dotenv()
@@ -715,7 +715,12 @@ async def crawl_endpoint(body: CrawlRequest):
 
 
 async def _run_nightly_scan_background():
-    """Run full scan and replace Supabase listings (all sources, then clear old + store new)."""
+    """
+    Run full scan and upsert Supabase listings (all sources, append history).
+
+    We no longer clear the listings table on each run; instead we upsert by
+    listing id so Supabase accumulates historical rows as new IDs appear.
+    """
     try:
         from scraper.aggregator import scrape_all_sources
         listings = await scrape_all_sources()
@@ -728,8 +733,11 @@ async def _run_nightly_scan_background():
             regular = await enrich_listings_strict(regular)
         except Exception:
             pass
-        stored = await replace_listings(regular)
-        logger.info("Nightly scan complete: %d listings in Supabase (old removed)", stored)
+        if regular:
+            stored = await embed_and_store_listings(regular)
+            logger.info("Nightly scan complete: %d listings upserted into Supabase (append-only)", stored)
+        else:
+            logger.info("Nightly scan complete: no listings to store")
     except Exception as e:
         logger.exception("Nightly scan failed: %s", e)
 
