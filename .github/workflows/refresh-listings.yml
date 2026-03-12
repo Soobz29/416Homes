@@ -26,6 +26,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Install Playwright browsers (Chromium only)
+        run: |
+          python -m playwright install --with-deps chromium
+
       - name: Run scrapers and store to Supabase
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
