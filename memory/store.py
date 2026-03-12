@@ -189,6 +189,46 @@ class MemoryStore:
         logger.info(f"Stored {success_count}/{len(listings)} listings successfully")
         
         return success_count
+
+    async def clear_listings(self) -> int:
+        """Delete all rows from the listings table. Returns number of ids removed."""
+        try:
+            ids = []
+            page_size = 500
+            offset = 0
+            while True:
+                result = (
+                    self.supabase.table("listings")
+                    .select("id")
+                    .range(offset, offset + page_size - 1)
+                    .execute()
+                )
+                page = [r["id"] for r in (result.data or [])]
+                ids.extend(page)
+                if len(page) < page_size:
+                    break
+                offset += page_size
+            if not ids:
+                logger.info("listings table already empty")
+                return 0
+            chunk_size = 200
+            deleted = 0
+            for i in range(0, len(ids), chunk_size):
+                chunk = ids[i : i + chunk_size]
+                self.supabase.table("listings").delete().in_("id", chunk).execute()
+                deleted += len(chunk)
+            logger.info(f"Cleared {deleted} listings from database")
+            return deleted
+        except Exception as e:
+            logger.error(f"Failed to clear listings: {e}")
+            raise
+
+    async def replace_listings(self, listings: List[Dict[str, Any]]) -> int:
+        """Remove all existing listings and store the new set. Use for full refresh."""
+        await self.clear_listings()
+        if not listings:
+            return 0
+        return await self.embed_and_store_listings(listings)
     
     async def search_similar_listings(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Search for similar listings using vector similarity"""
@@ -279,6 +319,10 @@ memory_store = MemoryStore()
 async def embed_and_store_listings(listings: List[Dict[str, Any]]) -> int:
     """Store multiple listings to database"""
     return await memory_store.embed_and_store_listings(listings)
+
+async def replace_listings(listings: List[Dict[str, Any]]) -> int:
+    """Clear all listings and store the new set (full refresh)."""
+    return await memory_store.replace_listings(listings)
 
 async def store_sold_comps(comps: List[Dict[str, Any]]) -> int:
     """Store multiple sold comps to database"""

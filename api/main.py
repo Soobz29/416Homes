@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 import random
 import string
 
-from memory.store import memory_store, search_listings
+from memory.store import memory_store, search_listings, replace_listings
 from video_pipeline.pipeline import create_video_job, get_video_job_status
 
 load_dotenv()
@@ -712,6 +712,44 @@ async def crawl_endpoint(body: CrawlRequest):
     except Exception as e:
         logger.exception(f"Crawl failed: {e}")
         raise HTTPException(status_code=500, detail=f"Crawl failed: {str(e)}")
+
+
+async def _run_nightly_scan_background():
+    """Run full scan and replace Supabase listings (all sources, then clear old + store new)."""
+    try:
+        from scraper.aggregator import scrape_all_sources
+        listings = await scrape_all_sources()
+        regular = [
+            L for L in listings
+            if L.get("source") != "housesigma" and "sold_price" not in L
+        ]
+        try:
+            from listing_agent import enrich_listings_strict
+            regular = await enrich_listings_strict(regular)
+        except Exception:
+            pass
+        stored = await replace_listings(regular)
+        logger.info("Nightly scan complete: %d listings in Supabase (old removed)", stored)
+    except Exception as e:
+        logger.exception("Nightly scan failed: %s", e)
+
+
+@app.post("/api/initiate-scan")
+async def initiate_scan(background_tasks: BackgroundTasks):
+    """
+    Start a full nightly-style scan in the background.
+    Scrapes all sources (Realtor.ca, Zoocasa, Condos.ca, Kijiji), then replaces
+    Supabase listings with the new set (removes old ones). Dashboard and Telegram
+    will show the updated listings when the scan finishes.
+    """
+    background_tasks.add_task(_run_nightly_scan_background)
+    return JSONResponse(
+        status_code=202,
+        content={
+            "status": "started",
+            "message": "Nightly scan started. Listings will be replaced when complete. Check logs or /api/listings in a few minutes.",
+        },
+    )
 
 
 # API root helper

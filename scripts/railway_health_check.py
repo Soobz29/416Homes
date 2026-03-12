@@ -41,10 +41,13 @@ def main():
     try:
         req = urllib.request.Request(f"{base}/api/listings?limit=3")
         with urllib.request.urlopen(req, timeout=15) as r:
-            listings = json.loads(r.read().decode())
-            count = len(listings) if isinstance(listings, list) else 0
-            print(f"  Listings: {count} (sample)")
-            for i, L in enumerate((listings or [])[:3], 1):
+            data = json.loads(r.read().decode())
+            listings = data.get("listings", data) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+            total = data.get("total", len(listings)) if isinstance(data, dict) else len(listings)
+            if not isinstance(listings, list):
+                listings = []
+            print(f"  Listings: {len(listings)} (total={total})")
+            for i, L in enumerate(listings[:3], 1):
                 addr = (L.get("address") or "?")[:50]
                 print(f"    {i}. {addr}")
     except urllib.error.HTTPError as e:
