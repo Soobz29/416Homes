@@ -1,0 +1,36 @@
+# Trigger the nightly-style scan on Railway every 3 hours (Option B: API trigger).
+# The scan runs on the API server; this workflow only calls the endpoint.
+name: Refresh Listings (Trigger Scan)
+
+on:
+  schedule:
+    # Every 3 hours at :00 UTC (e.g. 00:00, 03:00, 06:00, 09:00, 12:00, 15:00, 18:00, 21:00)
+    - cron: '0 */3 * * *'
+  workflow_dispatch:
+
+jobs:
+  trigger-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger listing refresh
+        run: |
+          API_URL="${API_BASE_URL%/}"
+          if [ -z "$API_URL" ]; then
+            echo "::error::API_BASE_URL secret is not set. Add it in repo Settings → Secrets."
+            exit 1
+          fi
+          echo "Calling POST $API_URL/api/initiate-scan ..."
+          response=$(curl -s -w "\n%{http_code}" -X POST "$API_URL/api/initiate-scan")
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+          echo "Response ($http_code): $body"
+          if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+            echo "Scan triggered successfully."
+          else
+            echo "::warning::Unexpected status $http_code. Scan may still have started (202 = accepted)."
+            if [ "$http_code" -eq 202 ]; then exit 0; fi
+            exit 1
+          fi
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
