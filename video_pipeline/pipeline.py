@@ -218,6 +218,10 @@ class VideoJobManager:
 
         async with httpx.AsyncClient(follow_redirects=True, timeout=30) as client:
             for idx, url in enumerate(photo_urls):
+                # Only handle absolute http/https URLs; skip relative assets
+                if not isinstance(url, str) or not url.startswith(("http://", "https://")):
+                    logger.warning("Skipping non-http image url for job %s: %r", job_id, url)
+                    continue
                 path = f"{job_id}/frame_{idx:03d}.jpg"
                 try:
                     resp = await client.get(url)
@@ -333,31 +337,32 @@ class VideoJobManager:
                 return
 
             listing_url = job.get("listing_url") or ""
-            await self.update_job_status(job_id, "processing", 10)
+            # Use only statuses allowed by DB CHECK constraint
+            await self.update_job_status(job_id, "generating_script", 10)
 
             # Step 1: Fetch photos from listing URL (or use existing manifest)
             photo_urls = await self._fetch_listing_photos(listing_url)
             if not photo_urls:
                 raise RuntimeError("No photos found for listing_url")
-            await self.update_job_status(job_id, "photos_fetched", 20)
+            await self.update_job_status(job_id, "generating_script", 20)
 
             # Step 2: Upload photos to Supabase Storage and get public URLs
             uploaded_urls = await self._upload_photos_to_storage(job_id, photo_urls)
             if not uploaded_urls:
                 raise RuntimeError("Failed to upload any listing photos")
-            await self.update_job_status(job_id, "photos_uploaded", 30)
+            await self.update_job_status(job_id, "generating_script", 30)
 
             # Step 3: Classify photos with Gemini Vision
             logger.info("Classifying %d uploaded photos for job %s", len(uploaded_urls), job_id)
             photo_manifest = await self.photo_classifier.classify_photos(uploaded_urls)
             self._update_job_record(job_id, photo_manifest=photo_manifest)
-            await self.update_job_status(job_id, "photos_classified", 50)
+            await self.update_job_status(job_id, "generating_script", 50)
 
             # Step 4: Plan scenes
             logger.info("Planning scenes for job %s", job_id)
             scene_plan = self.scene_planner.plan_scenes(photo_manifest, target_duration_sec=30)
             self._update_job_record(job_id, scene_plan=scene_plan)
-            await self.update_job_status(job_id, "scenes_planned", 60)
+            await self.update_job_status(job_id, "generating_script", 60)
 
             # Step 5: Generate script aligned with scenes
             script_data = await self._generate_aligned_script(scene_plan, job)
@@ -372,10 +377,12 @@ class VideoJobManager:
 
             # Step 6: Generate audio (placeholder for ElevenLabs)
             audio_url: Optional[str] = None
-            await self.update_job_status(job_id, "audio_generated", 75, audio_url=audio_url)
+            await self.update_job_status(job_id, "generating_audio", 75, audio_url=audio_url)
+            await self.update_job_status(job_id, "audio_generated", 80, audio_url=audio_url)
 
             # Step 7: Render video with ffmpeg
             logger.info("Rendering video for job %s", job_id)
+            await self.update_job_status(job_id, "generating_video", 90)
             with tempfile.TemporaryDirectory() as tmpdir:
                 renderer = VideoRenderer(Path(tmpdir))
                 video_path = await renderer.render_video(
