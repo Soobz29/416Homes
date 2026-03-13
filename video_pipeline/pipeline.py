@@ -76,13 +76,12 @@ class VideoJobManager:
         }
         
         try:
-            result = self.supabase.table("video_jobs").insert(job_data).execute()
-            if getattr(result, "data", None):
-                logger.info("Created video job %s for %s", job_id, customer_email)
-                asyncio.create_task(self.process_video_job(job_id))
-                return job_id
-            logger.error("Failed to create video job")
-            return None
+            # Rely on Supabase to raise on error; we don't need the returned row.
+            self.supabase.table("video_jobs").insert(job_data).execute()
+            logger.info("Created video job %s for %s", job_id, customer_email)
+            # Start processing asynchronously
+            asyncio.create_task(self.process_video_job(job_id))
+            return job_id
         except Exception as e:  # pragma: no cover - network/db
             logger.error("Error creating video job: %s", e)
             return None
