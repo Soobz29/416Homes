@@ -1,45 +1,60 @@
 import asyncio
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import datetime
+from pathlib import Path
+import tempfile
 import uuid
 import os
+
+import httpx
 from dotenv import load_dotenv
 
 from memory.store import memory_store
-# from elevenlabs import ElevenLabs  # Commented out for now
+from .photo_classifier import PhotoClassifier
+from .scene_planner import ScenePlanner
+from .renderer import VideoRenderer
+
 try:
     # New Gemini SDK (package: google-genai)
     from google import genai as _genai  # type: ignore
     _GENAI_SDK = "google-genai"
 except Exception:  # pragma: no cover
-    # Legacy Gemini SDK (package: google-generativeai)
-    import google.generativeai as _genai  # type: ignore
-    _GENAI_SDK = "google-generativeai"
+    try:
+        # Legacy Gemini SDK (package: google-generativeai)
+        import google.generativeai as _genai  # type: ignore
+        _GENAI_SDK = "google-generativeai"
+    except Exception:  # pragma: no cover
+        _genai = None  # type: ignore[assignment]
+        _GENAI_SDK = "none"
 
 load_dotenv()
 logger = logging.getLogger(__name__)
 
+
 class VideoJobManager:
-    """Manages video generation jobs with Supabase persistence"""
-    
+    """Manages video generation jobs with Supabase persistence."""
+
     def __init__(self):
         self.supabase = memory_store.supabase
-        
-        # Initialize ElevenLabs
-        # self.elevenlabs = ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))  # Commented out
-        
-        # Initialize Gemini
-        api_key = os.getenv("GEMINI_API_KEY")
+
+        # Initialize Gemini (for script generation)
         self.client = None
-        if _GENAI_SDK == "google-genai":
-            self.client = _genai.Client(api_key=api_key)
-        else:
-            _genai.configure(api_key=api_key)
-        self.model_id = "gemini-2.5-flash"
+        api_key = os.getenv("GEMINI_API_KEY")
+        if api_key and _genai is not None and _GENAI_SDK != "none":
+            if _GENAI_SDK == "google-genai":
+                self.client = _genai.Client(api_key=api_key)  # type: ignore[call-arg]
+            else:
+                _genai.configure(api_key=api_key)  # type: ignore[call-arg]
+                self.client = _genai.GenerativeModel("gemini-2.0-flash-exp")  # type: ignore[call-arg]
+        self.model_id = os.getenv("GEMINI_VIDEO_MODEL", "gemini-2.5-flash")
+
+        # Vision + scene planning components
+        self.photo_classifier = PhotoClassifier()
+        self.scene_planner = ScenePlanner()
     
-    async def create_video_job(self, listing_url: str, customer_email: str, 
-                            customer_name: str = None) -> str:
+    async def create_video_job(self, listing_url: str, customer_email: str,
+                               customer_name: str = None) -> str:
         """Create a new video job and persist to database"""
         
         job_id = str(uuid.uuid4())
@@ -62,20 +77,14 @@ class VideoJobManager:
         
         try:
             result = self.supabase.table("video_jobs").insert(job_data).execute()
-            
-            if result.data:
-                logger.info(f"Created video job {job_id} for {customer_email}")
-                
-                # Start processing asynchronously
+            if getattr(result, "data", None):
+                logger.info("Created video job %s for %s", job_id, customer_email)
                 asyncio.create_task(self.process_video_job(job_id))
-                
                 return job_id
-            else:
-                logger.error(f"Failed to create video job")
-                return None
-                
-        except Exception as e:
-            logger.error(f"Error creating video job: {e}")
+            logger.error("Failed to create video job")
+            return None
+        except Exception as e:  # pragma: no cover - network/db
+            logger.error("Error creating video job: %s", e)
             return None
     
     async def get_video_job(self, job_id: str) -> Optional[Dict[str, Any]]:
@@ -87,7 +96,7 @@ class VideoJobManager:
                 .single()\
                 .execute()
             
-            return result.data
+            return getattr(result, "data", None)
             
         except Exception as e:
             logger.error(f"Error getting video job {job_id}: {e}")
@@ -118,84 +127,279 @@ class VideoJobManager:
             update_data["final_video_path"] = final_video_path
         
         try:
-            result = self.supabase.table("video_jobs")\
-                .update(update_data)\
-                .eq("id", job_id)\
+            result = (
+                self.supabase.table("video_jobs")
+                .update(update_data)
+                .eq("id", job_id)
                 .execute()
-            
-            if result.data:
-                logger.info(f"Updated job {job_id} to {status} (progress: {progress}%)")
+            )
+            if getattr(result, "data", None):
+                logger.info("Updated job %s to %s (progress: %s%%)", job_id, status, progress)
             else:
-                logger.error(f"Failed to update job {job_id}")
-                
-        except Exception as e:
-            logger.error(f"Error updating job {job_id}: {e}")
+                logger.error("Failed to update job %s", job_id)
+        except Exception as e:  # pragma: no cover - network/db
+            logger.error("Error updating job %s: %s", job_id, e)
+
+    def _update_job_record(self, job_id: str, **fields: Any) -> None:
+        """Low-level helper to patch arbitrary fields on a video job."""
+        if not fields:
+            return
+        try:
+            (
+                self.supabase.table("video_jobs")
+                .update(fields | {"updated_at": datetime.utcnow().isoformat()})
+                .eq("id", job_id)
+                .execute()
+            )
+        except Exception as e:  # pragma: no cover
+            logger.error("Error patching job %s: %s", job_id, e)
+
+    async def _fetch_listing_photos(self, listing_url: str) -> List[str]:
+        """Fetch photo URLs from a listing detail page (best-effort HTML scrape)."""
+        if not listing_url:
+            return []
+
+        try:
+            async with httpx.AsyncClient(follow_redirects=True, timeout=20) as client:
+                resp = await client.get(listing_url)
+                resp.raise_for_status()
+                html = resp.text
+        except Exception as e:  # pragma: no cover - network dependent
+            logger.error("Failed to fetch listing HTML for %s: %s", listing_url, e)
+            return []
+
+        try:
+            from bs4 import BeautifulSoup  # type: ignore
+        except Exception as e:  # pragma: no cover
+            logger.error("BeautifulSoup not available for photo extraction: %s", e)
+            return []
+
+        soup = BeautifulSoup(html, "html.parser")
+        urls: List[str] = []
+        for img in soup.find_all("img"):
+            src = img.get("src") or img.get("data-src")
+            if not src:
+                continue
+            # Prefer likely listing images
+            if any(
+                token in src
+                for token in (
+                    "cdn.zoocasa.com",
+                    "realtor.ca",
+                    "cloudfront",
+                    "zillowstatic",
+                    "property",
+                    "listing",
+                )
+            ):
+                urls.append(src)
+
+        # Fallback: take any images if filters were too strict
+        if not urls:
+            for img in soup.find_all("img"):
+                src = img.get("src") or img.get("data-src")
+                if src:
+                    urls.append(src)
+
+        # De-duplicate and cap count
+        seen = set()
+        deduped: List[str] = []
+        for u in urls:
+            if u not in seen:
+                seen.add(u)
+                deduped.append(u)
+        return deduped[:15]
+
+    async def _upload_photos_to_storage(self, job_id: str, photo_urls: List[str]) -> List[str]:
+        """Upload remote photos to Supabase Storage and return public URLs."""
+
+        uploaded: List[str] = []
+        if not photo_urls:
+            return uploaded
+
+        async with httpx.AsyncClient(follow_redirects=True, timeout=30) as client:
+            for idx, url in enumerate(photo_urls):
+                path = f"{job_id}/frame_{idx:03d}.jpg"
+                try:
+                    resp = await client.get(url)
+                    resp.raise_for_status()
+                    self.supabase.storage.from_("listing-photos").upload(  # type: ignore[attr-defined]
+                        path,
+                        resp.content,
+                        file_options={"content-type": "image/jpeg"},
+                    )
+                    public_url = (
+                        self.supabase.storage.from_("listing-photos")  # type: ignore[attr-defined]
+                        .get_public_url(path)
+                        .get("publicUrl")
+                    )
+                    if public_url:
+                        uploaded.append(public_url)
+                except Exception as e:  # pragma: no cover - network/storage
+                    logger.error("Failed to upload photo %s for job %s: %s", url, job_id, e)
+
+        return uploaded
+
+    async def _upload_video_to_storage(self, job_id: str, video_path: Path) -> str:
+        """Upload rendered video file to Supabase Storage and return public URL."""
+
+        path = f"{job_id}.mp4"
+        with video_path.open("rb") as f:
+            self.supabase.storage.from_("videos").upload(  # type: ignore[attr-defined]
+                path,
+                f,
+                file_options={"content-type": "video/mp4"},
+            )
+        public_url = (
+            self.supabase.storage.from_("videos")  # type: ignore[attr-defined]
+            .get_public_url(path)
+            .get("publicUrl")
+        )
+        return public_url
+
+    async def _generate_aligned_script(
+        self,
+        scene_plan: List[Dict[str, Any]],
+        job: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Generate a 30-second script roughly aligned with the scene sequence."""
+
+        if not self.client:
+            # Fallback to simple static script if Gemini is not configured
+            return {
+                "headline": "Your Dream Home Awaits",
+                "voiceover_script": (
+                    "Welcome to this beautiful property, featuring bright living spaces and modern finishes. "
+                    "Enjoy generous bedrooms, stylish bathrooms, and inviting common areas perfect for everyday life "
+                    "and entertaining. Reach out today to schedule a private viewing."
+                ),
+                "music_mood": "cinematic_luxury",
+                "key_features": ["Bright living spaces", "Modern finishes", "Great location"],
+            }
+
+        scene_desc = "\n".join(
+            f"{idx+1}. {scene.get('room_type','other').replace('_',' ').title()} "
+            f"({scene['start_time']}-{scene['end_time']}s)"
+            for idx, scene in enumerate(scene_plan)
+        )
+
+        listing_url = job.get("listing_url") or ""
+        prompt = (
+            "Create a 30-second real estate video script that matches the following scene sequence.\n\n"
+            f"Listing URL (for context only, do not open): {listing_url}\n\n"
+            "Scenes:\n"
+            f"{scene_desc}\n\n"
+            "Requirements:\n"
+            "- 70-80 words total\n"
+            "- Opening hook (0-5s): highlight exterior/entry\n"
+            "- Middle (5-25s): walk through key rooms and features\n"
+            "- Closing CTA (25-30s): invite viewer to book a showing\n\n"
+            "Return ONLY JSON in this shape:\n"
+            "{\n"
+            '  \"headline\": \"Short catchy title\",\n'
+            '  \"voiceover_script\": \"Full 70-80 word script matching scene timing\",\n'
+            '  \"music_mood\": \"cinematic_luxury\",\n'
+            '  \"key_features\": [\"feature1\", \"feature2\", \"feature3\"]\n'
+            "}"
+        )
+
+        if _GENAI_SDK == "google-genai":
+            response = self.client.models.generate_content(  # type: ignore[attr-defined]
+                model=self.model_id,
+                contents=[prompt],
+            )
+            text = getattr(response, "text", None)
+        else:
+            response = self.client.generate_content(prompt)  # type: ignore[call-arg]
+            text = getattr(response, "text", None)
+
+        if not text:
+            raise RuntimeError("Gemini script generation response was empty")
+
+        raw = text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1].rsplit("\n```", 1)[0]
+
+        import json as _json
+
+        return _json.loads(raw)
     
     async def process_video_job(self, job_id: str):
-        """Process a video job through the pipeline"""
-        
+        """Process a video job through the intelligent photo-aware pipeline."""
+
         try:
-            # Get job details
             job = await self.get_video_job(job_id)
             if not job:
-                logger.error(f"Job {job_id} not found")
+                logger.error("Job %s not found", job_id)
                 return
-            
-            listing_url = job["listing_url"]
-            
-            # Step 1: Generate script (25%)
-            await self.update_job_status(job_id, "generating_script", 25)
-            script_data = await self.generate_script(listing_url)
-            
+
+            listing_url = job.get("listing_url") or ""
+            await self.update_job_status(job_id, "processing", 10)
+
+            # Step 1: Fetch photos from listing URL (or use existing manifest)
+            photo_urls = await self._fetch_listing_photos(listing_url)
+            if not photo_urls:
+                raise RuntimeError("No photos found for listing_url")
+            await self.update_job_status(job_id, "photos_fetched", 20)
+
+            # Step 2: Upload photos to Supabase Storage and get public URLs
+            uploaded_urls = await self._upload_photos_to_storage(job_id, photo_urls)
+            if not uploaded_urls:
+                raise RuntimeError("Failed to upload any listing photos")
+            await self.update_job_status(job_id, "photos_uploaded", 30)
+
+            # Step 3: Classify photos with Gemini Vision
+            logger.info("Classifying %d uploaded photos for job %s", len(uploaded_urls), job_id)
+            photo_manifest = await self.photo_classifier.classify_photos(uploaded_urls)
+            self._update_job_record(job_id, photo_manifest=photo_manifest)
+            await self.update_job_status(job_id, "photos_classified", 50)
+
+            # Step 4: Plan scenes
+            logger.info("Planning scenes for job %s", job_id)
+            scene_plan = self.scene_planner.plan_scenes(photo_manifest, target_duration_sec=30)
+            self._update_job_record(job_id, scene_plan=scene_plan)
+            await self.update_job_status(job_id, "scenes_planned", 60)
+
+            # Step 5: Generate script aligned with scenes
+            script_data = await self._generate_aligned_script(scene_plan, job)
             if not script_data:
-                await self.update_job_status(
-                    job_id, "failed", 0, "Failed to generate script"
+                raise RuntimeError("Failed to generate aligned script")
+            await self.update_job_status(
+                job_id,
+                "script_generated",
+                70,
+                script_data=script_data,
+            )
+
+            # Step 6: Generate audio (placeholder for ElevenLabs)
+            audio_url: Optional[str] = None
+            await self.update_job_status(job_id, "audio_generated", 75, audio_url=audio_url)
+
+            # Step 7: Render video with ffmpeg
+            logger.info("Rendering video for job %s", job_id)
+            with tempfile.TemporaryDirectory() as tmpdir:
+                renderer = VideoRenderer(Path(tmpdir))
+                video_path = await renderer.render_video(
+                    scene_plan=scene_plan,
+                    audio_url=audio_url,
+                    headline=script_data.get("headline", "Luxury Property"),
+                    output_filename=f"{job_id}.mp4",
                 )
-                return
-            
+
+                video_url = await self._upload_video_to_storage(job_id, video_path)
+
             await self.update_job_status(
-                job_id, "script_generated", 50, 
-                script_data=script_data
+                job_id,
+                "completed",
+                100,
+                video_url=video_url,
+                final_video_path=f"videos/{job_id}.mp4",
             )
-            
-            # Step 2: Generate audio (75%)
-            await self.update_job_status(job_id, "generating_audio", 75)
-            audio_url = await self.generate_audio(script_data["voiceover_script"])
-            
-            if not audio_url:
-                await self.update_job_status(
-                    job_id, "failed", 50, "Failed to generate audio"
-                )
-                return
-            
-            await self.update_job_status(
-                job_id, "audio_generated", 75, 
-                audio_url=audio_url
-            )
-            
-            # Step 3: Generate final video (90%)
-            await self.update_job_status(job_id, "generating_video", 90)
-            video_url = await self.generate_final_video(script_data, audio_url)
-            
-            if not video_url:
-                await self.update_job_status(
-                    job_id, "failed", 75, "Failed to generate final video"
-                )
-                return
-            
-            # Step 4: Complete (100%)
-            await self.update_job_status(
-                job_id, "completed", 100, 
-                video_url=video_url
-            )
-            
-            logger.info(f"Video job {job_id} completed successfully")
-            
-        except Exception as e:
-            logger.error(f"Error processing video job {job_id}: {e}")
-            await self.update_job_status(
-                job_id, "failed", 0, str(e)
-            )
+            logger.info("Video job %s completed successfully: %s", job_id, video_url)
+
+        except Exception as e:  # pragma: no cover - orchestration
+            logger.exception("Error processing video job %s: %s", job_id, e)
+            await self.update_job_status(job_id, "failed", 0, str(e))
     
     async def generate_script(self, listing_url: str) -> Dict[str, Any]:
         """Generate video script from listing URL using Gemini"""
@@ -266,23 +470,6 @@ class VideoJobManager:
             
         except Exception as e:
             logger.error(f"Audio generation failed: {e}")
-            return None
-    
-    async def generate_final_video(self, script_data: Dict, audio_url: str) -> str:
-        """Generate final video with animation"""
-        
-        try:
-            # For demo, return mock URL
-            # In production, this would use Calico AI or ffmpeg
-            video_url = f"https://storage.googleapis.com/416homes-videos/{uuid.uuid4()}.mp4"
-            
-            # Simulate processing time
-            await asyncio.sleep(3)
-            
-            return video_url
-            
-        except Exception as e:
-            logger.error(f"Video generation failed: {e}")
             return None
 
 # Global video job manager
