@@ -76,15 +76,13 @@ class VideoJobManager:
         }
         
         try:
-            # Rely on Supabase to raise on error; we don't need the returned row.
             self.supabase.table("video_jobs").insert(job_data).execute()
-            logger.info("Created video job %s for %s", job_id, customer_email)
-            # Start processing asynchronously
+            logger.info("Created video job: %s", job_id)
             asyncio.create_task(self.process_video_job(job_id))
             return job_id
-        except Exception as e:  # pragma: no cover - network/db
-            logger.error("Error creating video job: %s", e)
-            return None
+        except Exception as e:
+            logger.error("Failed to create video job: %s", e)
+            raise
     
     async def get_video_job(self, job_id: str) -> Optional[Dict[str, Any]]:
         """Get video job status from database"""
@@ -139,19 +137,25 @@ class VideoJobManager:
         except Exception as e:  # pragma: no cover - network/db
             logger.error("Error updating job %s: %s", job_id, e)
 
+    def _update_job(self, job_id: str, **updates: Any) -> None:
+        """Update job fields in Supabase."""
+        try:
+            clean_updates = {k: v for k, v in updates.items() if v is not None}
+
+            if not clean_updates:
+                return
+
+            clean_updates["updated_at"] = datetime.utcnow().isoformat()
+            logger.info("Updating job %s: %s", job_id, list(clean_updates.keys()))
+
+            self.supabase.table("video_jobs").update(clean_updates).eq("id", job_id).execute()
+
+        except Exception as e:
+            logger.error("Failed to update job %s: %s", job_id, e)
+
     def _update_job_record(self, job_id: str, **fields: Any) -> None:
         """Low-level helper to patch arbitrary fields on a video job."""
-        if not fields:
-            return
-        try:
-            (
-                self.supabase.table("video_jobs")
-                .update(fields | {"updated_at": datetime.utcnow().isoformat()})
-                .eq("id", job_id)
-                .execute()
-            )
-        except Exception as e:  # pragma: no cover
-            logger.error("Error patching job %s: %s", job_id, e)
+        self._update_job(job_id, **fields)
 
     async def _fetch_listing_photos(self, listing_url: str) -> List[str]:
         """Fetch photo URLs from a listing detail page (best-effort HTML scrape)."""
@@ -210,38 +214,50 @@ class VideoJobManager:
         return deduped[:15]
 
     async def _upload_photos_to_storage(self, job_id: str, photo_urls: List[str]) -> List[str]:
-        """Upload remote photos to Supabase Storage and return public URLs."""
+        """Upload photos to Supabase Storage."""
 
-        uploaded: List[str] = []
-        if not photo_urls:
-            return uploaded
+        valid_urls = [
+            url for url in photo_urls
+            if isinstance(url, str) and (url.startswith("http://") or url.startswith("https://"))
+        ]
 
-        async with httpx.AsyncClient(follow_redirects=True, timeout=30) as client:
-            for idx, url in enumerate(photo_urls):
-                # Only handle absolute http/https URLs; skip relative assets
-                if not isinstance(url, str) or not url.startswith(("http://", "https://")):
-                    logger.warning("Skipping non-http image url for job %s: %r", job_id, url)
-                    continue
-                path = f"{job_id}/frame_{idx:03d}.jpg"
+        logger.info("Filtered %d URLs -> %d valid URLs", len(photo_urls), len(valid_urls))
+
+        if not valid_urls:
+            logger.warning("No valid photo URLs found (all were relative paths)")
+            raise RuntimeError("No valid photo URLs to upload")
+
+        uploaded_urls: List[str] = []
+
+        async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
+            for idx, url in enumerate(valid_urls):
                 try:
-                    resp = await client.get(url)
-                    resp.raise_for_status()
+                    logger.info("Downloading photo %d/%d: %s", idx + 1, len(valid_urls), url)
+                    response = await client.get(url)
+                    response.raise_for_status()
+
+                    path = f"{job_id}/frame_{idx:03d}.jpg"
+                    logger.info("Uploading to listing-photos/%s", path)
+
                     self.supabase.storage.from_("listing-photos").upload(  # type: ignore[attr-defined]
                         path,
-                        resp.content,
+                        response.content,
                         file_options={"content-type": "image/jpeg"},
                     )
-                    public_url = (
-                        self.supabase.storage.from_("listing-photos")  # type: ignore[attr-defined]
-                        .get_public_url(path)
-                        .get("publicUrl")
-                    )
-                    if public_url:
-                        uploaded.append(public_url)
-                except Exception as e:  # pragma: no cover - network/storage
-                    logger.error("Failed to upload photo %s for job %s: %s", url, job_id, e)
 
-        return uploaded
+                    pub = self.supabase.storage.from_("listing-photos").get_public_url(path)  # type: ignore[attr-defined]
+                    public_url = pub.get("publicUrl") if isinstance(pub, dict) else pub
+                    if public_url:
+                        uploaded_urls.append(public_url)
+                    logger.info("Successfully uploaded photo %d", idx + 1)
+                except Exception as e:
+                    logger.error("Failed to upload photo %d from %s: %s", idx, url, e)
+
+        if not uploaded_urls:
+            raise RuntimeError("Failed to upload any listing photos")
+
+        logger.info("Successfully uploaded %d photos", len(uploaded_urls))
+        return uploaded_urls
 
     async def _upload_video_to_storage(self, job_id: str, video_path: Path) -> str:
         """Upload rendered video file to Supabase Storage and return public URL."""

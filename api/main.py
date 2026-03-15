@@ -631,24 +631,14 @@ async def create_video_job_endpoint(request: VideoJobRequest):
             customer_email=request.customer_email,
             customer_name=request.customer_name
         )
-        
-        if job_id:
-            return VideoJobResponse(
-                id=job_id,
-                status="pending",
-                message="Video job created successfully"
-            )
-        else:
-            raise HTTPException(status_code=500, detail="Failed to create video job")
-            
-    except Exception as e:
-        logger.error(f"Error creating video job: {e}")
-        # Return demo job for testing
         return VideoJobResponse(
-            id="demo-job-123",
+            id=job_id,
             status="pending",
-            message="Demo video job created successfully"
+            message="Video job created successfully"
         )
+    except Exception as e:
+        logger.error("Error creating video job: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to create video job")
 
 @app.get("/api/video-jobs/{job_id}")
 async def get_video_job(job_id: str):
