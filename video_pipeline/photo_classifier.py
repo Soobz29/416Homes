@@ -7,6 +7,7 @@ import base64
 import json
 
 import httpx
+from google.genai import types
 
 logger = logging.getLogger(__name__)
 
@@ -124,11 +125,13 @@ class PhotoClassifier:
             response = self.client.models.generate_content(  # type: ignore[attr-defined]
                 model=self.model_id,
                 contents=[
-                    prompt,
-                    {
-                        "mime_type": "image/jpeg",
-                        "data": base64.b64encode(image_data).decode("utf-8"),
-                    },
+                    types.Part(text=prompt),
+                    types.Part(
+                        inline_data=types.Blob(
+                            mime_type="image/jpeg",
+                            data=base64.b64encode(image_data).decode("utf-8"),
+                        )
+                    ),
                 ],
             )
             text = getattr(response, "text", None) or "".join(
