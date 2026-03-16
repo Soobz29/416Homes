@@ -48,7 +48,7 @@ class PhotoClassifier:
 
         if _GENAI_SDK == "google-genai":
             self.client = _genai.Client(api_key=api_key)  # type: ignore[attr-defined]
-            self.model_id = os.getenv("GEMINI_VISION_MODEL", "gemini-2.0-flash-exp")
+            self.model_id = os.getenv("GEMINI_VISION_MODEL", "gemini-2.0-flash-001")
         else:
             _genai.configure(api_key=api_key)  # type: ignore[call-arg]
             self.client = _genai.GenerativeModel(  # type: ignore[call-arg]

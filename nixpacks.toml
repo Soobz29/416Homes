@@ -1,3 +1,2 @@
-# System deps for Python packages (e.g. lxml) so Railway/Nixpacks build succeeds
 [phases.setup]
-nixPkgs = ["...", "libxml2", "libxslt"]
+nixPkgs = ["python312", "ffmpeg"]
