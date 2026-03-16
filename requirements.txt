@@ -10,6 +10,7 @@ python-telegram-bot==22.6
 
 # LLM/Embeddings
 google-genai>=1.0.0,<2
+google-cloud-aiplatform>=1.45.0
 
 # Video/Audio
 elevenlabs==1.54.0

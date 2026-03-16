@@ -7,22 +7,10 @@ import base64
 import json
 
 import httpx
-from google.genai import types
+from google.cloud import aiplatform
+from vertexai.generative_models import GenerativeModel, Part
 
 logger = logging.getLogger(__name__)
-
-try:
-    # Prefer new google-genai SDK when available
-    from google import genai as _genai  # type: ignore
-    _GENAI_SDK = "google-genai"
-except Exception:  # pragma: no cover
-    try:
-        # Fallback to legacy google-generativeai
-        import google.generativeai as _genai  # type: ignore
-        _GENAI_SDK = "google-generativeai"
-    except Exception:  # pragma: no cover
-        _genai = None  # type: ignore[assignment]
-        _GENAI_SDK = "none"
 
 
 class PhotoClassifier:
@@ -42,19 +30,20 @@ class PhotoClassifier:
     ]
 
     def __init__(self) -> None:
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key or _genai is None or _GENAI_SDK == "none":
-            raise ValueError("GEMINI_API_KEY and Gemini SDK are required for photo classification")
+        # Decode service account key for Vertex AI (optional)
+        vertex_key_b64 = os.getenv("VERTEX_KEY_BASE64")
+        if vertex_key_b64:
+            key_json = base64.b64decode(vertex_key_b64).decode("utf-8")
+            key_path = "/tmp/vertex-key.json"
+            with open(key_path, "w", encoding="utf-8") as f:
+                f.write(key_json)
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = key_path
 
-        if _GENAI_SDK == "google-genai":
-            self.client = _genai.Client(api_key=api_key)  # type: ignore[attr-defined]
-            self.model_id = os.getenv("GEMINI_VISION_MODEL", "gemini-2.0-flash-001")
-        else:
-            _genai.configure(api_key=api_key)  # type: ignore[call-arg]
-            self.client = _genai.GenerativeModel(  # type: ignore[call-arg]
-                os.getenv("GEMINI_VISION_MODEL", "gemini-1.5-flash")
-            )
-            self.model_id = ""
+        project = os.getenv("GOOGLE_CLOUD_PROJECT", "416homes")
+        location = os.getenv("VERTEX_AI_LOCATION", "us-central1")
+
+        aiplatform.init(project=project, location=location)
+        self.model = GenerativeModel("gemini-2.0-flash-001")
 
     async def classify_photos(self, photo_urls: List[str]) -> List[Dict[str, Any]]:
         """
@@ -120,43 +109,21 @@ class PhotoClassifier:
             "Return ONLY valid JSON, no markdown."
         )
 
-        if _GENAI_SDK == "google-genai":
-            # New google-genai SDK
-            response = self.client.models.generate_content(  # type: ignore[attr-defined]
-                model=self.model_id,
-                contents=[
-                    types.Part(text=prompt),
-                    types.Part(
-                        inline_data=types.Blob(
-                            mime_type="image/jpeg",
-                            data=base64.b64encode(image_data).decode("utf-8"),
-                        )
-                    ),
-                ],
-            )
-            text = getattr(response, "text", None) or "".join(
-                [c.text for c in getattr(response, "candidates", []) if getattr(c, "text", None)]
-            )
-        else:
-            # Legacy google-generativeai
-            response = self.client.generate_content(  # type: ignore[call-arg]
-                [
-                    prompt,
-                    {
-                        "mime_type": "image/jpeg",
-                        "data": base64.b64encode(image_data).decode("utf-8"),
-                    },
-                ]
-            )
-            # Response schema differs; try common attributes
-            text = getattr(response, "text", None)
-            if not text and getattr(response, "candidates", None):
-                parts = []
-                for c in response.candidates:
-                    for p in getattr(c, "content", []).parts:
-                        if getattr(p, "text", None):
-                            parts.append(p.text)
-                text = "".join(parts)
+        response = self.model.generate_content(
+            [
+                prompt,
+                Part.from_bytes(data=image_data, mime_type="image/jpeg"),
+            ]
+        )
+
+        text = getattr(response, "text", None)
+        if not text and getattr(response, "candidates", None):
+            parts = []
+            for c in response.candidates:
+                for p in getattr(c, "content", []).parts:
+                    if getattr(p, "text", None):
+                        parts.append(p.text)
+            text = "".join(parts)
 
         if not text:
             raise RuntimeError("Gemini vision response was empty")
