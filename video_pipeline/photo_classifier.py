@@ -86,54 +86,48 @@ class PhotoClassifier:
         return classified
 
     async def _classify_single_photo(self, photo_url: str) -> Dict[str, Any]:
-        """Classify a single photo using Gemini Vision."""
+        """Classify a single photo using Vertex AI."""
 
-        async with httpx.AsyncClient(follow_redirects=True, timeout=20) as client:
-            resp = await client.get(photo_url)
-            resp.raise_for_status()
-            image_data = resp.content
+        # Download image
+        async with httpx.AsyncClient() as client:
+            response = await client.get(photo_url)
+            response.raise_for_status()
+            image_data = response.content
 
-        prompt = (
-            "Analyze this property listing photo and return JSON with:\n\n"
-            f'- "room_type": one of {self.ROOM_TYPES}\n'
-            '- "quality_score": 0.0-1.0 (technical quality: lighting, focus, composition)\n'
-            '- "features": list of 2-4 key visual features\n'
-            '- "order_priority": 1-10 (1=show last, 10=hero shot/show first)\n\n'
-            "Rules:\n"
-            "- Exterior/entry photos get priority 9-10\n"
-            "- Kitchen/living get priority 7-9\n"
-            "- Bedrooms get priority 5-7\n"
-            "- Bathrooms get priority 4-6\n"
-            "- Floorplans/views get priority 3-5\n"
-            "- Blurry/dark photos get quality_score < 0.5\n\n"
-            "Return ONLY valid JSON, no markdown."
-        )
+        # Prepare prompt
+        prompt = f"""Analyze this property listing photo and return JSON with:
 
-        response = self.model.generate_content(
-            [
-                prompt,
-                Part.from_bytes(data=image_data, mime_type="image/jpeg"),
-            ]
-        )
+- "room_type": one of {self.ROOM_TYPES}
+- "quality_score": 0.0-1.0 (technical quality: lighting, focus, composition)
+- "features": list of 2-4 key visual features
+- "order_priority": 1-10 (1=show last, 10=hero shot/show first)
 
-        text = getattr(response, "text", None)
-        if not text and getattr(response, "candidates", None):
-            parts = []
-            for c in response.candidates:
-                for p in getattr(c, "content", []).parts:
-                    if getattr(p, "text", None):
-                        parts.append(p.text)
-            text = "".join(parts)
+Rules:
+- Exterior/entry photos get priority 9-10
+- Kitchen/living get priority 7-9
+- Bedrooms get priority 5-7
+- Bathrooms get priority 4-6
+- Floorplans/views get priority 3-5
+- Blurry/dark photos get quality_score < 0.5
 
-        if not text:
-            raise RuntimeError("Gemini vision response was empty")
+Return ONLY valid JSON, no markdown.
+"""
 
-        result_text = text.strip()
+        # Use Vertex AI format
+        from vertexai.generative_models import Part, Image
+
+        image_part = Part.from_data(data=image_data, mime_type="image/jpeg")
+
+        response = self.model.generate_content([prompt, image_part])
+
+        # Parse JSON response
+        import json
+        result_text = response.text.strip()
         if result_text.startswith("```"):
-            # Strip markdown fences if model added them
             result_text = result_text.split("\n", 1)[1].rsplit("\n```", 1)[0]
 
-        data = json.loads(result_text)
-        data["url"] = photo_url
-        return data
+        result = json.loads(result_text)
+        result["url"] = photo_url
+
+        return result
 

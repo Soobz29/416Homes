@@ -49,6 +49,26 @@ class VideoJobManager:
                 self.client = _genai.GenerativeModel("gemini-2.0-flash-exp")  # type: ignore[call-arg]
         self.model_id = os.getenv("GEMINI_VIDEO_MODEL", "gemini-2.5-flash")
 
+        # Vertex AI setup (decode service account key)
+        import json
+        import base64
+        from google.cloud import aiplatform
+        from vertexai.generative_models import GenerativeModel
+
+        vertex_key_b64 = os.getenv("VERTEX_KEY_BASE64")
+        if vertex_key_b64:
+            key_json = base64.b64decode(vertex_key_b64).decode('utf-8')
+            key_path = "/tmp/vertex-key.json"
+            with open(key_path, 'w') as f:
+                f.write(key_json)
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = key_path
+
+        project = os.getenv("GOOGLE_CLOUD_PROJECT", "416homes")
+        location = os.getenv("VERTEX_AI_LOCATION", "us-central1")
+
+        aiplatform.init(project=project, location=location)
+        self.vertex_model = GenerativeModel("gemini-2.0-flash-001")
+
         # Vision + scene planning components
         self.photo_classifier = PhotoClassifier()
         self.scene_planner = ScenePlanner()
@@ -322,15 +342,8 @@ class VideoJobManager:
             "}"
         )
 
-        if _GENAI_SDK == "google-genai":
-            response = self.client.models.generate_content(  # type: ignore[attr-defined]
-                model=self.model_id,
-                contents=[prompt],
-            )
-            text = getattr(response, "text", None)
-        else:
-            response = self.client.generate_content(prompt)  # type: ignore[call-arg]
-            text = getattr(response, "text", None)
+        response = self.vertex_model.generate_content(prompt)
+        text = getattr(response, "text", None)
 
         if not text:
             raise RuntimeError("Gemini script generation response was empty")
