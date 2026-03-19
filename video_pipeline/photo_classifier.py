@@ -59,7 +59,7 @@ class PhotoClassifier:
         print(f"Initializing Vertex AI: project={project}, location={location}")
         aiplatform.init(project=project, location=location)
 
-        self.model = GenerativeModel("gemini-2.0-flash-001")
+        self.model = GenerativeModel("gemini-1.5-flash-001")
         print("✅ Vertex AI model initialized")
 
     async def classify_photos(self, photo_urls: List[str]) -> List[Dict[str, Any]]:
