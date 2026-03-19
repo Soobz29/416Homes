@@ -114,55 +114,29 @@ class VideoRenderer:
             # Repeat last image to ensure proper duration
             f.write(f"file '{photo_paths[-1]}'\n")
 
-        # Escape headline for drawtext (we wrap it in single quotes)
-        safe_headline = headline.replace("'", r"\'")
-
-        drawtext_filter = (
-            "fps=25,"
-            "scale=1920:1080:force_original_aspect_ratio=decrease,"
-            "pad=1920:1080:(ow-iw)/2:(oh-ih)/2,"
-            f"drawtext=text='{safe_headline}':fontsize=60:fontcolor=white:"
-            "x=(w-text_w)/2:y=50:borderw=3:bordercolor=black"
-        )
-
-        # Simple ffmpeg command - concat images and overlay headline
+        # Simple ffmpeg command - silent concat slideshow (no drawtext overlay)
         cmd: List[str] = [
             "ffmpeg",
-            "-y",  # Overwrite output
+            "-y",
             "-f",
             "concat",
             "-safe",
             "0",
             "-i",
             concat_file,
+            "-vf",
+            "fps=25,scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",  # Fast encoding
+            "-crf",
+            "28",  # Lower quality for speed
+            "-t",
+            "30",
+            "-an",  # No audio for now
+            str(output_path),
         ]
-
-        if audio_path:
-            cmd.extend(["-i", str(audio_path)])
-
-        cmd.extend(
-            [
-                "-vf",
-                drawtext_filter,
-                "-c:v",
-                "libx264",
-                "-c:a",
-                "aac",
-            ]
-        )
-
-        if audio_path:
-            cmd.append("-shortest")
-        else:
-            cmd.append("-an")  # no audio input
-
-        cmd.extend(
-            [
-                "-t",
-                "30",  # Limit to 30 seconds
-                str(output_path),
-            ]
-        )
 
         logger.info("Running ffmpeg (showing first args): %s", " ".join(cmd[:10]))
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
