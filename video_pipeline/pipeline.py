@@ -59,7 +59,7 @@ class VideoJobManager:
                 location = os.getenv("VERTEX_AI_LOCATION", "us-central1")
 
                 aiplatform.init(project=project, location=location)
-                self.vertex_model = GenerativeModel("gemini-1.5-flash-001")
+                self.vertex_model = GenerativeModel("publishers/google/models/gemini-1.5-flash")
                 logger.info("✅ Vertex AI initialized for script generation")
             except Exception as e:
                 logger.error(f"Failed to initialize Vertex AI: {e}")
