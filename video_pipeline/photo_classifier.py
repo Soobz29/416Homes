@@ -29,21 +29,38 @@ class PhotoClassifier:
         "other",
     ]
 
-    def __init__(self) -> None:
-        # Decode service account key for Vertex AI (optional)
+    def __init__(self):
+        """Initialize Vertex AI photo classifier."""
+        import os
+        import json
+        import base64
+        from google.cloud import aiplatform
+        from vertexai.generative_models import GenerativeModel
+
+        # Decode and write service account key to file
         vertex_key_b64 = os.getenv("VERTEX_KEY_BASE64")
-        if vertex_key_b64:
-            key_json = base64.b64decode(vertex_key_b64).decode("utf-8")
+        if not vertex_key_b64:
+            raise ValueError("VERTEX_KEY_BASE64 environment variable required")
+
+        try:
+            key_json = base64.b64decode(vertex_key_b64).decode('utf-8')
             key_path = "/tmp/vertex-key.json"
-            with open(key_path, "w", encoding="utf-8") as f:
+            with open(key_path, 'w') as f:
                 f.write(key_json)
             os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = key_path
+            print(f"✅ Service account key loaded from {key_path}")
+        except Exception as e:
+            raise ValueError(f"Failed to decode VERTEX_KEY_BASE64: {e}")
 
-        project = os.getenv("GOOGLE_CLOUD_PROJECT", "416homes")
+        # Initialize Vertex AI
+        project = os.getenv("GOOGLE_CLOUD_PROJECT", "homes-490422")
         location = os.getenv("VERTEX_AI_LOCATION", "us-central1")
 
+        print(f"Initializing Vertex AI: project={project}, location={location}")
         aiplatform.init(project=project, location=location)
+
         self.model = GenerativeModel("gemini-2.0-flash-001")
+        print("✅ Vertex AI model initialized")
 
     async def classify_photos(self, photo_urls: List[str]) -> List[Dict[str, Any]]:
         """
@@ -87,6 +104,8 @@ class PhotoClassifier:
 
     async def _classify_single_photo(self, photo_url: str) -> Dict[str, Any]:
         """Classify a single photo using Vertex AI."""
+        import httpx
+        from vertexai.generative_models import Part
 
         # Download image
         async with httpx.AsyncClient() as client:
@@ -98,26 +117,17 @@ class PhotoClassifier:
         prompt = f"""Analyze this property listing photo and return JSON with:
 
 - "room_type": one of {self.ROOM_TYPES}
-- "quality_score": 0.0-1.0 (technical quality: lighting, focus, composition)
-- "features": list of 2-4 key visual features
-- "order_priority": 1-10 (1=show last, 10=hero shot/show first)
-
-Rules:
-- Exterior/entry photos get priority 9-10
-- Kitchen/living get priority 7-9
-- Bedrooms get priority 5-7
-- Bathrooms get priority 4-6
-- Floorplans/views get priority 3-5
-- Blurry/dark photos get quality_score < 0.5
+- "quality_score": 0.0-1.0
+- "features": list of 2-4 key features
+- "order_priority": 1-10
 
 Return ONLY valid JSON, no markdown.
 """
 
-        # Use Vertex AI format
-        from vertexai.generative_models import Part, Image
-
+        # Create image part using Vertex AI format
         image_part = Part.from_data(data=image_data, mime_type="image/jpeg")
 
+        # Call Vertex AI
         response = self.model.generate_content([prompt, image_part])
 
         # Parse JSON response

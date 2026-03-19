@@ -38,6 +38,36 @@ class VideoJobManager:
     def __init__(self):
         self.supabase = memory_store.supabase
 
+        # Initialize Vertex AI for script generation
+        import os
+        import json
+        import base64
+        from google.cloud import aiplatform
+        from vertexai.generative_models import GenerativeModel
+
+        # Decode and write service account key (same as photo_classifier)
+        vertex_key_b64 = os.getenv("VERTEX_KEY_BASE64")
+        if vertex_key_b64:
+            try:
+                key_json = base64.b64decode(vertex_key_b64).decode('utf-8')
+                key_path = "/tmp/vertex-key.json"
+                with open(key_path, 'w') as f:
+                    f.write(key_json)
+                os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = key_path
+
+                project = os.getenv("GOOGLE_CLOUD_PROJECT", "homes-490422")
+                location = os.getenv("VERTEX_AI_LOCATION", "us-central1")
+
+                aiplatform.init(project=project, location=location)
+                self.vertex_model = GenerativeModel("gemini-2.0-flash-001")
+                logger.info("✅ Vertex AI initialized for script generation")
+            except Exception as e:
+                logger.error(f"Failed to initialize Vertex AI: {e}")
+                self.vertex_model = None
+        else:
+            logger.warning("VERTEX_KEY_BASE64 not set, script generation will fail")
+            self.vertex_model = None
+
         # Initialize Gemini (for script generation)
         self.client = None
         api_key = os.getenv("GEMINI_API_KEY")
@@ -48,26 +78,6 @@ class VideoJobManager:
                 _genai.configure(api_key=api_key)  # type: ignore[call-arg]
                 self.client = _genai.GenerativeModel("gemini-2.0-flash-exp")  # type: ignore[call-arg]
         self.model_id = os.getenv("GEMINI_VIDEO_MODEL", "gemini-2.5-flash")
-
-        # Vertex AI setup (decode service account key)
-        import json
-        import base64
-        from google.cloud import aiplatform
-        from vertexai.generative_models import GenerativeModel
-
-        vertex_key_b64 = os.getenv("VERTEX_KEY_BASE64")
-        if vertex_key_b64:
-            key_json = base64.b64decode(vertex_key_b64).decode('utf-8')
-            key_path = "/tmp/vertex-key.json"
-            with open(key_path, 'w') as f:
-                f.write(key_json)
-            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = key_path
-
-        project = os.getenv("GOOGLE_CLOUD_PROJECT", "416homes")
-        location = os.getenv("VERTEX_AI_LOCATION", "us-central1")
-
-        aiplatform.init(project=project, location=location)
-        self.vertex_model = GenerativeModel("gemini-2.0-flash-001")
 
         # Vision + scene planning components
         self.photo_classifier = PhotoClassifier()
@@ -341,6 +351,9 @@ class VideoJobManager:
             '  \"key_features\": [\"feature1\", \"feature2\", \"feature3\"]\n'
             "}"
         )
+
+        if not self.vertex_model:
+            raise RuntimeError("Vertex AI not initialized")
 
         response = self.vertex_model.generate_content(prompt)
         text = getattr(response, "text", None)
