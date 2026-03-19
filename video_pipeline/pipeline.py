@@ -287,11 +287,22 @@ class VideoJobManager:
                 f,
                 file_options={"content-type": "video/mp4"},
             )
-        public_url = (
+        pub = (
             self.supabase.storage.from_("videos")  # type: ignore[attr-defined]
             .get_public_url(path)
-            .get("publicUrl")
         )
+
+        # `get_public_url()` may return either:
+        # 1) {"publicUrl": "..."} (dict)
+        # 2) "..." (string URL)
+        if isinstance(pub, dict):
+            public_url = pub.get("publicUrl")
+        else:
+            public_url = pub
+
+        if not public_url:
+            raise RuntimeError("Supabase get_public_url returned empty value")
+
         return public_url
 
     async def _generate_aligned_script(
