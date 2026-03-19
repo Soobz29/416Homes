@@ -38,10 +38,10 @@ class PhotoClassifier:
         if hasattr(genai, "configure"):
             genai.configure(api_key=api_key)  # type: ignore[attr-defined]
             self._genai_client = None
-            self.model = genai.GenerativeModel("gemini-1.5-flash")  # type: ignore[attr-defined]
+            self.model = genai.GenerativeModel("gemini-2.5-flash-lite")  # type: ignore[attr-defined]
         else:
             self._genai_client = genai.Client(api_key=api_key)  # type: ignore[attr-defined]
-            self.model = "gemini-1.5-flash"
+            self.model = "gemini-2.5-flash-lite"
 
         print("✅ Vertex AI Studio API key configured")
 

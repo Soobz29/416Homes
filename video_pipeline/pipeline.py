@@ -49,10 +49,10 @@ class VideoJobManager:
         if hasattr(genai, "configure"):
             genai.configure(api_key=api_key)  # type: ignore[attr-defined]
             self._vertex_client = None
-            self.vertex_model = genai.GenerativeModel("gemini-1.5-flash")  # type: ignore[attr-defined]
+            self.vertex_model = genai.GenerativeModel("gemini-2.5-flash-lite")  # type: ignore[attr-defined]
         else:
             self._vertex_client = genai.Client(api_key=api_key)  # type: ignore[attr-defined]
-            self.vertex_model = "gemini-1.5-flash"
+            self.vertex_model = "gemini-2.5-flash-lite"
 
         logger.info("✅ Vertex AI Studio API key configured for script generation")
 
