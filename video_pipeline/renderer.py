@@ -94,86 +94,80 @@ class VideoRenderer:
         headline: str,
         output_path: Path,
     ) -> None:
-        """Render slideshow with basic Ken Burns and crossfades using ffmpeg."""
+        """Render a simple slideshow without complex filters.
 
-        total_duration = scene_plan[-1]["end_time"] if scene_plan else 30.0
-        duration_per_photo = max(total_duration / len(photo_paths), 1.5)
+        This intentionally avoids `zoompan`/`filter_complex` pipelines that can hang.
+        """
 
-        filters: List[str] = []
+        if not photo_paths:
+            raise ValueError("photo_paths must not be empty")
 
-        # Per-photo zoompan
-        for idx, (photo_path, scene) in enumerate(zip(photo_paths, scene_plan)):
-            kb = scene.get("ken_burns", {}) or {}
-            zoom_direction = kb.get("zoom", "in")
+        # Calculate duration per photo (30 second video total)
+        duration_per_photo = 30.0 / len(photo_paths)
 
-            frame_count = int(duration_per_photo * 25)
-            if zoom_direction == "in":
-                zoom_expr = "min(zoom+0.0015,1.5)"
-            else:
-                zoom_expr = "if(lte(zoom,1.0),1.5,max(1.001,zoom-0.0015))"
+        # Create concat file for ffmpeg
+        concat_file = "/tmp/concat.txt"
+        with open(concat_file, "w", encoding="utf-8") as f:
+            for photo in photo_paths:
+                f.write(f"file '{photo}'\n")
+                f.write(f"duration {duration_per_photo}\n")
+            # Repeat last image to ensure proper duration
+            f.write(f"file '{photo_paths[-1]}'\n")
 
-            zoom_filter = (
-                f"[{idx}:v]zoompan=z='{zoom_expr}':d={frame_count}:s=1920x1080,setsar=1[v{idx}]"
-            )
-            filters.append(zoom_filter)
-
-        concat_inputs = "".join(f"[v{i}]" for i in range(len(photo_paths)))
-        filters.append(f"{concat_inputs}concat=n={len(photo_paths)}:v=1:a=0[outv]")
-
-        # Title overlay for first few seconds
+        # Escape headline for drawtext (we wrap it in single quotes)
         safe_headline = headline.replace("'", r"\'")
-        title_filter = (
-            f"[outv]drawtext=text='{safe_headline}':fontsize=60:fontcolor=white:"
-            "x=(w-text_w)/2:y=100:enable='between(t,0,3)'[titled]"
+
+        drawtext_filter = (
+            "fps=25,"
+            "scale=1920:1080:force_original_aspect_ratio=decrease,"
+            "pad=1920:1080:(ow-iw)/2:(oh-ih)/2,"
+            f"drawtext=text='{safe_headline}':fontsize=60:fontcolor=white:"
+            "x=(w-text_w)/2:y=50:borderw=3:bordercolor=black"
         )
-        filters.append(title_filter)
 
-        filter_complex = ";".join(filters)
-
-        cmd: List[str] = ["ffmpeg", "-y"]
-
-        for photo_path in photo_paths:
-            cmd.extend(["-loop", "1", "-t", f"{duration_per_photo:.2f}", "-i", str(photo_path)])
+        # Simple ffmpeg command - concat images and overlay headline
+        cmd: List[str] = [
+            "ffmpeg",
+            "-y",  # Overwrite output
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            concat_file,
+        ]
 
         if audio_path:
             cmd.extend(["-i", str(audio_path)])
 
         cmd.extend(
             [
-                "-filter_complex",
-                filter_complex,
-                "-map",
-                "[titled]",
+                "-vf",
+                drawtext_filter,
+                "-c:v",
+                "libx264",
+                "-c:a",
+                "aac",
             ]
         )
 
         if audio_path:
-            cmd.extend(["-map", f"{len(photo_paths)}:a"])
+            cmd.append("-shortest")
+        else:
+            cmd.append("-an")  # no audio input
 
         cmd.extend(
             [
-                "-c:v",
-                "libx264",
-                "-preset",
-                "medium",
-                "-crf",
-                "23",
-                "-pix_fmt",
-                "yuv420p",
-                "-shortest",
+                "-t",
+                "30",  # Limit to 30 seconds
                 str(output_path),
             ]
         )
 
         logger.info("Running ffmpeg (showing first args): %s", " ".join(cmd[:10]))
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
 
         if result.returncode != 0:
             logger.error("ffmpeg failed: %s", result.stderr)
-            raise RuntimeError(f"ffmpeg render failed: {result.stderr}")
+            raise RuntimeError(f"FFmpeg failed: {result.stderr}")
 
