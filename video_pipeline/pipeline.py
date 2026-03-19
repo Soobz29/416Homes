@@ -38,35 +38,23 @@ class VideoJobManager:
     def __init__(self):
         self.supabase = memory_store.supabase
 
-        # Initialize Vertex AI for script generation
-        import os
-        import json
-        import base64
-        from google.cloud import aiplatform
-        from vertexai.generative_models import GenerativeModel
+        # Initialize Vertex AI Studio (API key) for script generation
+        import google.genai as genai
 
-        # Decode and write service account key (same as photo_classifier)
-        vertex_key_b64 = os.getenv("VERTEX_KEY_BASE64")
-        if vertex_key_b64:
-            try:
-                key_json = base64.b64decode(vertex_key_b64).decode('utf-8')
-                key_path = "/tmp/vertex-key.json"
-                with open(key_path, 'w') as f:
-                    f.write(key_json)
-                os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = key_path
+        # Vertex AI Studio uses API key (uses free credits!)
+        api_key = os.getenv("VERTEX_AI_API_KEY")
+        if not api_key:
+            raise ValueError("VERTEX_AI_API_KEY required")
 
-                project = os.getenv("GOOGLE_CLOUD_PROJECT", "homes-490422")
-                location = os.getenv("VERTEX_AI_LOCATION", "us-central1")
-
-                aiplatform.init(project=project, location=location)
-                self.vertex_model = GenerativeModel("publishers/google/models/gemini-1.5-flash")
-                logger.info("✅ Vertex AI initialized for script generation")
-            except Exception as e:
-                logger.error(f"Failed to initialize Vertex AI: {e}")
-                self.vertex_model = None
+        if hasattr(genai, "configure"):
+            genai.configure(api_key=api_key)  # type: ignore[attr-defined]
+            self._vertex_client = None
+            self.vertex_model = genai.GenerativeModel("gemini-1.5-flash")  # type: ignore[attr-defined]
         else:
-            logger.warning("VERTEX_KEY_BASE64 not set, script generation will fail")
-            self.vertex_model = None
+            self._vertex_client = genai.Client(api_key=api_key)  # type: ignore[attr-defined]
+            self.vertex_model = "gemini-1.5-flash"
+
+        logger.info("✅ Vertex AI Studio API key configured for script generation")
 
         # Initialize Gemini (for script generation)
         self.client = None
@@ -355,8 +343,15 @@ class VideoJobManager:
         if not self.vertex_model:
             raise RuntimeError("Vertex AI not initialized")
 
-        response = self.vertex_model.generate_content(prompt)
-        text = getattr(response, "text", None)
+        if self._vertex_client is None:
+            response = self.vertex_model.generate_content(prompt)  # type: ignore[union-attr]
+            text = getattr(response, "text", None)
+        else:
+            response = self._vertex_client.models.generate_content(  # type: ignore[union-attr]
+                model=self.vertex_model,
+                contents=prompt,
+            )
+            text = getattr(response, "text", None)
 
         if not text:
             raise RuntimeError("Gemini script generation response was empty")

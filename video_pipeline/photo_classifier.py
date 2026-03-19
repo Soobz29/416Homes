@@ -3,12 +3,8 @@
 import os
 import logging
 from typing import List, Dict, Any
-import base64
-import json
 
 import httpx
-from google.cloud import aiplatform
-from vertexai.generative_models import GenerativeModel, Part
 
 logger = logging.getLogger(__name__)
 
@@ -31,36 +27,23 @@ class PhotoClassifier:
 
     def __init__(self):
         """Initialize Vertex AI photo classifier."""
-        import os
-        import json
-        import base64
-        from google.cloud import aiplatform
-        from vertexai.generative_models import GenerativeModel
+        import google.genai as genai
 
-        # Decode and write service account key to file
-        vertex_key_b64 = os.getenv("VERTEX_KEY_BASE64")
-        if not vertex_key_b64:
-            raise ValueError("VERTEX_KEY_BASE64 environment variable required")
+        # Vertex AI Studio uses API key (uses free credits!)
+        api_key = os.getenv("VERTEX_AI_API_KEY")
+        if not api_key:
+            raise ValueError("VERTEX_AI_API_KEY required")
 
-        try:
-            key_json = base64.b64decode(vertex_key_b64).decode('utf-8')
-            key_path = "/tmp/vertex-key.json"
-            with open(key_path, 'w') as f:
-                f.write(key_json)
-            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = key_path
-            print(f"✅ Service account key loaded from {key_path}")
-        except Exception as e:
-            raise ValueError(f"Failed to decode VERTEX_KEY_BASE64: {e}")
+        # Prefer the AI Studio-style configure() if present, otherwise fall back to Client(api_key=...)
+        if hasattr(genai, "configure"):
+            genai.configure(api_key=api_key)  # type: ignore[attr-defined]
+            self._genai_client = None
+            self.model = genai.GenerativeModel("gemini-1.5-flash")  # type: ignore[attr-defined]
+        else:
+            self._genai_client = genai.Client(api_key=api_key)  # type: ignore[attr-defined]
+            self.model = "gemini-1.5-flash"
 
-        # Initialize Vertex AI
-        project = os.getenv("GOOGLE_CLOUD_PROJECT", "homes-490422")
-        location = os.getenv("VERTEX_AI_LOCATION", "us-central1")
-
-        print(f"Initializing Vertex AI: project={project}, location={location}")
-        aiplatform.init(project=project, location=location)
-
-        self.model = GenerativeModel("publishers/google/models/gemini-1.5-flash")
-        print("✅ Vertex AI model initialized")
+        print("✅ Vertex AI Studio API key configured")
 
     async def classify_photos(self, photo_urls: List[str]) -> List[Dict[str, Any]]:
         """
@@ -104,8 +87,8 @@ class PhotoClassifier:
 
     async def _classify_single_photo(self, photo_url: str) -> Dict[str, Any]:
         """Classify a single photo using Vertex AI."""
-        import httpx
-        from vertexai.generative_models import Part
+        import json
+        import google.genai as genai
 
         # Download image
         async with httpx.AsyncClient() as client:
@@ -124,15 +107,23 @@ class PhotoClassifier:
 Return ONLY valid JSON, no markdown.
 """
 
-        # Create image part using Vertex AI format
-        image_part = Part.from_data(data=image_data, mime_type="image/jpeg")
+        # Call model with image + prompt
+        if self._genai_client is None:
+            response = self.model.generate_content([prompt, image_data])  # type: ignore[union-attr]
+            result_text = getattr(response, "text", None) or str(response)
+        else:
+            # google-genai SDK path
+            from google.genai import types  # type: ignore
 
-        # Call Vertex AI
-        response = self.model.generate_content([prompt, image_part])
+            image_part = types.Part.from_bytes(data=image_data, mime_type="image/jpeg")
+            response = self._genai_client.models.generate_content(  # type: ignore[union-attr]
+                model=self.model,
+                contents=[prompt, image_part],
+            )
+            result_text = getattr(response, "text", None) or str(response)
 
         # Parse JSON response
-        import json
-        result_text = response.text.strip()
+        result_text = result_text.strip()
         if result_text.startswith("```"):
             result_text = result_text.split("\n", 1)[1].rsplit("\n```", 1)[0]
 
