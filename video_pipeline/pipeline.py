@@ -234,10 +234,21 @@ class VideoJobManager:
     async def _upload_photos_to_storage(self, job_id: str, photo_urls: List[str]) -> List[str]:
         """Upload photos to Supabase Storage."""
 
-        valid_urls = [
-            url for url in photo_urls
-            if isinstance(url, str) and (url.startswith("http://") or url.startswith("https://"))
-        ]
+        # Convert relative URLs to absolute Zoocasa URLs
+        valid_urls: List[str] = []
+        for url in photo_urls:
+            if not isinstance(url, str):
+                continue
+            if url.startswith(("http://", "https://")):
+                valid_urls.append(url)
+            elif url.startswith("/"):
+                # Relative path - convert to absolute Zoocasa URL
+                valid_urls.append(f"https://www.zoocasa.com{url}")
+                logger.info(
+                    "Converted relative URL: %s -> https://www.zoocasa.com%s",
+                    url,
+                    url,
+                )
 
         logger.info("Filtered %d URLs -> %d valid URLs", len(photo_urls), len(valid_urls))
 
