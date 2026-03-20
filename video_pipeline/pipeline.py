@@ -189,77 +189,54 @@ class VideoJobManager:
             logger.error("Failed to fetch listing HTML for %s: %s", listing_url, e)
             return []
 
+        try:
+            from bs4 import BeautifulSoup
+        except Exception as e:
+            logger.error("BeautifulSoup not available: %s", e)
+            return []
+
+        soup = BeautifulSoup(html, "html.parser")
         urls: List[str] = []
 
-        # Method 1: Extract from JavaScript __NEXT_DATA__ (Zoocasa uses Next.js)
-        import json
-        import re
+        # Method 1: Find divs with id="photo-X" and extract img srcset
+        for photo_div in soup.find_all("div", id=lambda x: x and x.startswith("photo-")):
+            img = photo_div.find("img")
+            if not img:
+                continue
 
-        # Look for Next.js data which contains all listing info
-        next_data_match = re.search(
-            r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',
-            html,
-            re.DOTALL,
-        )
-        if next_data_match:
-            try:
-                data = json.loads(next_data_match.group(1))
-                # Navigate to photos array (structure varies, try common paths)
-                props = data.get("props", {}).get("pageProps", {})
-                listing = props.get("listing", {}) or props.get("property", {})
+            # Extract largest image from srcset
+            srcset = img.get("srcset", "")
+            if srcset:
+                # srcset format: "url1 384w, url2 828w"
+                # Split by comma, take the last one (largest)
+                parts = [p.strip() for p in srcset.split(",") if p.strip()]
+                if parts:
+                    # Get URL from last part (largest size)
+                    largest = parts[-1].split()[0]  # "url 828w" -> "url"
+                    urls.append(largest)
+                    logger.info("Found photo: %s", largest[:80])
 
-                # Try different possible photo array locations
-                photos = (
-                    listing.get("photos", [])
-                    or listing.get("images", [])
-                    or listing.get("media", {}).get("photos", [])
-                )
+            # Fallback to src if no srcset
+            elif img.get("src"):
+                src = img.get("src")
+                if src.startswith("http"):
+                    urls.append(src)
 
-                for photo in photos:
-                    if isinstance(photo, str):
-                        urls.append(photo)
-                    elif isinstance(photo, dict):
-                        # Try different URL keys
-                        url = (
-                            photo.get("url")
-                            or photo.get("highResUrl")
-                            or photo.get("large")
-                            or photo.get("src")
-                        )
-                        if url:
-                            urls.append(url)
+        logger.info("Extracted %d photos from photo-X divs", len(urls))
 
-                logger.info("Extracted %d photos from Next.js data", len(urls))
-            except Exception as e:
-                logger.warning("Failed to parse Next.js data: %s", e)
-
-        # Method 2: Fallback to BeautifulSoup (for static images)
+        # Method 2: Fallback - find all img tags with images.expcloud.com
         if not urls:
-            try:
-                from bs4 import BeautifulSoup
-            except Exception as e:
-                logger.error("BeautifulSoup not available: %s", e)
-                return []
-
-            soup = BeautifulSoup(html, "html.parser")
-
-            # Look for picture tags with high-res sources
-            for picture in soup.find_all("picture"):
-                for source in picture.find_all("source"):
-                    srcset = source.get("srcset", "")
-                    # Extract largest image from srcset
+            for img in soup.find_all("img"):
+                srcset = img.get("srcset", "")
+                if "images.expcloud.com" in srcset or "images.expcloud.com" in (img.get("src") or ""):
                     if srcset:
-                        # srcset format: "url1 1000w, url2 2000w"
-                        parts = [p.strip().split()[0] for p in srcset.split(",") if p.strip()]
+                        parts = [p.strip() for p in srcset.split(",") if p.strip()]
                         if parts:
-                            urls.extend(parts)
+                            urls.append(parts[-1].split()[0])
+                    elif img.get("src"):
+                        urls.append(img.get("src"))
 
-            # Fallback to img tags with CDN URLs
-            if not urls:
-                for img in soup.find_all("img"):
-                    src = img.get("src") or img.get("data-src") or img.get("data-lazy-src")
-                    if src and "cdn.zoocasa.com" in src and "/properties/" in src:
-                        urls.append(src)
+            logger.info("Fallback: extracted %d photos from img tags", len(urls))
 
         # Clean and deduplicate
         seen = set()
@@ -267,16 +244,13 @@ class VideoJobManager:
         for u in urls:
             if not u or u in seen:
                 continue
-            # Skip tiny thumbnails, icons, logos
-            if any(skip in u.lower() for skip in ["icon", "logo", "avatar", "thumbnail_", "_thumb"]):
-                continue
             # Skip SVG
             if u.lower().endswith(".svg"):
                 continue
             seen.add(u)
             clean_urls.append(u)
 
-        logger.info("Extracted %d high-res photos from listing", len(clean_urls))
+        logger.info("Final count: %d high-res photos from listing", len(clean_urls))
         return clean_urls[:15]
 
     async def _upload_photos_to_storage(self, job_id: str, photo_urls: List[str]) -> List[str]:
