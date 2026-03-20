@@ -94,38 +94,68 @@ class VideoRenderer:
         headline: str,
         output_path: Path,
     ) -> None:
-        """Render 30-second slideshow with Ken Burns effects and audio."""
+        """Render 30-second slideshow with Ken Burns effects using two-pass approach."""
 
         if not photo_paths:
             raise ValueError("photo_paths must not be empty")
 
-        # Calculate duration per photo for 30 seconds total
         duration_per_photo = 30.0 / len(photo_paths)
-        frames = max(int(duration_per_photo * 25), 1)
-        zoom_end = 1.2  # 20% zoom
 
-        # Build filter complex for Ken Burns effect on each photo
-        filter_parts: List[str] = []
+        # PASS 1: Convert each photo to a video clip with Ken Burns effect
+        clip_paths: List[Path] = []
 
-        for i, _photo_path in enumerate(photo_paths):
-            # Normalize: scale, set SAR, crop to 16:9, then apply Ken Burns
-            filter_parts.append(
-                f"[{i}:v]"
-                f"scale=1920:1080:force_original_aspect_ratio=increase,"
-                f"setsar=1,"  # Force SAR to 1:1
-                f"crop=1920:1080,"
-                f"format=yuv420p,"  # Normalize pixel format (PNG/JPEG variants)
-                f"zoompan=z='min(zoom+0.0015,{zoom_end})':d={frames}:s=1920x1080:fps=25,"
-                f"fade=t=in:st=0:d=0.5,"
-                f"fade=t=out:st={duration_per_photo - 0.5}:d=0.5[v{i}]"
-            )
+        for i, photo in enumerate(photo_paths):
+            clip_path = self.work_dir / f"clip_{i:03d}.mp4"
 
-        # Concat with explicit format
-        n = len(photo_paths)
-        concat_inputs = "".join(f"[v{i}]" for i in range(n))
-        filter_parts.append(f"{concat_inputs}concat=n={n}:v=1:a=0,format=yuv420p[outv]")
+            # Create individual clip with Ken Burns effect
+            cmd: List[str] = [
+                "ffmpeg",
+                "-y",
+                "-loop",
+                "1",
+                "-i",
+                str(photo),
+                "-vf",
+                ",".join(
+                    [
+                        "scale=1920:1080:force_original_aspect_ratio=increase",
+                        "crop=1920:1080",
+                        "zoompan=z='min(zoom+0.0015,1.2)':d={}:s=1920x1080:fps=25".format(
+                            int(duration_per_photo * 25)
+                        ),
+                        "fade=t=in:st=0:d=0.5",
+                        "fade=t=out:st={}:d=0.5".format(duration_per_photo - 0.5),
+                        "format=yuv420p",
+                    ]
+                ),
+                "-c:v",
+                "libx264",
+                "-preset",
+                "ultrafast",
+                "-t",
+                str(duration_per_photo),
+                "-pix_fmt",
+                "yuv420p",
+                str(clip_path),
+            ]
 
-        # Escape headline for drawtext (single-quoted text in filter)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            if result.returncode != 0:
+                logger.warning("Failed to create clip %d: %s", i, result.stderr)
+                continue
+
+            clip_paths.append(clip_path)
+
+        if not clip_paths:
+            raise RuntimeError("Failed to create any video clips")
+
+        # Create concat file
+        concat_file = self.work_dir / "concat.txt"
+        with open(concat_file, "w", encoding="utf-8") as f:
+            for clip in clip_paths:
+                f.write(f"file '{clip}'\n")
+
+        # PASS 2: Concat clips, add text overlay and audio
         safe_headline = (
             headline.replace("\\", "\\\\")
             .replace("'", "")
@@ -133,38 +163,36 @@ class VideoRenderer:
             .replace("=", "\\=")
         )[:200]
 
-        filter_parts.append(
-            f"[outv]drawtext=text='{safe_headline}'"
-            f":fontsize=48:fontcolor=white:x=(w-text_w)/2:y=40"
-            f":box=1:boxcolor=black@0.5:boxborderw=10[v]"
+        # Audio input
+        if audio_path:
+            audio_inputs: List[str] = ["-i", str(audio_path)]
+            audio_map: List[str] = ["-map", "1:a"]
+        else:
+            audio_inputs = [
+                "-f",
+                "lavfi",
+                "-i",
+                "anullsrc=channel_layout=stereo:sample_rate=44100",
+            ]
+            audio_map = ["-map", "1:a"]
+
+        drawtext_filter = (
+            f"drawtext=text='{safe_headline}':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=40"
+            f":box=1:boxcolor=black@0.5:boxborderw=10"
         )
 
-        filter_complex = ";".join(filter_parts)
-
-        # Build per-image inputs
-        inputs: List[str] = []
-        for photo in photo_paths:
-            inputs.extend(["-loop", "1", "-t", str(duration_per_photo), "-i", str(photo)])
-
-        # Audio: real file or silent placeholder (30s capped via -shortest / -t on output)
-        audio_input_index = n
-        if audio_path:
-            inputs.extend(["-i", str(audio_path)])
-        else:
-            inputs.extend(
-                ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"]
-            )
-
-        cmd: List[str] = [
+        cmd = [
             "ffmpeg",
             "-y",
-            *inputs,
-            "-filter_complex",
-            filter_complex,
-            "-map",
-            "[v]",
-            "-map",
-            f"{audio_input_index}:a",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            str(concat_file),
+            *audio_inputs,
+            "-vf",
+            drawtext_filter,
             "-c:v",
             "libx264",
             "-preset",
@@ -175,15 +203,16 @@ class VideoRenderer:
             "aac",
             "-b:a",
             "192k",
+            *audio_map,
             "-shortest",
             "-t",
             "30",
             str(output_path),
         ]
 
-        logger.info("Running ffmpeg Ken Burns slideshow (first args): %s", " ".join(cmd[:12]))
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+        logger.info("Concatenating clips and adding overlay")
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
 
         if result.returncode != 0:
-            logger.error("ffmpeg failed: %s", result.stderr)
+            logger.error("ffmpeg concat failed: %s", result.stderr)
             raise RuntimeError(f"FFmpeg failed: {result.stderr}")
