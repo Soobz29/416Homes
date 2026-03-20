@@ -1,4 +1,4 @@
-"""FFmpeg-based video renderer with simple Ken Burns-style effects."""
+"""FFmpeg-based video renderer with Ken Burns-style effects and optional audio."""
 
 import subprocess
 import logging
@@ -94,54 +94,91 @@ class VideoRenderer:
         headline: str,
         output_path: Path,
     ) -> None:
-        """Render a simple slideshow without complex filters.
-
-        This intentionally avoids `zoompan`/`filter_complex` pipelines that can hang.
-        """
+        """Render 30-second slideshow with Ken Burns effects and audio."""
 
         if not photo_paths:
             raise ValueError("photo_paths must not be empty")
 
-        # Calculate duration per photo (30 second video total)
+        # Calculate duration per photo for 30 seconds total
         duration_per_photo = 30.0 / len(photo_paths)
+        frames = max(int(duration_per_photo * 25), 1)
+        zoom_end = 1.2  # 20% zoom
 
-        # Create concat file for ffmpeg
-        concat_file = "/tmp/concat.txt"
-        with open(concat_file, "w", encoding="utf-8") as f:
-            for photo in photo_paths:
-                f.write(f"file '{photo}'\n")
-                f.write(f"duration {duration_per_photo}\n")
-            # Repeat last image to ensure proper duration
-            f.write(f"file '{photo_paths[-1]}'\n")
+        # Build filter complex for Ken Burns effect on each photo
+        filter_parts: List[str] = []
 
-        # Simple ffmpeg command - silent concat slideshow (no drawtext overlay)
+        for i, _photo_path in enumerate(photo_paths):
+            filter_parts.append(
+                f"[{i}:v]scale=1920:1080:force_original_aspect_ratio=increase,"
+                f"crop=1920:1080,"
+                f"zoompan=z='min(zoom+0.0015,{zoom_end})':d={frames}:s=1920x1080:fps=25,"
+                f"fade=t=in:st=0:d=0.5,"
+                f"fade=t=out:st={duration_per_photo - 0.5}:d=0.5[v{i}]"
+            )
+
+        n = len(photo_paths)
+        concat_inputs = "".join(f"[v{i}]" for i in range(n))
+        filter_parts.append(f"{concat_inputs}concat=n={n}:v=1:a=0[outv]")
+
+        # Escape headline for drawtext (single-quoted text in filter)
+        safe_headline = (
+            headline.replace("\\", "\\\\")
+            .replace("'", "")
+            .replace(":", "\\:")
+            .replace("=", "\\=")
+        )[:200]
+
+        filter_parts.append(
+            f"[outv]drawtext=text='{safe_headline}'"
+            f":fontsize=48:fontcolor=white:x=(w-text_w)/2:y=40"
+            f":box=1:boxcolor=black@0.5:boxborderw=10[v]"
+        )
+
+        filter_complex = ";".join(filter_parts)
+
+        # Build per-image inputs
+        inputs: List[str] = []
+        for photo in photo_paths:
+            inputs.extend(["-loop", "1", "-t", str(duration_per_photo), "-i", str(photo)])
+
+        # Audio: real file or silent placeholder (30s capped via -shortest / -t on output)
+        audio_input_index = n
+        if audio_path:
+            inputs.extend(["-i", str(audio_path)])
+        else:
+            inputs.extend(
+                ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"]
+            )
+
         cmd: List[str] = [
             "ffmpeg",
             "-y",
-            "-f",
-            "concat",
-            "-safe",
-            "0",
-            "-i",
-            concat_file,
-            "-vf",
-            "fps=25,scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2",
+            *inputs,
+            "-filter_complex",
+            filter_complex,
+            "-map",
+            "[v]",
+            "-map",
+            f"{audio_input_index}:a",
             "-c:v",
             "libx264",
             "-preset",
-            "ultrafast",  # Fast encoding
+            "medium",
             "-crf",
-            "28",  # Lower quality for speed
+            "23",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            "-shortest",
             "-t",
             "30",
-            "-an",  # No audio for now
             str(output_path),
         ]
 
-        logger.info("Running ffmpeg (showing first args): %s", " ".join(cmd[:10]))
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        logger.info("Running ffmpeg Ken Burns slideshow (first args): %s", " ".join(cmd[:12]))
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
 
         if result.returncode != 0:
             logger.error("ffmpeg failed: %s", result.stderr)
             raise RuntimeError(f"FFmpeg failed: {result.stderr}")
-
