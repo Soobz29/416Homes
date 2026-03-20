@@ -176,7 +176,7 @@ class VideoJobManager:
         self._update_job(job_id, **fields)
 
     async def _fetch_listing_photos(self, listing_url: str) -> List[str]:
-        """Fetch photo URLs from a listing detail page (best-effort HTML scrape)."""
+        """Fetch high-resolution photo URLs from Zoocasa listing page."""
         if not listing_url:
             return []
 
@@ -185,51 +185,99 @@ class VideoJobManager:
                 resp = await client.get(listing_url)
                 resp.raise_for_status()
                 html = resp.text
-        except Exception as e:  # pragma: no cover - network dependent
+        except Exception as e:
             logger.error("Failed to fetch listing HTML for %s: %s", listing_url, e)
             return []
 
-        try:
-            from bs4 import BeautifulSoup  # type: ignore
-        except Exception as e:  # pragma: no cover
-            logger.error("BeautifulSoup not available for photo extraction: %s", e)
-            return []
-
-        soup = BeautifulSoup(html, "html.parser")
         urls: List[str] = []
-        for img in soup.find_all("img"):
-            src = img.get("src") or img.get("data-src")
-            if not src:
-                continue
-            # Prefer likely listing images
-            if any(
-                token in src
-                for token in (
-                    "cdn.zoocasa.com",
-                    "realtor.ca",
-                    "cloudfront",
-                    "zillowstatic",
-                    "property",
-                    "listing",
+
+        # Method 1: Extract from JavaScript __NEXT_DATA__ (Zoocasa uses Next.js)
+        import json
+        import re
+
+        # Look for Next.js data which contains all listing info
+        next_data_match = re.search(
+            r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',
+            html,
+            re.DOTALL,
+        )
+        if next_data_match:
+            try:
+                data = json.loads(next_data_match.group(1))
+                # Navigate to photos array (structure varies, try common paths)
+                props = data.get("props", {}).get("pageProps", {})
+                listing = props.get("listing", {}) or props.get("property", {})
+
+                # Try different possible photo array locations
+                photos = (
+                    listing.get("photos", [])
+                    or listing.get("images", [])
+                    or listing.get("media", {}).get("photos", [])
                 )
-            ):
-                urls.append(src)
 
-        # Fallback: take any images if filters were too strict
+                for photo in photos:
+                    if isinstance(photo, str):
+                        urls.append(photo)
+                    elif isinstance(photo, dict):
+                        # Try different URL keys
+                        url = (
+                            photo.get("url")
+                            or photo.get("highResUrl")
+                            or photo.get("large")
+                            or photo.get("src")
+                        )
+                        if url:
+                            urls.append(url)
+
+                logger.info("Extracted %d photos from Next.js data", len(urls))
+            except Exception as e:
+                logger.warning("Failed to parse Next.js data: %s", e)
+
+        # Method 2: Fallback to BeautifulSoup (for static images)
         if not urls:
-            for img in soup.find_all("img"):
-                src = img.get("src") or img.get("data-src")
-                if src:
-                    urls.append(src)
+            try:
+                from bs4 import BeautifulSoup
+            except Exception as e:
+                logger.error("BeautifulSoup not available: %s", e)
+                return []
 
-        # De-duplicate and cap count
+            soup = BeautifulSoup(html, "html.parser")
+
+            # Look for picture tags with high-res sources
+            for picture in soup.find_all("picture"):
+                for source in picture.find_all("source"):
+                    srcset = source.get("srcset", "")
+                    # Extract largest image from srcset
+                    if srcset:
+                        # srcset format: "url1 1000w, url2 2000w"
+                        parts = [p.strip().split()[0] for p in srcset.split(",") if p.strip()]
+                        if parts:
+                            urls.extend(parts)
+
+            # Fallback to img tags with CDN URLs
+            if not urls:
+                for img in soup.find_all("img"):
+                    src = img.get("src") or img.get("data-src") or img.get("data-lazy-src")
+                    if src and "cdn.zoocasa.com" in src and "/properties/" in src:
+                        urls.append(src)
+
+        # Clean and deduplicate
         seen = set()
-        deduped: List[str] = []
+        clean_urls: List[str] = []
         for u in urls:
-            if u not in seen:
-                seen.add(u)
-                deduped.append(u)
-        return deduped[:15]
+            if not u or u in seen:
+                continue
+            # Skip tiny thumbnails, icons, logos
+            if any(skip in u.lower() for skip in ["icon", "logo", "avatar", "thumbnail_", "_thumb"]):
+                continue
+            # Skip SVG
+            if u.lower().endswith(".svg"):
+                continue
+            seen.add(u)
+            clean_urls.append(u)
+
+        logger.info("Extracted %d high-res photos from listing", len(clean_urls))
+        return clean_urls[:15]
 
     async def _upload_photos_to_storage(self, job_id: str, photo_urls: List[str]) -> List[str]:
         """Upload photos to Supabase Storage."""
