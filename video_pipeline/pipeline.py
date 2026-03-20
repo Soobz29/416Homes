@@ -194,24 +194,32 @@ class VideoJobManager:
         # Method 1: Extract from ALL image URLs in HTML using regex (most reliable)
         import re
 
-        # Find all images.expcloud.com URLs (Zoocasa's CDN)
-        pattern = r'https://images\.expcloud\.com/[^\s"\'<>)]+\.(?:jpg|jpeg|png|webp)(?:\?[^\s"\'<>)]*)?'
+        # Find all images.expcloud.com URLs (Zoocasa's CDN).
+        # Do not require a file extension because many expcloud URLs are signed paths.
+        pattern = r'https://images\.expcloud\.com/[^\s"\'<>)]+'
         all_urls = re.findall(pattern, html, re.IGNORECASE)
 
         # Deduplicate and prefer larger sizes
         url_bases: Dict[str, Dict[str, Any]] = {}  # base_path -> largest_url
         for url in all_urls:
+            # Normalize escaped URL variants seen in inline scripts/html.
+            normalized = (
+                url.replace("\\/", "/")
+                .replace("&amp;", "&")
+                .rstrip("',")
+            )
+
             # Remove size params to find base
-            base = re.sub(r"[?&]w=\d+", "", url)
+            base = re.sub(r"[?&]w=\d+", "", normalized)
             base = re.sub(r"[?&]h=\d+", "", base)
 
             # Extract width if present
-            width_match = re.search(r"[?&]w=(\d+)", url)
+            width_match = re.search(r"[?&]w=(\d+)", normalized)
             width = int(width_match.group(1)) if width_match else 0
 
             # Keep largest version of each unique photo
             if base not in url_bases or width > url_bases.get(base, {}).get("width", 0):
-                url_bases[base] = {"url": url, "width": width}
+                url_bases[base] = {"url": normalized, "width": width}
 
         urls = [info["url"] for info in url_bases.values()]
         logger.info("Extracted %d unique photos from regex scan", len(urls))
