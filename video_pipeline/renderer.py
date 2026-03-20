@@ -108,17 +108,22 @@ class VideoRenderer:
         filter_parts: List[str] = []
 
         for i, _photo_path in enumerate(photo_paths):
+            # Normalize: scale, set SAR, crop to 16:9, then apply Ken Burns
             filter_parts.append(
-                f"[{i}:v]scale=1920:1080:force_original_aspect_ratio=increase,"
+                f"[{i}:v]"
+                f"scale=1920:1080:force_original_aspect_ratio=increase,"
+                f"setsar=1,"  # Force SAR to 1:1
                 f"crop=1920:1080,"
+                f"format=yuv420p,"  # Normalize pixel format (PNG/JPEG variants)
                 f"zoompan=z='min(zoom+0.0015,{zoom_end})':d={frames}:s=1920x1080:fps=25,"
                 f"fade=t=in:st=0:d=0.5,"
                 f"fade=t=out:st={duration_per_photo - 0.5}:d=0.5[v{i}]"
             )
 
+        # Concat with explicit format
         n = len(photo_paths)
         concat_inputs = "".join(f"[v{i}]" for i in range(n))
-        filter_parts.append(f"{concat_inputs}concat=n={n}:v=1:a=0[outv]")
+        filter_parts.append(f"{concat_inputs}concat=n={n}:v=1:a=0,format=yuv420p[outv]")
 
         # Escape headline for drawtext (single-quoted text in filter)
         safe_headline = (
