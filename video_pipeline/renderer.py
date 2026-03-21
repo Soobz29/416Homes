@@ -208,14 +208,9 @@ class VideoRenderer:
             for clip in clip_paths:
                 f.write(f"file '{clip}'\n")
 
-        # PASS 2: Concat clips, add text overlay and audio
-        safe_headline = (
-            headline.replace("\\", "\\\\")
-            .replace("'", "")
-            .replace(":", "\\:")
-            .replace("=", "\\=")
-        )[:200]
-
+        # PASS 2: Concat clips (stream-copy video, encode audio only)
+        # Do NOT re-encode video - the clips are already 1920x1080 yuv420p h264.
+        # Re-encoding via concat demuxer can cause 0-frame output on some FFmpeg builds.
         # Audio input
         if audio_path:
             audio_inputs: List[str] = ["-i", str(audio_path)]
@@ -229,13 +224,7 @@ class VideoRenderer:
             ]
             audio_map = ["-map", "1:a"]
 
-        drawtext_filter = (
-            f"format=yuv420p,"
-            f"drawtext=text='{safe_headline}':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=40"
-            f":box=1:boxcolor=black@0.5:boxborderw=10"
-        )
-
-        cmd_base = [
+        cmd = [
             "ffmpeg",
             "-y",
             "-f",
@@ -247,52 +236,24 @@ class VideoRenderer:
             *audio_inputs,
             "-map",
             "0:v:0",
+            *audio_map,
             "-c:v",
-            "libx264",
-            "-preset",
-            "medium",
-            "-crf",
-            "23",
+            "copy",  # stream-copy — no re-encode, no 0-frame bug
             "-c:a",
             "aac",
             "-b:a",
             "192k",
-            *audio_map,
             "-shortest",
             "-t",
             "30",
             str(output_path),
         ]
 
-        cmd = cmd_base.copy()
-        # Insert drawtext filter before encoding video codec flags.
-        # Layout is: ... -map 0:v:0 -c:v ...
-        insert_at = cmd.index("-c:v")
-        cmd[insert_at:insert_at] = ["-vf", drawtext_filter]
-
-        logger.info("Concatenating clips and adding overlay")
+        logger.info("Concatenating clips (stream-copy video)")
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
 
         if result.returncode != 0:
-            stderr = result.stderr or ""
-            logger.error("ffmpeg concat failed (with drawtext): %s", stderr)
-
-            # Railway/container FFmpeg often lacks freetype/fonts; drawtext can fail.
-            # Retry without drawtext to ensure video generation succeeds.
-            if any(
-                token in stderr.lower()
-                for token in ("fontconfig", "drawtext", "freetype", "libfreetype")
-            ):
-                logger.warning("Retrying ffmpeg concat without drawtext due to font errors")
-                cmd_no_text = cmd_base.copy()
-                # Insert pixel format normalization to fix yuvj420p from clips.
-                insert_at2 = cmd_no_text.index("-c:v")
-                cmd_no_text[insert_at2:insert_at2] = ["-vf", "format=yuv420p"]
-                result2 = subprocess.run(
-                    cmd_no_text, capture_output=True, text=True, timeout=120
-                )
-                if result2.returncode == 0:
-                    logger.info("✅ ffmpeg concat succeeded (no drawtext retry)")
-                    return
-
+            logger.error("ffmpeg concat failed: %s", (result.stderr or "")[:1000])
             raise RuntimeError(f"FFmpeg failed: {result.stderr}")
+
+        logger.info("✅ Video concat complete: %s", output_path)
