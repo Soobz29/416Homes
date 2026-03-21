@@ -48,6 +48,9 @@ class VideoRenderer:
 
         output_path = self.work_dir / output_filename
 
+        logger.info("🖼️ photo_paths count: %d", len(photo_paths))
+        logger.info("🖼️ photo_paths: %s", photo_paths[:3])
+
         self._render_slideshow(photo_paths, scene_plan, audio_path, headline, output_path)
 
         logger.info("Video rendered at %s", output_path)

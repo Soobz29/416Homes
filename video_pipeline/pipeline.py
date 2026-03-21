@@ -506,6 +506,11 @@ class VideoJobManager:
             await self.update_job_status(job_id, "generating_video", 90)
             with tempfile.TemporaryDirectory() as tmpdir:
                 renderer = VideoRenderer(Path(tmpdir))
+                logger.info("🖼️ scene_plan count before render_video: %d", len(scene_plan))
+                logger.info(
+                    "🖼️ scene_plan sample photo_url: %s",
+                    [str(s.get("photo_url", ""))[:100] for s in scene_plan[:3]],
+                )
                 video_path = await renderer.render_video(
                     scene_plan=scene_plan,
                     audio_url=audio_url,
