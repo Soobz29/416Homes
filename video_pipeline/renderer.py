@@ -143,42 +143,6 @@ class VideoRenderer:
         output_path: Path,
     ) -> None:
         """Render 30-second slideshow with Ken Burns effects using two-pass approach."""
-        logger.info("Starting two-pass slideshow rendering")
-        logger.info("Scenes to render: %d", len(scene_plan))
-
-        # ============ EMERGENCY DIAGNOSTIC ============
-        # Test if FFmpeg can create a basic video at all
-        logger.info("🚨 EMERGENCY TEST: Creating simple blue video")
-        test_cmd = [
-            "ffmpeg",
-            "-y",
-            "-f",
-            "lavfi",
-            "-i",
-            "color=c=blue:s=1920x1080:d=3",
-            "-f",
-            "lavfi",
-            "-i",
-            "anullsrc=channel_layout=stereo:sample_rate=44100:d=3",
-            "-c:v",
-            "libx264",
-            "-preset",
-            "ultrafast",
-            "-c:a",
-            "aac",
-            str(output_path),
-        ]
-        result = subprocess.run(test_cmd, capture_output=True, text=True, timeout=30)
-
-        if result.returncode == 0:
-            logger.info("✅ TEST VIDEO SUCCESS - FFmpeg works, issue is in photo processing")
-        else:
-            logger.error("❌ TEST VIDEO FAILED - FFmpeg itself is broken!")
-            logger.error("FFmpeg stderr: %s", (result.stderr or "")[:1000])
-
-        logger.info("🚨 EMERGENCY TEST COMPLETE - Skipping real video generation")
-        return
-        # ============ END EMERGENCY DIAGNOSTIC ============
 
         if not photo_paths:
             raise ValueError("photo_paths must not be empty")
