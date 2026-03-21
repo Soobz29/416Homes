@@ -234,7 +234,7 @@ class VideoRenderer:
             f":box=1:boxcolor=black@0.5:boxborderw=10"
         )
 
-        cmd = [
+        cmd_base = [
             "ffmpeg",
             "-y",
             "-f",
@@ -246,8 +246,6 @@ class VideoRenderer:
             *audio_inputs,
             "-map",
             "0:v:0",
-            "-vf",
-            drawtext_filter,
             "-c:v",
             "libx264",
             "-preset",
@@ -265,9 +263,32 @@ class VideoRenderer:
             str(output_path),
         ]
 
+        cmd = cmd_base.copy()
+        # Insert drawtext filter before encoding video codec flags.
+        # Layout is: ... -map 0:v:0 -c:v ...
+        insert_at = cmd.index("-c:v")
+        cmd[insert_at:insert_at] = ["-vf", drawtext_filter]
+
         logger.info("Concatenating clips and adding overlay")
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
 
         if result.returncode != 0:
-            logger.error("ffmpeg concat failed: %s", result.stderr)
+            stderr = result.stderr or ""
+            logger.error("ffmpeg concat failed (with drawtext): %s", stderr)
+
+            # Railway/container FFmpeg often lacks freetype/fonts; drawtext can fail.
+            # Retry without drawtext to ensure video generation succeeds.
+            if any(
+                token in stderr.lower()
+                for token in ("fontconfig", "drawtext", "freetype", "libfreetype")
+            ):
+                logger.warning("Retrying ffmpeg concat without drawtext due to font errors")
+                cmd_no_text = cmd_base
+                result2 = subprocess.run(
+                    cmd_no_text, capture_output=True, text=True, timeout=120
+                )
+                if result2.returncode == 0:
+                    logger.info("✅ ffmpeg concat succeeded (no drawtext retry)")
+                    return
+
             raise RuntimeError(f"FFmpeg failed: {result.stderr}")
