@@ -230,6 +230,7 @@ class VideoRenderer:
             audio_map = ["-map", "1:a"]
 
         drawtext_filter = (
+            f"format=yuv420p,"
             f"drawtext=text='{safe_headline}':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=40"
             f":box=1:boxcolor=black@0.5:boxborderw=10"
         )
@@ -283,7 +284,10 @@ class VideoRenderer:
                 for token in ("fontconfig", "drawtext", "freetype", "libfreetype")
             ):
                 logger.warning("Retrying ffmpeg concat without drawtext due to font errors")
-                cmd_no_text = cmd_base
+                cmd_no_text = cmd_base.copy()
+                # Insert pixel format normalization to fix yuvj420p from clips.
+                insert_at2 = cmd_no_text.index("-c:v")
+                cmd_no_text[insert_at2:insert_at2] = ["-vf", "format=yuv420p"]
                 result2 = subprocess.run(
                     cmd_no_text, capture_output=True, text=True, timeout=120
                 )
