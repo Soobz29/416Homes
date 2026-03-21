@@ -141,9 +141,11 @@ class VideoRenderer:
 
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
             if result.returncode != 0:
-                logger.warning("Failed to create clip %d: %s", i, result.stderr)
+                logger.error("❌ Failed to create clip %d from %s", i, photo)
+                logger.error("FFmpeg stderr: %s", (result.stderr or "")[:500])
                 continue
 
+            logger.info("✅ Created clip %d: %s", i, clip_path.name)
             clip_paths.append(clip_path)
 
         if not clip_paths:
