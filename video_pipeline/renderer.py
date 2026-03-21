@@ -54,7 +54,7 @@ class VideoRenderer:
         return output_path
 
     async def _download_photos(self, scene_plan: List[Dict[str, Any]]) -> List[Path]:
-        """Download all photos to work directory."""
+        """Download all photos to work directory and validate them."""
 
         photo_paths: List[Path] = []
 
@@ -65,13 +65,61 @@ class VideoRenderer:
                 filepath = self.work_dir / filename
 
                 try:
+                    logger.info("Downloading scene %d: %s", idx, url[:80])
                     resp = await client.get(url)
                     resp.raise_for_status()
-                    filepath.write_bytes(resp.content)
-                    photo_paths.append(filepath)
-                except Exception as e:  # pragma: no cover - network dependent
-                    logger.error("Failed to download %s: %s", url, e)
 
+                    # Validate we got actual image data
+                    content_type = resp.headers.get("content-type", "")
+                    content_length = len(resp.content)
+
+                    if content_length < 1000:  # Less than 1KB is suspicious
+                        logger.warning("Skipping scene %d: file too small (%d bytes)", idx, content_length)
+                        continue
+
+                    if "image" not in content_type and content_length < 50000:
+                        logger.warning("Skipping scene %d: unexpected content-type '%s'", idx, content_type)
+                        continue
+
+                    # Write file
+                    filepath.write_bytes(resp.content)
+
+                    # Verify it's a valid image using ffprobe
+                    probe_cmd = [
+                        "ffprobe",
+                        "-v",
+                        "error",
+                        "-select_streams",
+                        "v:0",
+                        "-show_entries",
+                        "stream=codec_name,width,height",
+                        "-of",
+                        "default=noprint_wrappers=1",
+                        str(filepath),
+                    ]
+                    probe_result = subprocess.run(probe_cmd, capture_output=True, text=True, timeout=5)
+
+                    if probe_result.returncode != 0:
+                        logger.warning(
+                            "Skipping scene %d: ffprobe failed - %s",
+                            idx,
+                            (probe_result.stderr or "")[:200],
+                        )
+                        filepath.unlink(missing_ok=True)
+                        continue
+
+                    logger.info(
+                        "✅ Downloaded valid image: %s (%d bytes, %s)",
+                        filename,
+                        content_length,
+                        content_type,
+                    )
+                    photo_paths.append(filepath)
+
+                except Exception as e:
+                    logger.error("Failed to download scene %d from %s: %s", idx, url[:80], e)
+
+        logger.info("Successfully downloaded %d/%d valid photos", len(photo_paths), len(scene_plan))
         return photo_paths
 
     async def _download_audio(self, audio_url: str) -> Path:
