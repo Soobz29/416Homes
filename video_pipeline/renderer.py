@@ -244,6 +244,8 @@ class VideoRenderer:
             "-i",
             str(concat_file),
             *audio_inputs,
+            "-map",
+            "0:v:0",
             "-vf",
             drawtext_filter,
             "-c:v",
