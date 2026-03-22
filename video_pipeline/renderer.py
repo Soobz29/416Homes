@@ -182,7 +182,9 @@ class VideoRenderer:
                 "-c:v",
                 "libx264",
                 "-preset",
-                "ultrafast",
+                "fast",
+                "-crf",
+                "28",
                 "-t",
                 str(duration_per_photo),
                 "-pix_fmt",
@@ -208,9 +210,8 @@ class VideoRenderer:
             for clip in clip_paths:
                 f.write(f"file '{clip}'\n")
 
-        # PASS 2: Concat clips (stream-copy video, encode audio only)
-        # Do NOT re-encode video - the clips are already 1920x1080 yuv420p h264.
-        # Re-encoding via concat demuxer can cause 0-frame output on some FFmpeg builds.
+        # PASS 2: Concat clips, normalize pixel format, re-encode video (CRF) + AAC audio.
+        # Smaller final file (~8–15MB for 30s 1080p) for Supabase upload limits.
         # Audio input
         if audio_path:
             audio_inputs: List[str] = ["-i", str(audio_path)]
@@ -237,8 +238,14 @@ class VideoRenderer:
             "-map",
             "0:v:0",
             *audio_map,
+            "-vf",
+            "format=yuv420p",
             "-c:v",
-            "copy",  # stream-copy — no re-encode, no 0-frame bug
+            "libx264",
+            "-preset",
+            "fast",
+            "-crf",
+            "28",
             "-c:a",
             "aac",
             "-b:a",
@@ -249,7 +256,7 @@ class VideoRenderer:
             str(output_path),
         ]
 
-        logger.info("Concatenating clips (stream-copy video)")
+        logger.info("Concatenating clips (re-encode video CRF28 + AAC)")
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
 
         if result.returncode != 0:
