@@ -158,16 +158,18 @@ class VideoRenderer:
         for i, photo in enumerate(photo_paths):
             clip_path = self.work_dir / f"clip_{i:03d}.mp4"
 
-            # Create individual clip with Ken Burns effect
+            # Create individual clip (minimal scale/crop)
             cmd: List[str] = [
                 "ffmpeg",
                 "-y",
                 "-loop",
                 "1",
+                "-framerate",
+                "25",
                 "-i",
                 str(photo),
                 "-vf",
-                "scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,format=yuv420p",
+                "scale=1920:1080,format=yuv420p",
                 "-c:v",
                 "libx264",
                 "-preset",
@@ -178,13 +180,16 @@ class VideoRenderer:
                 str(duration_per_photo),
                 "-r",
                 "25",
+                "-pix_fmt",
+                "yuv420p",
                 str(clip_path),
             ]
 
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
             if result.returncode != 0:
                 logger.error("❌ Failed to create clip %d from %s", i, photo)
-                logger.error("FFmpeg stderr: %s", (result.stderr or "")[:500])
+                # Show stderr tail because FFmpeg headers can consume the first N chars.
+                logger.error("FFmpeg stderr: %s", (result.stderr or "")[-800:])
                 continue
 
             logger.info("✅ Created clip %d: %s", i, clip_path.name)
