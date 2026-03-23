@@ -167,18 +167,7 @@ class VideoRenderer:
                 "-i",
                 str(photo),
                 "-vf",
-                ",".join(
-                    [
-                        "scale=1920:1080:force_original_aspect_ratio=increase",
-                        "crop=1920:1080",
-                        "zoompan=z='min(zoom+0.0015,1.2)':d={}:s=1920x1080:fps=25".format(
-                            int(duration_per_photo * 25)
-                        ),
-                        "fade=t=in:st=0:d=0.5",
-                        "fade=t=out:st={}:d=0.5".format(duration_per_photo - 0.5),
-                        "format=yuv420p",
-                    ]
-                ),
+                "scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,format=yuv420p",
                 "-c:v",
                 "libx264",
                 "-preset",
@@ -187,8 +176,8 @@ class VideoRenderer:
                 "28",
                 "-t",
                 str(duration_per_photo),
-                "-pix_fmt",
-                "yuv420p",
+                "-r",
+                "25",
                 str(clip_path),
             ]
 
