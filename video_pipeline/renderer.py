@@ -2,6 +2,8 @@
 
 import subprocess
 import logging
+import json
+import time
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
@@ -16,6 +18,65 @@ class VideoRenderer:
     def __init__(self, work_dir: Path) -> None:
         self.work_dir = Path(work_dir)
         self.work_dir.mkdir(parents=True, exist_ok=True)
+
+    def _debug_log(
+        self,
+        hypothesis_id: str,
+        run_id: str,
+        location: str,
+        message: str,
+        data: Dict[str, Any],
+    ) -> None:
+        """Write a single NDJSON debug log line for DEBUG MODE."""
+        try:
+            payload = {
+                "sessionId": "d9d4d7",
+                "runId": run_id,
+                "hypothesisId": hypothesis_id,
+                "location": location,
+                "message": message,
+                "data": data,
+                "timestamp": int(time.time() * 1000),
+            }
+            line = json.dumps(payload, ensure_ascii=False) + "\n"
+
+            # Try a few locations so the log is retrievable in different runtimes:
+            # - local dev (repo root / CWD)
+            # - Railway/Docker (CWD, /app, etc.)
+            # - temp render dir (so logs are alongside artifacts)
+            candidates = []
+            try:
+                candidates.append(Path.cwd() / "debug-d9d4d7.log")
+            except Exception:
+                pass
+            try:
+                candidates.append(Path(__file__).resolve().parents[1] / "debug-d9d4d7.log")
+            except Exception:
+                pass
+            try:
+                candidates.append(self.work_dir / "debug-d9d4d7.log")
+            except Exception:
+                pass
+
+            wrote = False
+            for p in candidates:
+                try:
+                    p.parent.mkdir(parents=True, exist_ok=True)
+                    with p.open("a", encoding="utf-8") as f:
+                        f.write(line)
+                    wrote = True
+                    break
+                except Exception:
+                    continue
+
+            # Always emit to stdout logs too, so we can debug even when the
+            # filesystem isn't accessible from the Cursor workspace.
+            logger.info("DEBUG_NDJSON %s", line.rstrip("\n"))
+
+            _ = wrote
+        except Exception:
+            # Debug logging must never break rendering.
+            pass
 
     async def render_video(
         self,
@@ -151,9 +212,23 @@ class VideoRenderer:
             raise ValueError("photo_paths must not be empty")
 
         duration_per_photo = 30.0 / len(photo_paths)
+        run_id = "debug_pre_1"
+        self._debug_log(
+            hypothesis_id="H2_duration_too_short",
+            run_id=run_id,
+            location="video_pipeline/renderer.py:_render_slideshow:start",
+            message="computed timing for per-photo clips",
+            data={
+                "photo_count": len(photo_paths),
+                "duration_per_photo_sec": duration_per_photo,
+                "target_fps": 25,
+                "target_frames_est": duration_per_photo * 25,
+            },
+        )
 
         # PASS 1: Convert each photo to a video clip with Ken Burns effect
         clip_paths: List[Path] = []
+        debug_failures_logged = 0
 
         for i, photo in enumerate(photo_paths):
             clip_path = self.work_dir / f"clip_{i:03d}.mp4"
@@ -162,6 +237,9 @@ class VideoRenderer:
             cmd: List[str] = [
                 "ffmpeg",
                 "-y",
+                "-hide_banner",
+                "-loglevel",
+                "error",
                 "-loop",
                 "1",
                 "-framerate",
@@ -188,14 +266,74 @@ class VideoRenderer:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
             if result.returncode != 0:
                 logger.error("❌ Failed to create clip %d from %s", i, photo)
-                # Show stderr tail because FFmpeg headers can consume the first N chars.
-                logger.error("FFmpeg stderr: %s", (result.stderr or "")[-800:])
+                logger.error("FFmpeg cmd: %s", " ".join(cmd))
+                # With -hide_banner -loglevel error, stderr should contain the real failure.
+                logger.error("FFmpeg stderr (tail): %s", (result.stderr or "")[-8000:])
+                logger.error("FFmpeg stdout (tail): %s", (result.stdout or "")[-2000:])
+                debug_failures_logged += 1
+                if debug_failures_logged <= 5:
+                    stderr = result.stderr or ""
+                    stderr_lower = stderr.lower()
+                    error_lines = [
+                        ln
+                        for ln in stderr.splitlines()
+                        if any(
+                            k in ln.lower()
+                            for k in (
+                                "error",
+                                "invalid",
+                                "failed",
+                                "no such file",
+                                "cannot",
+                                "corrupt",
+                                "decode",
+                            )
+                        )
+                    ]
+                    clip_exists = clip_path.exists()
+                    clip_size = clip_path.stat().st_size if clip_exists else None
+                    photo_exists = photo.exists()
+                    photo_size = photo.stat().st_size if photo_exists else None
+                    vf_filter = (
+                        cmd[cmd.index("-vf") + 1] if "-vf" in cmd and cmd.index("-vf") + 1 < len(cmd) else None
+                    )
+                    self._debug_log(
+                        hypothesis_id="H1_ffmpeg_clip_failure",
+                        run_id=run_id,
+                        location="video_pipeline/renderer.py:_render_slideshow:pass1_failure",
+                        message="ffmpeg clip creation failed",
+                        data={
+                            "clip_index": i,
+                            "photo_path": str(photo),
+                            "photo_size_bytes": photo_size,
+                            "duration_per_photo_sec": duration_per_photo,
+                            "ffmpeg_returncode": result.returncode,
+                            "vf_filter": vf_filter,
+                            "clip_path": str(clip_path),
+                            "clip_exists": clip_exists,
+                            "clip_size_bytes": clip_size,
+                            "stderr_error_lines_tail": error_lines[-4:],
+                            "stderr_tail": stderr[-1200:],
+                            "stderr_tail_has_error_keyword": any(k in stderr_lower for k in ("error", "invalid", "failed")),
+                        },
+                    )
                 continue
 
             logger.info("✅ Created clip %d: %s", i, clip_path.name)
             clip_paths.append(clip_path)
 
         if not clip_paths:
+            self._debug_log(
+                hypothesis_id="H4_no_clips_created",
+                run_id=run_id,
+                location="video_pipeline/renderer.py:_render_slideshow:no_clips",
+                message="no clips were created in pass1",
+                data={
+                    "photo_count": len(photo_paths),
+                    "duration_per_photo_sec": duration_per_photo,
+                    "work_dir": str(self.work_dir),
+                },
+            )
             raise RuntimeError("Failed to create any video clips")
 
         # Create concat file
@@ -222,6 +360,9 @@ class VideoRenderer:
         cmd = [
             "ffmpeg",
             "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
             "-f",
             "concat",
             "-safe",
