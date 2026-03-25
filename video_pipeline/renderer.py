@@ -2,7 +2,6 @@
 
 import subprocess
 import logging
-import json
 import time
 from pathlib import Path
 from typing import List, Dict, Any, Optional
@@ -18,65 +17,31 @@ class VideoRenderer:
     def __init__(self, work_dir: Path) -> None:
         self.work_dir = Path(work_dir)
         self.work_dir.mkdir(parents=True, exist_ok=True)
+        self._encoder_cache: Optional[str] = None
 
-    def _debug_log(
-        self,
-        hypothesis_id: str,
-        run_id: str,
-        location: str,
-        message: str,
-        data: Dict[str, Any],
-    ) -> None:
-        """Write a single NDJSON debug log line for DEBUG MODE."""
-        try:
-            payload = {
-                "sessionId": "d9d4d7",
-                "runId": run_id,
-                "hypothesisId": hypothesis_id,
-                "location": location,
-                "message": message,
-                "data": data,
-                "timestamp": int(time.time() * 1000),
-            }
-            line = json.dumps(payload, ensure_ascii=False) + "\n"
+    def _run_ffmpeg_probe(self, args: List[str], timeout_sec: int = 5) -> subprocess.CompletedProcess[str]:
+        """Run a small ffmpeg/ffprobe command and capture output."""
+        return subprocess.run(args, capture_output=True, text=True, timeout=timeout_sec)
 
-            # Try a few locations so the log is retrievable in different runtimes:
-            # - local dev (repo root / CWD)
-            # - Railway/Docker (CWD, /app, etc.)
-            # - temp render dir (so logs are alongside artifacts)
-            candidates = []
+    def _choose_video_encoder(self) -> str:
+        """Pick a H.264-ish encoder that exists in the current ffmpeg build."""
+        if self._encoder_cache:
+            return self._encoder_cache
+
+        candidates = ["libx264", "libopenh264", "h264_nvenc", "h264_qsv", "h264_vaapi", "mpeg4"]
+        for enc in candidates:
             try:
-                candidates.append(Path.cwd() / "debug-d9d4d7.log")
+                # `-h encoder=NAME` returns 0 if encoder exists, non-0 otherwise.
+                p = self._run_ffmpeg_probe(["ffmpeg", "-hide_banner", "-h", f"encoder={enc}"], timeout_sec=5)
+                if p.returncode == 0:
+                    self._encoder_cache = enc
+                    return enc
             except Exception:
-                pass
-            try:
-                candidates.append(Path(__file__).resolve().parents[1] / "debug-d9d4d7.log")
-            except Exception:
-                pass
-            try:
-                candidates.append(self.work_dir / "debug-d9d4d7.log")
-            except Exception:
-                pass
+                continue
 
-            wrote = False
-            for p in candidates:
-                try:
-                    p.parent.mkdir(parents=True, exist_ok=True)
-                    with p.open("a", encoding="utf-8") as f:
-                        f.write(line)
-                    wrote = True
-                    break
-                except Exception:
-                    continue
-
-            # Always emit to stdout logs too, so we can debug even when the
-            # filesystem isn't accessible from the Cursor workspace.
-            logger.info("DEBUG_NDJSON %s", line.rstrip("\n"))
-
-            _ = wrote
-        except Exception:
-            # Debug logging must never break rendering.
-            pass
+        # Last resort — keep current behavior; failure logs will explain why.
+        self._encoder_cache = "libx264"
+        return self._encoder_cache
 
     async def render_video(
         self,
@@ -212,18 +177,25 @@ class VideoRenderer:
             raise ValueError("photo_paths must not be empty")
 
         duration_per_photo = 30.0 / len(photo_paths)
-        run_id = "debug_pre_1"
-        self._debug_log(
-            hypothesis_id="H2_duration_too_short",
-            run_id=run_id,
-            location="video_pipeline/renderer.py:_render_slideshow:start",
-            message="computed timing for per-photo clips",
-            data={
-                "photo_count": len(photo_paths),
-                "duration_per_photo_sec": duration_per_photo,
-                "target_fps": 25,
-                "target_frames_est": duration_per_photo * 25,
-            },
+
+        # --- FFmpeg preflight (version + encoder availability) ---
+        try:
+            v = self._run_ffmpeg_probe(["ffmpeg", "-hide_banner", "-version"], timeout_sec=5)
+            logger.info("FFmpeg preflight: rc=%s", v.returncode)
+            if (v.stdout or "").strip():
+                logger.info("FFmpeg preflight stdout (tail): %s", (v.stdout or "")[-800:])
+            if (v.stderr or "").strip():
+                logger.info("FFmpeg preflight stderr (tail): %s", (v.stderr or "")[-800:])
+        except Exception as e:
+            logger.exception("FFmpeg preflight failed to execute: %s", e)
+
+        chosen_encoder = self._choose_video_encoder()
+        logger.info("FFmpeg encoder chosen for Pass1/Pass2: %s", chosen_encoder)
+        logger.info(
+            "Timing: photo_count=%d duration_per_photo=%.3fs fps=25 (~%.1f frames)",
+            len(photo_paths),
+            duration_per_photo,
+            duration_per_photo * 25,
         )
 
         # PASS 1: Convert each photo to a video clip with Ken Burns effect
@@ -234,12 +206,33 @@ class VideoRenderer:
             clip_path = self.work_dir / f"clip_{i:03d}.mp4"
 
             # Create individual clip (minimal scale/crop)
+            photo_exists = photo.exists()
+            photo_size = photo.stat().st_size if photo_exists else None
+            jpeg_magic_ok: Optional[bool] = None
+            if photo_exists:
+                try:
+                    with photo.open("rb") as f:
+                        jpeg_magic_ok = f.read(2) == b"\xff\xd8"
+                except Exception:
+                    jpeg_magic_ok = None
+
+            if not photo_exists or not photo_size:
+                logger.error(
+                    "Skipping frame %d: missing/empty file (exists=%s size=%s) path=%s",
+                    i,
+                    photo_exists,
+                    photo_size,
+                    photo,
+                )
+                continue
+
+            if jpeg_magic_ok is False:
+                logger.error("Skipping frame %d: not a JPEG (magic mismatch) path=%s", i, photo)
+                continue
+
             cmd: List[str] = [
                 "ffmpeg",
                 "-y",
-                "-hide_banner",
-                "-loglevel",
-                "error",
                 "-loop",
                 "1",
                 "-framerate",
@@ -249,7 +242,7 @@ class VideoRenderer:
                 "-vf",
                 "scale=1920:1080,format=yuv420p",
                 "-c:v",
-                "libx264",
+                chosen_encoder,
                 "-preset",
                 "fast",
                 "-crf",
@@ -263,76 +256,42 @@ class VideoRenderer:
                 str(clip_path),
             ]
 
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            started = time.time()
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            except subprocess.TimeoutExpired as e:
+                elapsed = time.time() - started
+                logger.error("FFmpeg timed out creating clip %d after %.2fs from %s", i, elapsed, photo)
+                logger.error("FFmpeg cmd: %s", " ".join(cmd))
+                logger.error("FFmpeg stderr (tail): %s", (getattr(e, "stderr", "") or "")[-8000:])
+                logger.error("FFmpeg stdout (tail): %s", (getattr(e, "stdout", "") or "")[-2000:])
+                continue
+            except OSError as e:
+                elapsed = time.time() - started
+                logger.exception("FFmpeg failed to start for clip %d after %.2fs: %s", i, elapsed, e)
+                logger.error("FFmpeg cmd: %s", " ".join(cmd))
+                continue
+
             if result.returncode != 0:
+                elapsed = time.time() - started
                 logger.error("❌ Failed to create clip %d from %s", i, photo)
                 logger.error("FFmpeg cmd: %s", " ".join(cmd))
                 # With -hide_banner -loglevel error, stderr should contain the real failure.
                 logger.error("FFmpeg stderr (tail): %s", (result.stderr or "")[-8000:])
                 logger.error("FFmpeg stdout (tail): %s", (result.stdout or "")[-2000:])
+                logger.error("FFmpeg rc=%s elapsed=%.2fs photo_size=%s jpeg_magic_ok=%s", result.returncode, elapsed, photo_size, jpeg_magic_ok)
                 debug_failures_logged += 1
-                if debug_failures_logged <= 5:
-                    stderr = result.stderr or ""
-                    stderr_lower = stderr.lower()
-                    error_lines = [
-                        ln
-                        for ln in stderr.splitlines()
-                        if any(
-                            k in ln.lower()
-                            for k in (
-                                "error",
-                                "invalid",
-                                "failed",
-                                "no such file",
-                                "cannot",
-                                "corrupt",
-                                "decode",
-                            )
-                        )
-                    ]
-                    clip_exists = clip_path.exists()
-                    clip_size = clip_path.stat().st_size if clip_exists else None
-                    photo_exists = photo.exists()
-                    photo_size = photo.stat().st_size if photo_exists else None
-                    vf_filter = (
-                        cmd[cmd.index("-vf") + 1] if "-vf" in cmd and cmd.index("-vf") + 1 < len(cmd) else None
-                    )
-                    self._debug_log(
-                        hypothesis_id="H1_ffmpeg_clip_failure",
-                        run_id=run_id,
-                        location="video_pipeline/renderer.py:_render_slideshow:pass1_failure",
-                        message="ffmpeg clip creation failed",
-                        data={
-                            "clip_index": i,
-                            "photo_path": str(photo),
-                            "photo_size_bytes": photo_size,
-                            "duration_per_photo_sec": duration_per_photo,
-                            "ffmpeg_returncode": result.returncode,
-                            "vf_filter": vf_filter,
-                            "clip_path": str(clip_path),
-                            "clip_exists": clip_exists,
-                            "clip_size_bytes": clip_size,
-                            "stderr_error_lines_tail": error_lines[-4:],
-                            "stderr_tail": stderr[-1200:],
-                            "stderr_tail_has_error_keyword": any(k in stderr_lower for k in ("error", "invalid", "failed")),
-                        },
-                    )
                 continue
 
             logger.info("✅ Created clip %d: %s", i, clip_path.name)
             clip_paths.append(clip_path)
 
         if not clip_paths:
-            self._debug_log(
-                hypothesis_id="H4_no_clips_created",
-                run_id=run_id,
-                location="video_pipeline/renderer.py:_render_slideshow:no_clips",
-                message="no clips were created in pass1",
-                data={
-                    "photo_count": len(photo_paths),
-                    "duration_per_photo_sec": duration_per_photo,
-                    "work_dir": str(self.work_dir),
-                },
+            logger.error(
+                "Pass1 produced 0 clips (photo_count=%d duration_per_photo=%.3fs work_dir=%s)",
+                len(photo_paths),
+                duration_per_photo,
+                self.work_dir,
             )
             raise RuntimeError("Failed to create any video clips")
 
