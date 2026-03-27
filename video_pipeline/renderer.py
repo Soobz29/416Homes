@@ -2,7 +2,6 @@
 
 import subprocess
 import logging
-import time
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
@@ -171,142 +170,29 @@ class VideoRenderer:
         headline: str,
         output_path: Path,
     ) -> None:
-        """Render 30-second slideshow with Ken Burns effects using two-pass approach."""
+        """Render slideshow in a single FFmpeg pass using the image concat demuxer."""
+
+        _ = scene_plan, headline  # reserved for overlays / future use
 
         if not photo_paths:
             raise ValueError("photo_paths must not be empty")
 
         duration_per_photo = 30.0 / len(photo_paths)
 
-        # --- FFmpeg preflight (version + encoder availability) ---
-        try:
-            v = self._run_ffmpeg_probe(["ffmpeg", "-hide_banner", "-version"], timeout_sec=5)
-            logger.info("FFmpeg preflight: rc=%s", v.returncode)
-            if (v.stdout or "").strip():
-                logger.info("FFmpeg preflight stdout (tail): %s", (v.stdout or "")[-800:])
-            if (v.stderr or "").strip():
-                logger.info("FFmpeg preflight stderr (tail): %s", (v.stderr or "")[-800:])
-        except Exception as e:
-            logger.exception("FFmpeg preflight failed to execute: %s", e)
+        # Absolute paths avoid concat demuxer path bugs under /tmp and Windows.
+        abs_photos = [p.resolve() for p in photo_paths]
 
-        chosen_encoder = self._choose_video_encoder()
-        logger.info("FFmpeg encoder chosen for Pass1/Pass2: %s", chosen_encoder)
-        logger.info(
-            "Timing: photo_count=%d duration_per_photo=%.3fs fps=25 (~%.1f frames)",
-            len(photo_paths),
-            duration_per_photo,
-            duration_per_photo * 25,
-        )
+        images_txt = self.work_dir / "images.txt"
+        with open(images_txt, "w", encoding="utf-8") as f:
+            for photo in abs_photos:
+                f.write(f"file '{photo.as_posix()}'\n")
+                f.write(f"duration {duration_per_photo:.3f}\n")
+            # FFmpeg concat demuxer requires the last file repeated without duration.
+            f.write(f"file '{abs_photos[-1].as_posix()}'\n")
 
-        # PASS 1: Convert each photo to a video clip with Ken Burns effect
-        clip_paths: List[Path] = []
-        debug_failures_logged = 0
-
-        for i, photo in enumerate(photo_paths):
-            clip_path = self.work_dir / f"clip_{i:03d}.mp4"
-
-            # Create individual clip (minimal scale/crop)
-            photo_exists = photo.exists()
-            photo_size = photo.stat().st_size if photo_exists else None
-            jpeg_magic_ok: Optional[bool] = None
-            if photo_exists:
-                try:
-                    with photo.open("rb") as f:
-                        jpeg_magic_ok = f.read(2) == b"\xff\xd8"
-                except Exception:
-                    jpeg_magic_ok = None
-
-            if not photo_exists or not photo_size:
-                logger.error(
-                    "Skipping frame %d: missing/empty file (exists=%s size=%s) path=%s",
-                    i,
-                    photo_exists,
-                    photo_size,
-                    photo,
-                )
-                continue
-
-            if jpeg_magic_ok is False:
-                logger.error("Skipping frame %d: not a JPEG (magic mismatch) path=%s", i, photo)
-                continue
-
-            cmd: List[str] = [
-                "ffmpeg",
-                "-y",
-                "-loop",
-                "1",
-                "-framerate",
-                "25",
-                "-i",
-                str(photo),
-                "-vf",
-                "scale=1920:1080,format=yuv420p",
-                "-c:v",
-                chosen_encoder,
-                "-preset",
-                "fast",
-                "-crf",
-                "28",
-                "-t",
-                str(duration_per_photo),
-                "-r",
-                "25",
-                "-pix_fmt",
-                "yuv420p",
-                str(clip_path),
-            ]
-
-            started = time.time()
-            try:
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-            except subprocess.TimeoutExpired as e:
-                elapsed = time.time() - started
-                logger.error("FFmpeg timed out creating clip %d after %.2fs from %s", i, elapsed, photo)
-                logger.error("FFmpeg cmd: %s", " ".join(cmd))
-                logger.error("FFmpeg stderr (tail): %s", (getattr(e, "stderr", "") or "")[-8000:])
-                logger.error("FFmpeg stdout (tail): %s", (getattr(e, "stdout", "") or "")[-2000:])
-                continue
-            except OSError as e:
-                elapsed = time.time() - started
-                logger.exception("FFmpeg failed to start for clip %d after %.2fs: %s", i, elapsed, e)
-                logger.error("FFmpeg cmd: %s", " ".join(cmd))
-                continue
-
-            if result.returncode != 0:
-                elapsed = time.time() - started
-                logger.error("❌ Failed to create clip %d from %s", i, photo)
-                logger.error("FFmpeg cmd: %s", " ".join(cmd))
-                # With -hide_banner -loglevel error, stderr should contain the real failure.
-                logger.error("FFmpeg stderr (tail): %s", (result.stderr or "")[-8000:])
-                logger.error("FFmpeg stdout (tail): %s", (result.stdout or "")[-2000:])
-                logger.error("FFmpeg rc=%s elapsed=%.2fs photo_size=%s jpeg_magic_ok=%s", result.returncode, elapsed, photo_size, jpeg_magic_ok)
-                debug_failures_logged += 1
-                continue
-
-            logger.info("✅ Created clip %d: %s", i, clip_path.name)
-            clip_paths.append(clip_path)
-
-        if not clip_paths:
-            logger.error(
-                "Pass1 produced 0 clips (photo_count=%d duration_per_photo=%.3fs work_dir=%s)",
-                len(photo_paths),
-                duration_per_photo,
-                self.work_dir,
-            )
-            raise RuntimeError("Failed to create any video clips")
-
-        # Create concat file
-        concat_file = self.work_dir / "concat.txt"
-        with open(concat_file, "w", encoding="utf-8") as f:
-            for clip in clip_paths:
-                f.write(f"file '{clip}'\n")
-
-        # PASS 2: Concat clips, normalize pixel format, re-encode video (CRF) + AAC audio.
-        # Smaller final file (~8–15MB for 30s 1080p) for Supabase upload limits.
-        # Audio input
         if audio_path:
             audio_inputs: List[str] = ["-i", str(audio_path)]
-            audio_map: List[str] = ["-map", "1:a"]
+            audio_map = ["-map", "1:a"]
         else:
             audio_inputs = [
                 "-f",
@@ -316,45 +202,53 @@ class VideoRenderer:
             ]
             audio_map = ["-map", "1:a"]
 
-        cmd = [
+        enc = self._choose_video_encoder()
+        # Fastest preset for libx264 reduces CPU time (helps tight Railway limits).
+        if enc == "libx264":
+            enc_opts: List[str] = ["-preset", "ultrafast", "-crf", "30"]
+        else:
+            enc_opts = ["-preset", "veryfast", "-crf", "28"]
+
+        cmd: List[str] = [
             "ffmpeg",
             "-y",
-            "-hide_banner",
-            "-loglevel",
-            "error",
             "-f",
             "concat",
             "-safe",
             "0",
             "-i",
-            str(concat_file),
+            str(images_txt),
             *audio_inputs,
             "-map",
             "0:v:0",
             *audio_map,
             "-vf",
-            "format=yuv420p",
+            "scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,format=yuv420p",
             "-c:v",
-            "libx264",
-            "-preset",
-            "fast",
-            "-crf",
-            "28",
+            enc,
+            *enc_opts,
             "-c:a",
             "aac",
             "-b:a",
-            "192k",
+            "128k",
+            "-r",
+            "25",
             "-shortest",
             "-t",
             "30",
             str(output_path),
         ]
 
-        logger.info("Concatenating clips (re-encode video CRF28 + AAC)")
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        logger.info("Rendering single-pass slideshow (%d photos, encoder=%s)", len(photo_paths), enc)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
 
         if result.returncode != 0:
-            logger.error("ffmpeg concat failed: %s", (result.stderr or "")[:1000])
-            raise RuntimeError(f"FFmpeg failed: {result.stderr}")
+            logger.error(
+                "FFmpeg failed (rc=%s): cmd=%s stderr_tail=%s",
+                result.returncode,
+                " ".join(cmd),
+                (result.stderr or "")[-2000:],
+            )
+            raise RuntimeError(f"FFmpeg failed (rc={result.returncode})")
 
-        logger.info("✅ Video concat complete: %s", output_path)
+        logger.info("✅ Video rendered: %s", output_path)
