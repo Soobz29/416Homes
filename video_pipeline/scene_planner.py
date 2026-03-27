@@ -133,6 +133,10 @@ class ScenePlanner:
                     "ken_burns": ken_burns_patterns[idx % len(ken_burns_patterns)],
                     "transition": "crossfade" if idx < len(photos) - 1 else "none",
                     "features": photo.get("features", []) or [],
+                    "order_priority": float(photo.get("order_priority", 5) or 5),
+                    "original_index": int(photo["original_index"])
+                    if photo.get("original_index") is not None
+                    else idx,
                 }
             )
             current_time += scene_duration

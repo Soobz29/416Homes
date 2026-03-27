@@ -14,6 +14,7 @@ from memory.store import memory_store
 from .photo_classifier import PhotoClassifier
 from .scene_planner import ScenePlanner
 from .renderer import VideoRenderer
+from .veo_renderer import VeoRenderer, veo_vertex_config_from_env
 
 try:
     # New Gemini SDK (package: google-genai)
@@ -501,14 +502,35 @@ class VideoJobManager:
             await self.update_job_status(job_id, "generating_audio", 75, audio_url=audio_url)
             await self.update_job_status(job_id, "audio_generated", 80, audio_url=audio_url)
 
-            # Step 7: Render video with ffmpeg
-            logger.info("Rendering video for job %s", job_id)
+            # Step 7: Render video (FFmpeg slideshow by default; opt-in Vertex Veo via VIDEO_RENDERER=veo)
+            render_mode = (os.getenv("VIDEO_RENDERER") or "ffmpeg").strip().lower()
+            veo_cfg = veo_vertex_config_from_env()
+            use_veo = render_mode == "veo" and veo_cfg is not None
+            if render_mode == "veo" and veo_cfg is None:
+                logger.warning(
+                    "VIDEO_RENDERER=veo but Vertex project/location not set "
+                    "(need GOOGLE_CLOUD_PROJECT or GCP_PROJECT or VERTEX_PROJECT); "
+                    "falling back to ffmpeg"
+                )
+
+            logger.info(
+                "Rendering video for job %s (backend=%s)",
+                job_id,
+                "veo" if use_veo else "ffmpeg",
+            )
             await self.update_job_status(job_id, "generating_video", 90)
             with tempfile.TemporaryDirectory() as tmpdir:
-                renderer = VideoRenderer(Path(tmpdir))
-                logger.info("🖼️ scene_plan count before render_video: %d", len(scene_plan))
+                work = Path(tmpdir)
+                if use_veo:
+                    assert veo_cfg is not None
+                    project_id, veo_location = veo_cfg
+                    renderer: Any = VeoRenderer(project_id, veo_location, work)
+                else:
+                    renderer = VideoRenderer(work)
+
+                logger.info("scene_plan count before render_video: %d", len(scene_plan))
                 logger.info(
-                    "🖼️ scene_plan sample photo_url: %s",
+                    "scene_plan sample photo_url: %s",
                     [str(s.get("photo_url", ""))[:100] for s in scene_plan[:3]],
                 )
                 video_path = await renderer.render_video(
