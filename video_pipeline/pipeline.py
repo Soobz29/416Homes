@@ -502,27 +502,29 @@ class VideoJobManager:
             await self.update_job_status(job_id, "generating_audio", 75, audio_url=audio_url)
             await self.update_job_status(job_id, "audio_generated", 80, audio_url=audio_url)
 
-            # Step 7: Render video (FFmpeg by default; Veo via VIDEO_RENDERER=veo + VERTEX_AI_API_KEY)
+            # Step 7: Render video (FFmpeg by default; Veo via VIDEO_RENDERER=veo +
+            # GOOGLE_APPLICATION_CREDENTIALS_JSON for Vertex)
             video_renderer = (os.getenv("VIDEO_RENDERER") or "ffmpeg").strip().lower()
-            vertex_api_key = (os.getenv("VERTEX_AI_API_KEY") or "").strip()
+            vertex_creds = (os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON") or "").strip()
 
             await self.update_job_status(job_id, "generating_video", 90)
             with tempfile.TemporaryDirectory() as tmpdir:
                 work_dir = Path(tmpdir)
-                if video_renderer == "veo" and vertex_api_key:
-                    logger.info("Using Veo renderer (VERTEX_AI_API_KEY set)")
-                    renderer: Any = VeoRenderer(api_key=vertex_api_key, work_dir=work_dir)
+                if video_renderer == "veo" and vertex_creds:
+                    logger.info("Using Veo renderer (service account credentials found)")
+                    renderer: Any = VeoRenderer(work_dir=work_dir)
                 else:
-                    if video_renderer == "veo" and not vertex_api_key:
+                    if video_renderer == "veo":
                         logger.warning(
-                            "VIDEO_RENDERER=veo but VERTEX_AI_API_KEY not set; falling back to ffmpeg"
+                            "VIDEO_RENDERER=veo but GOOGLE_APPLICATION_CREDENTIALS_JSON not set; "
+                            "falling back to ffmpeg"
                         )
                     renderer = VideoRenderer(work_dir)
 
                 logger.info(
                     "Rendering video for job %s (backend=%s)",
                     job_id,
-                    "veo" if video_renderer == "veo" and vertex_api_key else "ffmpeg",
+                    "veo" if video_renderer == "veo" and vertex_creds else "ffmpeg",
                 )
 
                 logger.info("scene_plan count before render_video: %d", len(scene_plan))

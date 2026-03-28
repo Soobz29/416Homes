@@ -1,11 +1,13 @@
-"""Veo-based video renderer — animates listing photos via Gemini API (API key),
-following the AI-generated scene plan for ordering and prompts."""
+"""Veo-based video renderer — Vertex Veo via service account (GOOGLE_APPLICATION_CREDENTIALS_JSON)."""
 
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import os
 import subprocess
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -68,13 +70,40 @@ def _build_clip_prompt(scene: Dict[str, Any]) -> str:
 
 
 class VeoRenderer:
-    """Render animated property videos using Veo (google-genai API key client),
-    driven by the AI scene plan for ordering and per-clip prompts."""
+    """Render animated property videos using Vertex Veo (google-genai + service account)."""
 
-    def __init__(self, api_key: str, work_dir: Path) -> None:
+    def __init__(self, work_dir: Path) -> None:
         self.work_dir = Path(work_dir)
         self.work_dir.mkdir(parents=True, exist_ok=True)
-        self.client = genai.Client(api_key=api_key)
+
+        creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+        project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "416homes")
+        location = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
+
+        if creds_json:
+            creds_dict = json.loads(creds_json)
+            self._creds_file = tempfile.NamedTemporaryFile(
+                mode="w",
+                suffix=".json",
+                delete=False,
+                encoding="utf-8",
+            )
+            try:
+                json.dump(creds_dict, self._creds_file)
+                self._creds_file.flush()
+            finally:
+                self._creds_file.close()
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = self._creds_file.name
+            logger.info("Loaded service account credentials for Vertex/Veo")
+        else:
+            raise RuntimeError("GOOGLE_APPLICATION_CREDENTIALS_JSON not set")
+
+        self.client = genai.Client(
+            vertexai=True,
+            project=project_id,
+            location=location,
+        )
+        self.project_id = project_id
 
     async def render_video(
         self,
