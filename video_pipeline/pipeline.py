@@ -39,23 +39,25 @@ class VideoJobManager:
     def __init__(self):
         self.supabase = memory_store.supabase
 
-        # Initialize Vertex AI Studio (API key) for script generation
+        # Vertex AI Studio (API key) for JSON-aligned script generation — optional so the API
+        # can boot without it (e.g. Railway only sets GOOGLE_APPLICATION_CREDENTIALS_JSON for Veo).
         import google.genai as genai
 
-        # Vertex AI Studio uses API key (uses free credits!)
-        api_key = os.getenv("VERTEX_AI_API_KEY")
-        if not api_key:
-            raise ValueError("VERTEX_AI_API_KEY required")
-
-        if hasattr(genai, "configure"):
-            genai.configure(api_key=api_key)  # type: ignore[attr-defined]
-            self._vertex_client = None
-            self.vertex_model = genai.GenerativeModel("gemini-2.5-flash-lite")  # type: ignore[attr-defined]
+        self._vertex_client = None
+        self.vertex_model = None
+        vertex_key = (os.getenv("VERTEX_AI_API_KEY") or "").strip()
+        if vertex_key:
+            if hasattr(genai, "configure"):
+                genai.configure(api_key=vertex_key)  # type: ignore[attr-defined]
+                self.vertex_model = genai.GenerativeModel("gemini-2.5-flash-lite")  # type: ignore[attr-defined]
+            else:
+                self._vertex_client = genai.Client(api_key=vertex_key)  # type: ignore[attr-defined]
+                self.vertex_model = "gemini-2.5-flash-lite"
+            logger.info("Vertex AI Studio API key configured for script generation")
         else:
-            self._vertex_client = genai.Client(api_key=api_key)  # type: ignore[attr-defined]
-            self.vertex_model = "gemini-2.5-flash-lite"
-
-        logger.info("✅ Vertex AI Studio API key configured for script generation")
+            logger.warning(
+                "VERTEX_AI_API_KEY not set; video jobs will use fallback script text until it is set"
+            )
 
         # Initialize Gemini (for script generation)
         self.client = None
@@ -426,7 +428,16 @@ class VideoJobManager:
         )
 
         if not self.vertex_model:
-            raise RuntimeError("Vertex AI not initialized")
+            return {
+                "headline": "Your Dream Home Awaits",
+                "voiceover_script": (
+                    "Welcome to this beautiful property, featuring bright living spaces and modern finishes. "
+                    "Enjoy generous bedrooms, stylish bathrooms, and inviting common areas perfect for everyday life "
+                    "and entertaining. Reach out today to schedule a private viewing."
+                ),
+                "music_mood": "cinematic_luxury",
+                "key_features": ["Bright living spaces", "Modern finishes", "Great location"],
+            }
 
         if self._vertex_client is None:
             response = self.vertex_model.generate_content(prompt)  # type: ignore[union-attr]

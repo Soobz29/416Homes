@@ -26,24 +26,29 @@ class PhotoClassifier:
     ]
 
     def __init__(self):
-        """Initialize Vertex AI photo classifier."""
+        """Initialize Gemini Vision client (Vertex Studio key preferred, else GEMINI_API_KEY)."""
         import google.genai as genai
 
-        # Vertex AI Studio uses API key (uses free credits!)
-        api_key = os.getenv("VERTEX_AI_API_KEY")
+        self._genai_client = None
+        self.model = None
+        api_key = (
+            (os.getenv("VERTEX_AI_API_KEY") or "").strip()
+            or (os.getenv("GEMINI_API_KEY") or "").strip()
+        )
         if not api_key:
-            raise ValueError("VERTEX_AI_API_KEY required")
+            logger.warning(
+                "VERTEX_AI_API_KEY and GEMINI_API_KEY missing; photo classification will fail per-photo until one is set"
+            )
+            return
 
-        # Prefer the AI Studio-style configure() if present, otherwise fall back to Client(api_key=...)
         if hasattr(genai, "configure"):
             genai.configure(api_key=api_key)  # type: ignore[attr-defined]
-            self._genai_client = None
             self.model = genai.GenerativeModel("gemini-2.5-flash-lite")  # type: ignore[attr-defined]
         else:
             self._genai_client = genai.Client(api_key=api_key)  # type: ignore[attr-defined]
             self.model = "gemini-2.5-flash-lite"
 
-        print("✅ Vertex AI Studio API key configured")
+        logger.info("Photo classifier Gemini client configured")
 
     async def classify_photos(self, photo_urls: List[str]) -> List[Dict[str, Any]]:
         """
@@ -106,6 +111,9 @@ class PhotoClassifier:
 
 Return ONLY valid JSON, no markdown.
 """
+
+        if self.model is None and self._genai_client is None:
+            raise RuntimeError("Gemini API key not configured for photo classification")
 
         # Call model with image + prompt
         if self._genai_client is None:
