@@ -14,7 +14,7 @@ from memory.store import memory_store
 from .photo_classifier import PhotoClassifier
 from .scene_planner import ScenePlanner
 from .renderer import VideoRenderer
-from .veo_renderer import VeoRenderer, veo_vertex_config_from_env
+from .veo_renderer import VeoRenderer
 
 try:
     # New Gemini SDK (package: google-genai)
@@ -502,31 +502,28 @@ class VideoJobManager:
             await self.update_job_status(job_id, "generating_audio", 75, audio_url=audio_url)
             await self.update_job_status(job_id, "audio_generated", 80, audio_url=audio_url)
 
-            # Step 7: Render video (FFmpeg slideshow by default; opt-in Vertex Veo via VIDEO_RENDERER=veo)
-            render_mode = (os.getenv("VIDEO_RENDERER") or "ffmpeg").strip().lower()
-            veo_cfg = veo_vertex_config_from_env()
-            use_veo = render_mode == "veo" and veo_cfg is not None
-            if render_mode == "veo" and veo_cfg is None:
-                logger.warning(
-                    "VIDEO_RENDERER=veo but Vertex project/location not set "
-                    "(need GOOGLE_CLOUD_PROJECT or GCP_PROJECT or VERTEX_PROJECT); "
-                    "falling back to ffmpeg"
-                )
+            # Step 7: Render video (FFmpeg by default; Veo via VIDEO_RENDERER=veo + VERTEX_AI_API_KEY)
+            video_renderer = (os.getenv("VIDEO_RENDERER") or "ffmpeg").strip().lower()
+            vertex_api_key = (os.getenv("VERTEX_AI_API_KEY") or "").strip()
 
-            logger.info(
-                "Rendering video for job %s (backend=%s)",
-                job_id,
-                "veo" if use_veo else "ffmpeg",
-            )
             await self.update_job_status(job_id, "generating_video", 90)
             with tempfile.TemporaryDirectory() as tmpdir:
-                work = Path(tmpdir)
-                if use_veo:
-                    assert veo_cfg is not None
-                    project_id, veo_location = veo_cfg
-                    renderer: Any = VeoRenderer(project_id, veo_location, work)
+                work_dir = Path(tmpdir)
+                if video_renderer == "veo" and vertex_api_key:
+                    logger.info("Using Veo renderer (VERTEX_AI_API_KEY set)")
+                    renderer: Any = VeoRenderer(api_key=vertex_api_key, work_dir=work_dir)
                 else:
-                    renderer = VideoRenderer(work)
+                    if video_renderer == "veo" and not vertex_api_key:
+                        logger.warning(
+                            "VIDEO_RENDERER=veo but VERTEX_AI_API_KEY not set; falling back to ffmpeg"
+                        )
+                    renderer = VideoRenderer(work_dir)
+
+                logger.info(
+                    "Rendering video for job %s (backend=%s)",
+                    job_id,
+                    "veo" if video_renderer == "veo" and vertex_api_key else "ffmpeg",
+                )
 
                 logger.info("scene_plan count before render_video: %d", len(scene_plan))
                 logger.info(

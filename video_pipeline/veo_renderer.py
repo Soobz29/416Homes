@@ -1,4 +1,4 @@
-"""Veo-based video renderer — animates listing photos via Vertex AI Veo 2,
+"""Veo-based video renderer — animates listing photos via Gemini API (API key),
 following the AI-generated scene plan for ordering and prompts."""
 
 from __future__ import annotations
@@ -8,7 +8,7 @@ import logging
 import subprocess
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import httpx
 from google import genai
@@ -20,27 +20,6 @@ VEO_MODEL = "veo-2.0-generate-001"
 CLIP_DURATION_SECONDS = 5
 POLL_INTERVAL = 15
 MAX_CLIPS = 6  # 6 × 5s = 30s final video
-
-
-def veo_vertex_config_from_env() -> Optional[Tuple[str, str]]:
-    """Return (project_id, location) for Vertex Veo, or None if not configured."""
-    import os
-
-    project = (
-        os.getenv("GOOGLE_CLOUD_PROJECT")
-        or os.getenv("GCP_PROJECT")
-        or os.getenv("VERTEX_PROJECT")
-        or ""
-    ).strip()
-    location = (
-        os.getenv("VERTEX_LOCATION")
-        or os.getenv("GOOGLE_CLOUD_REGION")
-        or os.getenv("GCP_REGION")
-        or "us-central1"
-    ).strip()
-    if not project:
-        return None
-    return project, location
 
 
 def _build_clip_prompt(scene: Dict[str, Any]) -> str:
@@ -89,17 +68,13 @@ def _build_clip_prompt(scene: Dict[str, Any]) -> str:
 
 
 class VeoRenderer:
-    """Render animated property videos using Vertex AI Veo 2,
+    """Render animated property videos using Veo (google-genai API key client),
     driven by the AI scene plan for ordering and per-clip prompts."""
 
-    def __init__(self, project_id: str, location: str, work_dir: Path) -> None:
+    def __init__(self, api_key: str, work_dir: Path) -> None:
         self.work_dir = Path(work_dir)
         self.work_dir.mkdir(parents=True, exist_ok=True)
-        self.client = genai.Client(
-            vertexai=True,
-            project=project_id,
-            location=location,
-        )
+        self.client = genai.Client(api_key=api_key)
 
     async def render_video(
         self,
