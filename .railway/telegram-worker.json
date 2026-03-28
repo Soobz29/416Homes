@@ -3,7 +3,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "pip install -r requirements-railway.txt && python run_agent.py",
+    "startCommand": "python run_agent.py",
     "restartPolicyType": "ALWAYS",
     "restartPolicyMaxRetries": 10
   }
