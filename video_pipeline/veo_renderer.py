@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 from google import genai
@@ -24,8 +24,8 @@ POLL_INTERVAL = 15
 MAX_CLIPS = 6  # 6 × 5s = 30s final video
 
 
-def _build_clip_prompt(scene: Dict[str, Any]) -> str:
-    """Build a Veo prompt from a scene plan entry."""
+def _build_clip_prompt(scene: Dict[str, Any], scene_index: int, total_scenes: int) -> str:
+    """Build a cinematic, narrative-driven Veo prompt from a scene plan entry."""
 
     room_type = scene.get("room_type", "room")
     features = scene.get("features", [])
@@ -33,37 +33,103 @@ def _build_clip_prompt(scene: Dict[str, Any]) -> str:
     pan = ken_burns.get("pan", "center")
     zoom = ken_burns.get("zoom", "in")
 
-    room_descriptions = {
-        "exterior": "exterior of the property, architectural details, curb appeal",
-        "living_room": "bright spacious living room, comfortable seating area",
-        "kitchen": "modern kitchen, countertops and cabinetry",
-        "bedroom": "serene bedroom, natural light through windows",
-        "bathroom": "clean elegant bathroom, fixtures and finishes",
-        "dining_room": "dining room, ideal for entertaining",
-        "basement": "finished lower level, additional living space",
-        "backyard": "outdoor living space, landscaped backyard",
-        "garage": "garage and parking area",
-    }
-    room_desc = room_descriptions.get(room_type, f"{str(room_type).replace('_', ' ')}")
+    # Narrative position in the tour
+    is_opening = scene_index == 0
+    is_closing = scene_index == total_scenes - 1
 
-    feature_text = ""
+    # Cinematic camera language mapped to ken_burns
+    camera_directions = {
+        ("center", "in"): "slow cinematic dolly push-in, camera glides forward",
+        ("right", "in"): "slow push-in with gentle rightward arc, reveals the space",
+        ("left", "in"): "slow push-in tracking left, sweeping reveal",
+        ("center", "out"): "graceful pull-back dolly, expanding reveal of the room",
+        ("right", "out"): "slow pull-back panning right, wide establishing movement",
+        ("left", "out"): "slow pull-back panning left, hero shot reveal",
+    }
+    camera = camera_directions.get((pan, zoom), "smooth cinematic camera drift")
+
+    # Room-specific cinematic language
+    room_cinematics = {
+        "exterior": {
+            "desc": "the property's striking exterior facade",
+            "mood": "golden hour warm light rakes across the architecture, strong curb appeal",
+            "beat": "establishing hero shot that immediately impresses",
+        },
+        "living_room": {
+            "desc": "an expansive, light-filled living room",
+            "mood": "soft natural light streams through large windows, inviting and warm",
+            "beat": "the heart of the home, welcoming and aspirational",
+        },
+        "kitchen": {
+            "desc": "a chef-quality kitchen with premium finishes",
+            "mood": "bright, clean light catches the countertops and hardware",
+            "beat": "culinary inspiration, functional beauty",
+        },
+        "dining_room": {
+            "desc": "an elegant dining space made for entertaining",
+            "mood": "warm ambient light, intimate yet spacious",
+            "beat": "where memories are made around the table",
+        },
+        "bedroom": {
+            "desc": "a serene master bedroom retreat",
+            "mood": "soft diffused light, calm and restful atmosphere",
+            "beat": "a private sanctuary, peaceful and refined",
+        },
+        "bathroom": {
+            "desc": "a spa-inspired bathroom with luxury finishes",
+            "mood": "clean bright light, immaculate surfaces gleam",
+            "beat": "hotel-quality comfort in a private setting",
+        },
+        "backyard": {
+            "desc": "a beautifully landscaped outdoor living space",
+            "mood": "natural light, lush greenery, open sky",
+            "beat": "outdoor living at its finest",
+        },
+        "basement": {
+            "desc": "a fully finished lower level with versatile space",
+            "mood": "well-lit, open and inviting below grade",
+            "beat": "bonus living space full of potential",
+        },
+        "garage": {
+            "desc": "a spacious garage with clean finishes",
+            "mood": "bright, organised, functional",
+            "beat": "practical luxury for the discerning owner",
+        },
+    }
+
+    rt_key = str(room_type) if room_type is not None else "room"
+    cinematic = room_cinematics.get(rt_key, {
+        "desc": f"a beautifully appointed {rt_key.replace('_', ' ')}",
+        "mood": "warm natural light, elegant atmosphere",
+        "beat": "a refined space that impresses",
+    })
+
+    # Feature highlights — pick top 2, make them specific
+    feature_line = ""
     if features:
-        feature_text = f" featuring {', '.join(str(f) for f in features[:3])}"
+        top_features = [str(f) for f in features[:2]]
+        feature_line = f" Highlight: {' and '.join(top_features)}."
 
-    camera_map = {
-        ("left", "in"): "slow push-in with gentle pan left",
-        ("right", "in"): "slow push-in with gentle pan right",
-        ("center", "in"): "slow cinematic push-in",
-        ("left", "out"): "slow pull-back with pan left",
-        ("right", "out"): "slow pull-back with pan right",
-        ("center", "out"): "slow cinematic pull-back",
-    }
-    camera = camera_map.get((pan, zoom), "smooth slow camera movement")
+    # Narrative beat based on position in tour
+    if is_opening:
+        narrative = (
+            "This is the opening shot of a luxury real estate tour — make a powerful first impression."
+        )
+    elif is_closing:
+        narrative = (
+            "This is the closing shot of the property tour — leave the viewer wanting to book a showing."
+        )
+    else:
+        narrative = "This is a mid-tour feature shot — draw the viewer deeper into the property."
 
     prompt = (
-        f"Professional real estate photography, {room_desc}{feature_text}. "
-        f"{camera.capitalize()}. Cinematic quality, steady motion, warm lighting. "
-        f"No people, no text overlays."
+        f"Cinematic real estate video clip. {cinematic['desc']}. "
+        f"{cinematic['mood']}.{feature_line} "
+        f"{camera.capitalize()}. "
+        f"{cinematic['beat'].capitalize()}. "
+        f"{narrative} "
+        f"Professional production quality, photorealistic, no people, no text, no watermarks. "
+        f"Shot on RED camera, anamorphic lens, film grain."
     )
 
     return prompt
@@ -131,8 +197,11 @@ class VeoRenderer:
             raise RuntimeError("Failed to download any photos")
 
         semaphore = asyncio.Semaphore(3)
+        total_scenes = len(ordered_scenes)
         tasks = [
-            self._generate_clip(photo_path, ordered_scenes[i], i, semaphore)
+            self._generate_clip(
+                photo_path, ordered_scenes[i], i, total_scenes, semaphore
+            )
             for i, photo_path in enumerate(photo_paths)
         ]
         clip_results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -198,13 +267,14 @@ class VeoRenderer:
         photo_path: Path,
         scene: Dict[str, Any],
         idx: int,
+        total_scenes: int,
         semaphore: asyncio.Semaphore,
     ) -> Optional[Path]:
         """Generate a single Veo clip for one scene."""
 
         async with semaphore:
             clip_path = self.work_dir / f"veo_clip_{idx:03d}.mp4"
-            prompt = _build_clip_prompt(scene)
+            prompt = _build_clip_prompt(scene, idx, total_scenes)
 
             logger.info(
                 "Clip %d (%s): submitting to Veo\n  Prompt: %s",
