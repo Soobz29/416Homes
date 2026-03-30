@@ -15,6 +15,7 @@ from .photo_classifier import PhotoClassifier
 from .scene_planner import ScenePlanner
 from .renderer import VideoRenderer
 from .veo_renderer import VeoRenderer
+from .listing_photos import extract_expcloud_photo_urls_from_html
 
 try:
     # New Gemini SDK (package: google-genai)
@@ -196,109 +197,7 @@ class VideoJobManager:
             logger.error("Failed to fetch listing HTML for %s: %s", listing_url, e)
             return []
 
-        urls: List[str] = []
-
-        # Method 1: Extract from ALL image URLs in HTML using regex (most reliable)
-        import re
-
-        # Find all images.expcloud.com URLs (Zoocasa's CDN).
-        # Do not require a file extension because many expcloud URLs are signed paths.
-        pattern = r'https://images\.expcloud\.com/[^\s"\'<>)]+'
-        all_urls = re.findall(pattern, html, re.IGNORECASE)
-
-        # Deduplicate and prefer larger sizes
-        url_bases: Dict[str, Dict[str, Any]] = {}  # base_path -> largest_url
-        for url in all_urls:
-            # Normalize escaped URL variants seen in inline scripts/html.
-            normalized = (
-                url.replace("\\/", "/")
-                .replace("&amp;", "&")
-                .rstrip("',")
-            )
-
-            # Remove size params to find base
-            base = re.sub(r"[?&]w=\d+", "", normalized)
-            base = re.sub(r"[?&]h=\d+", "", base)
-
-            # Extract width if present
-            width_match = re.search(r"[?&]w=(\d+)", normalized)
-            width = int(width_match.group(1)) if width_match else 0
-
-            # Keep largest version of each unique photo
-            if base not in url_bases or width > url_bases.get(base, {}).get("width", 0):
-                url_bases[base] = {"url": normalized, "width": width}
-
-        urls = [info["url"] for info in url_bases.values()]
-        logger.info("Extracted %d unique photos from regex scan", len(urls))
-
-        # Method 2: Try to find photo data in script tags (JSON arrays)
-        if len(urls) < 3:
-            photo_patterns = [
-                r'"photos"\s*:\s*\[(.*?)\]',
-                r'"images"\s*:\s*\[(.*?)\]',
-                r"photoUrls\s*[:=]\s*\[(.*?)\]",
-                r'"media"\s*:\s*{[^}]*"photos"\s*:\s*\[(.*?)\]',
-            ]
-
-            for p in photo_patterns:
-                matches = re.findall(p, html, re.DOTALL)
-                for match in matches:
-                    # Extract URLs from JSON-like content
-                    photo_urls = re.findall(r'https://images\.expcloud\.com/[^"\']+', match)
-                    urls.extend(photo_urls)
-
-            logger.info("After script extraction: %d total photos", len(urls))
-
-        # Method 3: BeautifulSoup fallback for static img tags
-        if len(urls) < 3:
-            try:
-                from bs4 import BeautifulSoup
-
-                soup = BeautifulSoup(html, "html.parser")
-
-                for img in soup.find_all("img"):
-                    # Check srcset first
-                    srcset = img.get("srcset", "")
-                    if "images.expcloud.com" in srcset:
-                        parts = [part.strip() for part in srcset.split(",")]
-                        for part in parts:
-                            srcset_url = part.split()[0]
-                            if srcset_url.startswith("http"):
-                                urls.append(srcset_url)
-
-                    # Check src
-                    src = img.get("src", "")
-                    if "images.expcloud.com" in src and src.startswith("http"):
-                        urls.append(src)
-
-                logger.info("After BeautifulSoup: %d total photos", len(urls))
-            except Exception as e:
-                logger.warning("BeautifulSoup parsing failed: %s", e)
-
-        # Clean and deduplicate
-        seen = set()
-        clean_urls: List[str] = []
-        for u in urls:
-            if not u or u in seen:
-                continue
-            # Skip SVG
-            if u.lower().endswith(".svg"):
-                continue
-            # Skip very small images (width < 200)
-            if re.search(r"[?&]w=([0-9]{1,2})(?:&|$)", u):
-                continue
-            seen.add(u)
-            clean_urls.append(u)
-
-        # Prefer larger images - sort by width parameter
-        def get_width(url: str) -> int:
-            match = re.search(r"[?&]w=(\d+)", url)
-            return int(match.group(1)) if match else 500  # default to medium
-
-        clean_urls.sort(key=get_width, reverse=True)
-
-        logger.info("Final count: %d high-res photos from listing", len(clean_urls))
-        return clean_urls[:15]
+        return extract_expcloud_photo_urls_from_html(html, max_urls=15)
 
     async def _upload_photos_to_storage(self, job_id: str, photo_urls: List[str]) -> List[str]:
         """Upload photos to Supabase Storage."""

@@ -34,6 +34,7 @@ from datetime import datetime, date
 import httpx
 from dotenv import load_dotenv
 from listing_agent.activity_log import log_activity
+from video_pipeline.listing_photos import extract_expcloud_photo_urls_from_html
 
 # Optional: Try to import PIL for image processing
 try:
@@ -243,9 +244,31 @@ async def smart_order_photos(photos: List[Path], listing_data: dict) -> List[Pat
             logger.warning("[smart_order] Gemini returned non-list, skipping")
             return valid
 
+        n = len(valid)
+        dict_entries = [e for e in classifications if isinstance(e, dict)]
+        if len(dict_entries) == n:
+            indices = [e.get("index", -1) for e in dict_entries]
+            perm_ok = (
+                all(isinstance(i, int) and 0 <= i < n for i in indices)
+                and len(set(indices)) == n
+            )
+            if perm_ok:
+                dict_entries = sorted(
+                    dict_entries, key=lambda e: int(e.get("index", 0))
+                )
+            else:
+                for k, e in enumerate(dict_entries):
+                    e["index"] = k
+                logger.info(
+                    "[smart_order] Positional index mapping (model indices missing or non-permutation)"
+                )
+            classifications = dict_entries
+
         # ── Build ordered list ──
         scored: List[dict] = []
         for entry in classifications:
+            if not isinstance(entry, dict):
+                continue
             idx = entry.get("index", -1)
             if idx < 0 or idx >= len(valid):
                 continue
@@ -352,6 +375,28 @@ async def download_listing_photos(url: str, job_dir: Path, address: Optional[str
             logger.info("Using dedicated condos.ca image downloader...")
             downloaded_files = await asyncio.to_thread(_scrape_and_download_images_condos, url, str(photos_dir))
             return [Path(p) for p in downloaded_files]
+        elif "zoocasa.com" in url.lower():
+            logger.info("Using Zoocasa HTML expcloud extraction (gallery order)...")
+            photo_urls = []
+            try:
+                async with httpx.AsyncClient(
+                    follow_redirects=True,
+                    timeout=20,
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    },
+                ) as client:
+                    resp = await client.get(url)
+                    resp.raise_for_status()
+                    photo_urls = extract_expcloud_photo_urls_from_html(resp.text, max_urls=15)
+            except Exception as e:
+                logger.warning("Zoocasa httpx fetch failed: %s", e)
+            if len(photo_urls) < 4:
+                logger.info(
+                    "Zoocasa expcloud found fewer than 4 images; falling back to browser scrape"
+                )
+                photo_urls = await asyncio.to_thread(_scrape_photo_urls, url)
         else:
             photo_urls = await asyncio.to_thread(_scrape_photo_urls, url)
             
