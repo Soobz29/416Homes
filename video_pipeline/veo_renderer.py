@@ -77,7 +77,7 @@ class VeoRenderer:
         self.work_dir.mkdir(parents=True, exist_ok=True)
 
         creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
-        project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "416homes")
+        project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
         location = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
 
         if creds_json:
