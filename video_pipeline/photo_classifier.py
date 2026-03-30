@@ -106,7 +106,7 @@ class PhotoClassifier:
 
 - "room_type": one of {self.ROOM_TYPES}
 - "quality_score": 0.0-1.0
-- "features": list of 2-4 key features
+- "features": list of 2-4 short phrases describing ONLY what is clearly visible (no guessing, no marketing copy)
 - "order_priority": 1-10
 
 Return ONLY valid JSON, no markdown.

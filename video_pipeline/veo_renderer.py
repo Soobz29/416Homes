@@ -25,7 +25,7 @@ MAX_CLIPS = 6  # 6 × 5s = 30s final video
 
 
 def _build_clip_prompt(scene: Dict[str, Any], scene_index: int, total_scenes: int) -> str:
-    """Build a cinematic, narrative-driven Veo prompt from a scene plan entry."""
+    """Strict image-faithful Veo prompt: subtle camera only, avoid invented content."""
 
     room_type = scene.get("room_type", "room")
     features = scene.get("features", [])
@@ -33,106 +33,59 @@ def _build_clip_prompt(scene: Dict[str, Any], scene_index: int, total_scenes: in
     pan = ken_burns.get("pan", "center")
     zoom = ken_burns.get("zoom", "in")
 
-    # Narrative position in the tour
     is_opening = scene_index == 0
     is_closing = scene_index == total_scenes - 1
 
-    # Cinematic camera language mapped to ken_burns
     camera_directions = {
-        ("center", "in"): "slow cinematic dolly push-in, camera glides forward",
-        ("right", "in"): "slow push-in with gentle rightward arc, reveals the space",
-        ("left", "in"): "slow push-in tracking left, sweeping reveal",
-        ("center", "out"): "graceful pull-back dolly, expanding reveal of the room",
-        ("right", "out"): "slow pull-back panning right, wide establishing movement",
-        ("left", "out"): "slow pull-back panning left, hero shot reveal",
+        ("center", "in"): "very slow subtle push-in; keep the same framing as the photo",
+        ("right", "in"): "very slow subtle push-in with a slight arc to the right; same environment as the photo",
+        ("left", "in"): "very slow subtle push-in tracking slightly left; same environment as the photo",
+        ("center", "out"): "very slow subtle pull-back; same environment as the photo",
+        ("right", "out"): "very slow subtle pull-back with gentle pan right; same environment as the photo",
+        ("left", "out"): "very slow subtle pull-back with gentle pan left; same environment as the photo",
     }
-    camera = camera_directions.get((pan, zoom), "smooth cinematic camera drift")
-
-    # Room-specific cinematic language
-    room_cinematics = {
-        "exterior": {
-            "desc": "the property's striking exterior facade",
-            "mood": "golden hour warm light rakes across the architecture, strong curb appeal",
-            "beat": "establishing hero shot that immediately impresses",
-        },
-        "living_room": {
-            "desc": "an expansive, light-filled living room",
-            "mood": "soft natural light streams through large windows, inviting and warm",
-            "beat": "the heart of the home, welcoming and aspirational",
-        },
-        "kitchen": {
-            "desc": "a chef-quality kitchen with premium finishes",
-            "mood": "bright, clean light catches the countertops and hardware",
-            "beat": "culinary inspiration, functional beauty",
-        },
-        "dining_room": {
-            "desc": "an elegant dining space made for entertaining",
-            "mood": "warm ambient light, intimate yet spacious",
-            "beat": "where memories are made around the table",
-        },
-        "bedroom": {
-            "desc": "a serene master bedroom retreat",
-            "mood": "soft diffused light, calm and restful atmosphere",
-            "beat": "a private sanctuary, peaceful and refined",
-        },
-        "bathroom": {
-            "desc": "a spa-inspired bathroom with luxury finishes",
-            "mood": "clean bright light, immaculate surfaces gleam",
-            "beat": "hotel-quality comfort in a private setting",
-        },
-        "backyard": {
-            "desc": "a beautifully landscaped outdoor living space",
-            "mood": "natural light, lush greenery, open sky",
-            "beat": "outdoor living at its finest",
-        },
-        "basement": {
-            "desc": "a fully finished lower level with versatile space",
-            "mood": "well-lit, open and inviting below grade",
-            "beat": "bonus living space full of potential",
-        },
-        "garage": {
-            "desc": "a spacious garage with clean finishes",
-            "mood": "bright, organised, functional",
-            "beat": "practical luxury for the discerning owner",
-        },
-    }
-
-    rt_key = str(room_type) if room_type is not None else "room"
-    cinematic = room_cinematics.get(rt_key, {
-        "desc": f"a beautifully appointed {rt_key.replace('_', ' ')}",
-        "mood": "warm natural light, elegant atmosphere",
-        "beat": "a refined space that impresses",
-    })
-
-    # Feature highlights — pick top 2, make them specific
-    feature_line = ""
-    if features:
-        top_features = [str(f) for f in features[:2]]
-        feature_line = f" Highlight: {' and '.join(top_features)}."
-
-    # Narrative beat based on position in tour
-    if is_opening:
-        narrative = (
-            "This is the opening shot of a luxury real estate tour — make a powerful first impression."
-        )
-    elif is_closing:
-        narrative = (
-            "This is the closing shot of the property tour — leave the viewer wanting to book a showing."
-        )
-    else:
-        narrative = "This is a mid-tour feature shot — draw the viewer deeper into the property."
-
-    prompt = (
-        f"Cinematic real estate video clip. {cinematic['desc']}. "
-        f"{cinematic['mood']}.{feature_line} "
-        f"{camera.capitalize()}. "
-        f"{cinematic['beat'].capitalize()}. "
-        f"{narrative} "
-        f"Professional production quality, photorealistic, no people, no text, no watermarks. "
-        f"Shot on RED camera, anamorphic lens, film grain."
+    camera = camera_directions.get(
+        (pan, zoom),
+        "very slow subtle camera drift; same environment as the photo",
     )
 
-    return prompt
+    rt = str(room_type).replace("_", " ") if room_type is not None else "space"
+
+    visible = ""
+    if features:
+        top_features = [str(f).strip() for f in features[:3] if str(f).strip()]
+        if top_features:
+            visible = (
+                " These elements appear in the reference image and must stay accurate: "
+                + "; ".join(top_features)
+                + "."
+            )
+
+    if is_opening:
+        tour_note = "Shot 1 of the tour: establish the listing; motion only, do not change the scene."
+    elif is_closing:
+        tour_note = (
+            f"Shot {scene_index + 1} of {total_scenes}: closing frame; motion only, do not change the scene."
+        )
+    else:
+        tour_note = (
+            f"Shot {scene_index + 1} of {total_scenes}: same property tour; same room as the photo."
+        )
+
+    return (
+        "Real estate listing video from a single reference photograph. "
+        "CRITICAL: Recreate ONLY what is in the reference image. "
+        "Do not add people, text, watermarks, new furniture, plants, vehicles, windows, fixtures, "
+        "or architecture not visible in the photo. "
+        "Do not replace surfaces, materials, or lighting with a different style. "
+        "Preserve layout, proportions, colors, and decor. "
+        f"Room type hint (approximate): {rt}. "
+        f"{tour_note}"
+        f"{visible} "
+        f"Camera: {camera}. "
+        "Natural photorealistic look, restrained grade, no heavy stylization. "
+        "No people, no text, no logos."
+    )
 
 
 class VeoRenderer:
@@ -192,39 +145,42 @@ class VeoRenderer:
             [s.get("room_type", "?") for s in ordered_scenes],
         )
 
-        photo_paths = await self._download_photos_in_order(ordered_scenes)
-        if not photo_paths:
+        indexed_paths = await self._download_photos_in_order(ordered_scenes)
+        if not indexed_paths:
             raise RuntimeError("Failed to download any photos")
 
         semaphore = asyncio.Semaphore(3)
         total_scenes = len(ordered_scenes)
         tasks = [
             self._generate_clip(
-                photo_path, ordered_scenes[i], i, total_scenes, semaphore
+                photo_path, ordered_scenes[scene_idx], scene_idx, total_scenes, semaphore
             )
-            for i, photo_path in enumerate(photo_paths)
+            for photo_path, scene_idx in indexed_paths
         ]
         clip_results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        clip_paths: List[Path] = []
-        for i, result in enumerate(clip_results):
+        with_scene: List[Tuple[int, Path]] = []
+        for (photo_path, scene_idx), result in zip(indexed_paths, clip_results):
             if isinstance(result, Exception):
                 logger.error(
-                    "Clip %d (%s) failed: %s",
-                    i,
-                    ordered_scenes[i].get("room_type", "?"),
+                    "Clip scene %d (%s) failed: %s",
+                    scene_idx,
+                    ordered_scenes[scene_idx].get("room_type", "?"),
                     result,
                 )
             elif result is not None:
-                clip_paths.append(result)
+                with_scene.append((scene_idx, result))
+
+        with_scene.sort(key=lambda x: x[0])
+        clip_paths = [p for _, p in with_scene]
 
         if not clip_paths:
             raise RuntimeError("All Veo clip generations failed")
 
         logger.info(
-            "Generated %d/%d Veo clips successfully",
+            "Generated %d/%d Veo clips successfully (ordered by scene index)",
             len(clip_paths),
-            len(photo_paths),
+            len(indexed_paths),
         )
 
         output_path = self.work_dir / output_filename
@@ -233,8 +189,8 @@ class VeoRenderer:
 
     async def _download_photos_in_order(
         self, ordered_scenes: List[Dict[str, Any]]
-    ) -> List[Path]:
-        """Download photos following scene plan order."""
+    ) -> List[Tuple[Path, int]]:
+        """Download photos; return (path, scene_index) pairs in scene order."""
         photo_paths: List[Tuple[Path, int]] = []
         async with httpx.AsyncClient(follow_redirects=True, timeout=30) as client:
             for idx, scene in enumerate(ordered_scenes):
@@ -260,7 +216,8 @@ class VeoRenderer:
                 except Exception as e:
                     logger.error("Failed to download scene %d: %s", idx, e)
 
-        return [p for p, _ in sorted(photo_paths, key=lambda x: x[1])]
+        photo_paths.sort(key=lambda x: x[1])
+        return photo_paths
 
     async def _generate_clip(
         self,

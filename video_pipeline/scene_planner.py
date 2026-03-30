@@ -44,63 +44,17 @@ class ScenePlanner:
             )
             good_photos = classified_photos
 
-        # Sort by order_priority (descending)
+        # Preserve listing crawl order (original_index) for a coherent walk-through.
         sorted_photos = sorted(
             good_photos,
-            key=lambda p: float(p.get("order_priority", 5) or 5),
-            reverse=True,
+            key=lambda p: int(p.get("original_index", 0) or 0),
         )
 
-        selected = self._select_diverse_photos(sorted_photos, max_photos)
+        selected = sorted_photos[:max_photos]
         scenes = self._assign_timing(selected, target_duration_sec)
 
         logger.info("Created scene plan with %d scenes", len(scenes))
         return scenes
-
-    def _select_diverse_photos(
-        self,
-        sorted_photos: List[Dict[str, Any]],
-        max_photos: int,
-    ) -> List[Dict[str, Any]]:
-        """Select diverse photos ensuring good category coverage."""
-
-        targets = {
-            "exterior": 2,
-            "kitchen": 2,
-            "living_room": 2,
-            "dining_room": 1,
-            "bedroom": 2,
-            "bathroom": 1,
-            "amenity": 1,
-            "view": 1,
-        }
-
-        selected: List[Dict[str, Any]] = []
-        used_types: Dict[str, int] = {}
-
-        for photo in sorted_photos:
-            if len(selected) >= max_photos:
-                break
-
-            room_type = photo.get("room_type", "other") or "other"
-            used_count = used_types.get(room_type, 0)
-            target_count = targets.get(room_type, 1)
-
-            # Prefer hitting target distribution first; then fill remaining slots
-            if used_count < target_count or len(selected) < max_photos // 2:
-                selected.append(photo)
-                used_types[room_type] = used_count + 1
-
-        # If still under max_photos, top up with remaining photos
-        if len(selected) < max_photos:
-            for photo in sorted_photos:
-                if photo in selected:
-                    continue
-                selected.append(photo)
-                if len(selected) >= max_photos:
-                    break
-
-        return selected
 
     def _assign_timing(
         self,
