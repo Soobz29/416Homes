@@ -24,67 +24,127 @@ POLL_INTERVAL = 15
 MAX_CLIPS = 6  # 6 × 5s = 30s final video
 
 
-def _build_clip_prompt(scene: Dict[str, Any], scene_index: int, total_scenes: int) -> str:
-    """Strict image-faithful Veo prompt: subtle camera only, avoid invented content."""
+_SHOT_VOCABULARY = {
+    "exterior": [
+        "Wide establishing shot. Camera slowly drifts forward toward the front entrance, "
+        "revealing the full facade. Golden warm light. Architecture is the hero.",
+        "Low angle push-in toward the front door. Slight upward tilt reveals the roofline. "
+        "Confident, impressive.",
+    ],
+    "living_room": [
+        "Camera enters the room from a low angle, gliding forward. Natural light streams "
+        "from the windows. Slow arc left reveals the full breadth of the space.",
+        "Steady push-in from the doorway threshold. The room opens up as we move deeper in.",
+    ],
+    "kitchen": [
+        "Camera tracks along the countertop at a low angle, revealing the appliances and "
+        "cabinetry. Clean, precise movement like a luxury commercial.",
+        "Slow push-in from the kitchen entrance. Island or counters fill the foreground.",
+    ],
+    "dining_room": [
+        "Slow orbit around the dining table. Chairs, light fixture, and room come alive "
+        "with subtle motion.",
+        "Push-in toward the table from the entrance. Warm ambient light.",
+    ],
+    "bedroom": [
+        "Camera floats in from the doorway, gliding low toward the bed. Soft natural light "
+        "from the window. Calm, peaceful movement.",
+        "Slow arc around the foot of the bed, revealing the full room.",
+    ],
+    "bathroom": [
+        "Slow push-in toward the vanity. Clean surfaces catch the light. "
+        "Precise, deliberate movement.",
+        "Pan from the shower to the vanity. Elegant, unhurried.",
+    ],
+    "backyard": [
+        "Wide shot. Camera slowly pushes forward across the outdoor space. "
+        "Sky and greenery fill the upper frame.",
+        "Low angle looking across the yard. Slow drift forward.",
+    ],
+    "basement": [
+        "Camera enters the space and slowly pans to reveal the full room. "
+        "Well-lit, open.",
+        "Push-in from the stairwell. The space opens up ahead.",
+    ],
+    "garage": [
+        "Wide push-in from the garage door. Clean floor and walls revealed. "
+        "Functional and spacious.",
+    ],
+}
 
-    room_type = scene.get("room_type", "room")
-    features = scene.get("features", [])
-    ken_burns = scene.get("ken_burns", {})
+_NARRATIVE_BEATS = {
+    0: (
+        "OPENING SHOT. This is the viewer's first impression of the property. "
+        "Make it cinematic and immediately compelling. "
+        "The camera movement should feel like an invitation -- come inside."
+    ),
+    "middle": (
+        "MID-TOUR SHOT. The viewer is already inside the property. "
+        "This shot continues the walk-through narrative. "
+        "Camera movement should feel like a natural continuation of exploring the space."
+    ),
+    "closing": (
+        "CLOSING SHOT. This is the final image the viewer carries away. "
+        "The movement should feel conclusive -- a slow pull-back or wide reveal "
+        "that makes the viewer want to book a showing."
+    ),
+}
+
+
+def _build_clip_prompt(scene: Dict[str, Any], scene_index: int, total_scenes: int) -> str:
+    """Build a videographer-directed Veo prompt grounded in the reference photo."""
+
+    room_type = str(scene.get("room_type") or "room").lower()
+    features = scene.get("features") or []
+    ken_burns = scene.get("ken_burns") or {}
     pan = ken_burns.get("pan", "center")
     zoom = ken_burns.get("zoom", "in")
 
-    is_opening = scene_index == 0
-    is_closing = scene_index == total_scenes - 1
-
-    camera_directions = {
-        ("center", "in"): "very slow subtle push-in; keep the same framing as the photo",
-        ("right", "in"): "very slow subtle push-in with a slight arc to the right; same environment as the photo",
-        ("left", "in"): "very slow subtle push-in tracking slightly left; same environment as the photo",
-        ("center", "out"): "very slow subtle pull-back; same environment as the photo",
-        ("right", "out"): "very slow subtle pull-back with gentle pan right; same environment as the photo",
-        ("left", "out"): "very slow subtle pull-back with gentle pan left; same environment as the photo",
-    }
-    camera = camera_directions.get(
-        (pan, zoom),
-        "very slow subtle camera drift; same environment as the photo",
+    shots = _SHOT_VOCABULARY.get(
+        room_type,
+        [
+            "Slow cinematic push-in. Camera glides forward into the space.",
+        ],
     )
+    shot_desc = shots[scene_index % len(shots)]
 
-    rt = str(room_type).replace("_", " ") if room_type is not None else "space"
+    if scene_index == 0:
+        beat = _NARRATIVE_BEATS[0]
+    elif scene_index == total_scenes - 1:
+        beat = _NARRATIVE_BEATS["closing"]
+    else:
+        beat = _NARRATIVE_BEATS["middle"]
 
-    visible = ""
+    camera_override = {
+        ("center", "in"): "slow dolly push-in",
+        ("right", "in"): "slow push-in arcing right",
+        ("left", "in"): "slow push-in arcing left",
+        ("center", "out"): "slow dolly pull-back",
+        ("right", "out"): "slow pull-back panning right",
+        ("left", "out"): "slow pull-back panning left",
+    }.get((pan, zoom), "slow cinematic drift")
+
+    anchor = ""
     if features:
-        top_features = [str(f).strip() for f in features[:3] if str(f).strip()]
-        if top_features:
-            visible = (
-                " These elements appear in the reference image and must stay accurate: "
-                + "; ".join(top_features)
-                + "."
+        clean = [str(f).strip() for f in features[:3] if str(f).strip()]
+        if clean:
+            anchor = (
+                f"The reference image shows: {', '.join(clean)}. "
+                "These must remain accurate in the generated clip. "
+                "Do not replace or remove any element visible in the photo."
             )
 
-    if is_opening:
-        tour_note = "Shot 1 of the tour: establish the listing; motion only, do not change the scene."
-    elif is_closing:
-        tour_note = (
-            f"Shot {scene_index + 1} of {total_scenes}: closing frame; motion only, do not change the scene."
-        )
-    else:
-        tour_note = (
-            f"Shot {scene_index + 1} of {total_scenes}: same property tour; same room as the photo."
-        )
-
     return (
-        "Real estate listing video from a single reference photograph. "
-        "CRITICAL: Recreate ONLY what is in the reference image. "
-        "Do not add people, text, watermarks, new furniture, plants, vehicles, windows, fixtures, "
-        "or architecture not visible in the photo. "
-        "Do not replace surfaces, materials, or lighting with a different style. "
-        "Preserve layout, proportions, colors, and decor. "
-        f"Room type hint (approximate): {rt}. "
-        f"{tour_note}"
-        f"{visible} "
-        f"Camera: {camera}. "
-        "Natural photorealistic look, restrained grade, no heavy stylization. "
-        "No people, no text, no logos."
+        f"Real estate walk-through video. Reference image: {room_type.replace('_', ' ')}.\n\n"
+        f"SHOT DIRECTION: {shot_desc}\n"
+        f"CAMERA: {camera_override}. Movement is slow, smooth, and deliberate -- "
+        f"never shaky, never fast.\n"
+        f"NARRATIVE: {beat}\n"
+        f"{anchor}\n"
+        "TECHNICAL: Photorealistic. Natural lighting preserved from reference image. "
+        "No added people, text, watermarks, or props not in the original photo. "
+        "Preserve all colors, materials, and proportions from the reference. "
+        "Shot on cinema camera, shallow depth of field, smooth stabilised motion."
     )
 
 
