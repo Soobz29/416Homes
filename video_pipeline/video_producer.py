@@ -10,6 +10,10 @@ Pipeline (Veo 3 / Flow mode):
   4C. Fallback: Ken Burns effects with ffmpeg if Veo unavailable
   5. Assemble final video (clips + voiceover + music + captions)
 
+  Env (produce_video / Veo): VEO_FALLBACK_MODE=per_shot (default) or uniform_kb —
+  if any Veo clip fails, re-render every shot with Ken Burns for a consistent look.
+  VEO_CLIP_RETRIES — extra per-shot Veo attempts after the batch run (default 1).
+
 Dependencies: ffmpeg (system), httpx, Pillow, google-genai
 """
 
@@ -921,6 +925,8 @@ async def enhance_photo_with_flow(photo_path: Path, scene_desc: str,
 async def generate_cinematic_prompt_for_photo(
     photo_path: Path,
     listing_data: dict,
+    scene_index: Optional[int] = None,
+    total_scenes: Optional[int] = None,
 ) -> str:
     """
     Send a listing photo to Gemini Vision and get back a precision
@@ -947,8 +953,21 @@ async def generate_cinematic_prompt_for_photo(
         import io
         img = PIL.Image.open(io.BytesIO(photo_bytes))
 
-        prompt = f"""You are a cinematic prompt engineer for luxury real estate video production.
+        tour_block = ""
+        if (
+            scene_index is not None
+            and total_scenes is not None
+            and total_scenes > 0
+        ):
+            tour_block = (
+                f"\nTour context: This photo is frame {scene_index + 1} of {total_scenes} in ONE "
+                "continuous luxury listing walk-through (not an isolated clip). The camera movement "
+                "you prescribe must feel like the natural next moment after the previous space and "
+                "should pull the viewer forward through the home.\n"
+            )
 
+        prompt = f"""You are a cinematic prompt engineer for luxury real estate video production.
+{tour_block}
 Analyze this room photo and write a single precision camera prompt for Veo 3 video generation.
 
 Property: {listing_data.get('address', 'GTA property')}, {listing_data.get('price', '')}
@@ -996,6 +1015,39 @@ VEO_SCENE_PROMPTS = [
     "Slow push-in shot highlighting architectural details, cinematic depth of field. Golden hour warmth. High-end property advertisement.",
     "Smooth orbiting camera revealing the space from a new angle, luxury real estate showcase. Professional lighting, magazine quality.",
 ]
+
+
+def _walkthrough_tour_suffix(scene_index: int, total_scenes: int) -> str:
+    """Prefix text so Veo treats each clip as part of one continuous listing walk-through."""
+    if total_scenes <= 0:
+        return ""
+    if total_scenes <= 1:
+        return (
+            "CONTINUOUS TOUR: Single-shot property showcase — one cohesive hero moment, "
+            "premium real estate production."
+        )
+    if scene_index == 0:
+        return (
+            "CONTINUOUS TOUR — OPENING: Start of a single walk-through visit; establish arrival "
+            "and invite the viewer into the home. This shot flows into the following spaces."
+        )
+    if scene_index == total_scenes - 1:
+        return (
+            "CONTINUOUS TOUR — CLOSING: Final beat of the same walk-through; resolve the visit "
+            "with a memorable last impression."
+        )
+    return (
+        "CONTINUOUS TOUR — MID WALK: Same continuous property visit; motivate forward motion "
+        "through the home as if escorting a buyer room-to-room."
+    )
+
+
+def _compose_veo_prompt_with_tour(base_prompt: str, scene_index: int, total_scenes: int) -> str:
+    tour = _walkthrough_tour_suffix(scene_index, total_scenes)
+    base = (base_prompt or "").strip()
+    if not tour:
+        return base
+    return f"{tour} {base}".strip()
 
 
 async def generate_veo_clip(
@@ -1422,6 +1474,11 @@ async def produce_video(
     job_id = job_dir.name
     job_dir.mkdir(parents=True, exist_ok=True)
     ensure_dirs()
+    logger.info(
+        "video_pipeline_entry=produce_video job_id=%s url=%s",
+        job_id,
+        (listing_url or url or "")[:120],
+    )
     log_activity("VIDEO", f"Job started: {job_id} for {listing_url}")
     _update_job_tracker(job_id, address=listing_data.get("address", url), status="running")
 
@@ -1516,75 +1573,138 @@ async def produce_video(
 
         # 4. Generate cinematic clips — try Veo 3 first (subject to budget), fallback to ffmpeg
         scene_prompts = script_data.get("scene_prompts", []) if script_data else []
-        clips = []
-
-        # Always generate per-photo cinematic prompts from actual image content for UI visibility
-        await progress("animate", f"Analyzing {len(photos)} photos for cinematic shots...")
-        vision_prompts = []
-        for i, photo in enumerate(photos):
-            prompt = await generate_cinematic_prompt_for_photo(photo, listing_data)
-            vision_prompts.append(prompt)
-            await progress("animate", f"Shot {i+1}/{len(photos)}: {prompt[:60]}...")
-
-        # 4A. Try Flow enhancement on photos (Premium tier only)
-        enhanced_photos: List[Path] = []
+        clips: List[Path] = []
 
         # Determine whether to use Veo based on budget and order type.
-        # 'paid_order' can be set by the caller for real, paid videos.
         paid_order = bool(listing_data.get("paid_order", False))
         env_use_veo = os.getenv("USE_VEO3", "true").lower() == "true"
         budget_ok = check_veo_budget_available() if paid_order or force_veo else False
         use_veo = env_use_veo and (force_veo or (paid_order and budget_ok))
-
         enhance_photos_flag = bool(listing_data.get("enhance_photos", False))
 
+        n_photos = len(photos)
+        await progress("animate", f"Analyzing {n_photos} photos for cinematic shots...")
+        vision_prompts: List[str] = []
+        for i, photo in enumerate(photos):
+            prompt = await generate_cinematic_prompt_for_photo(
+                photo, listing_data, scene_index=i, total_scenes=n_photos
+            )
+            vision_prompts.append(prompt)
+            await progress("animate", f"Shot {i+1}/{n_photos}: {prompt[:60]}...")
+
+        # 4A. Optional Flow enhancement (premium tier) — always followed by same Veo + gap-fill path
+        enhanced_photos: List[Path]
         if use_veo and enhance_photos_flag:
             logger.info("Using Flow enhancement before Veo (premium tier).")
-            await progress("enhance", f"Enhancing {len(photos)} photos with Flow AI...")
+            await progress("enhance", f"Enhancing {n_photos} photos with Flow AI...")
+            enhanced_photos = []
             for i, photo in enumerate(photos):
-                desc = scene_prompts[i] if script_data and i < len(scene_prompts) else "luxury living space"
+                desc = (
+                    scene_prompts[i]
+                    if script_data and i < len(scene_prompts)
+                    else "luxury living space"
+                )
                 enhanced = await enhance_photo_with_flow(photo, desc, job_dir)
                 enhanced_photos.append(enhanced or photo)
 
             enhanced_count = sum(1 for p in enhanced_photos if p.parent.name != "photos")
             _update_job_tracker(job_id, enhanced=enhanced_count, percent=30)
             if enhanced_count:
-                await progress("enhance", f"Enhanced {enhanced_count}/{len(photos)} photos")
+                await progress("enhance", f"Enhanced {enhanced_count}/{n_photos} photos")
             else:
                 await progress("enhance", "Flow enhancement skipped, using originals")
-                enhanced_photos = photos
+                enhanced_photos = list(photos)
         else:
-            # No enhancement (Basic/Cinematic tiers) — use original photos for Veo/Ken Burns.
-            enhanced_photos = photos
+            enhanced_photos = list(photos)
 
-            # Use vision prompts for Veo 3, fall back to script scene_prompts if vision failed
+        if use_veo:
             final_prompts = [
-                vp if vp else (scene_prompts[i] if i < len(scene_prompts) else VEO_SCENE_PROMPTS[i % len(VEO_SCENE_PROMPTS)])
+                _compose_veo_prompt_with_tour(
+                    vp
+                    if vp
+                    else (
+                        scene_prompts[i]
+                        if i < len(scene_prompts)
+                        else VEO_SCENE_PROMPTS[i % len(VEO_SCENE_PROMPTS)]
+                    ),
+                    i,
+                    len(enhanced_photos),
+                )
                 for i, vp in enumerate(vision_prompts)
             ]
 
             target_duration = 30.0
-            duration_per = target_duration / len(enhanced_photos) if enhanced_photos else 2.0
-            await progress("animate", f"🎬 Generating {len(enhanced_photos)} Veo 3 cinematic clips ({duration_per:.1f}s each)...")
+            duration_per = (
+                target_duration / len(enhanced_photos) if enhanced_photos else 2.0
+            )
+            await progress(
+                "animate",
+                f"🎬 Generating {len(enhanced_photos)} Veo 3 cinematic clips ({duration_per:.1f}s each)...",
+            )
             _update_job_tracker(job_id, clips_total=len(enhanced_photos), percent=35)
+            veo_results: List[Optional[Path]] = []
             try:
-                veo_results = await create_veo_clips(enhanced_photos, final_prompts, job_dir, duration=int(duration_per))
-                # If we successfully invoked Veo at least once, record spend.
+                veo_results = await create_veo_clips(
+                    enhanced_photos,
+                    final_prompts,
+                    job_dir,
+                    duration=int(duration_per),
+                )
                 if any(c is not None for c in veo_results):
                     record_veo_usage()
             except Exception as e:
-                logger.error(f"Veo generation failed: {e}, falling back to Ken Burns")
+                logger.error("Veo generation failed: %s, falling back to Ken Burns", e)
                 veo_results = [None] * len(enhanced_photos)
-            
-            # Fill in gaps with ffmpeg
-            clips = []
+
+            fallback_mode = (os.getenv("VEO_FALLBACK_MODE") or "per_shot").strip().lower()
+            extra_retries = max(0, int(os.getenv("VEO_CLIP_RETRIES", "1") or "0"))
             source_photos = enhanced_photos if enhanced_photos else photos
-            for i, clip in enumerate(veo_results):
-                if clip:
-                    clips.append(clip)
-                else:
-                    await progress("animate", f"Veo 3 failed for shot {i+1}, using ffmpeg fallback...")
-                    kb_clips = await create_photo_clips([source_photos[i]], job_dir, duration_per_photo=duration_per)
+
+            if fallback_mode == "uniform_kb" and any(r is None for r in veo_results):
+                await progress(
+                    "animate",
+                    "VEO_FALLBACK_MODE=uniform_kb — regenerating all shots with Ken Burns for a consistent look.",
+                )
+                clips = await create_photo_clips(
+                    source_photos,
+                    job_dir,
+                    duration_per_photo=duration_per,
+                )
+            else:
+                clips = []
+                for i, clip in enumerate(veo_results):
+                    if clip:
+                        clips.append(clip)
+                        continue
+                    retried: Optional[Path] = None
+                    for attempt in range(extra_retries):
+                        await progress(
+                            "animate",
+                            f"Veo extra attempt {attempt + 1}/{extra_retries} for shot {i + 1}...",
+                        )
+                        if attempt > 0:
+                            await asyncio.sleep(15)
+                        retried = await generate_veo_clip(
+                            source_photos[i],
+                            final_prompts[i],
+                            job_dir,
+                            i,
+                            duration=int(duration_per),
+                        )
+                        if retried:
+                            break
+                    if retried:
+                        clips.append(retried)
+                        continue
+                    await progress(
+                        "animate",
+                        f"Veo failed for shot {i + 1}, using ffmpeg fallback...",
+                    )
+                    kb_clips = await create_photo_clips(
+                        [source_photos[i]],
+                        job_dir,
+                        duration_per_photo=duration_per,
+                    )
                     if kb_clips:
                         clips.append(kb_clips[0])
 

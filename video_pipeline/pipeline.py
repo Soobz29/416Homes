@@ -474,6 +474,11 @@ class VideoJobManager:
                 return
 
             listing_url = job.get("listing_url") or ""
+            logger.info(
+                "video_pipeline_entry=VideoJobManager.process_video_job job_id=%s url=%s",
+                job_id,
+                (listing_url or "")[:120],
+            )
             # Use only statuses allowed by DB CHECK constraint
             await self.update_job_status(job_id, "generating_script", 10)
 
