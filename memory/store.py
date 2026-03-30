@@ -27,11 +27,23 @@ class MemoryStore:
     """Supabase-backed memory store with pgvector embeddings"""
     
     def __init__(self):
-        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_url = (os.getenv("SUPABASE_URL") or "").strip()
         # Prefer service_role for server-side reads/writes (RLS-safe),
         # fall back to anon key if needed.
-        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
-        self.supabase: Client = create_client(supabase_url, supabase_key)
+        supabase_key = (
+            (os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY") or "").strip()
+        )
+        self.supabase: Optional[Client] = None
+        if not supabase_url or not supabase_key:
+            logger.warning(
+                "SUPABASE_URL or Supabase key missing/empty; memory store disabled (API can still boot)"
+            )
+        else:
+            try:
+                self.supabase = create_client(supabase_url, supabase_key)
+            except Exception as e:
+                logger.error("Failed to create Supabase client: %s", e)
+                self.supabase = None
         
         # Initialize Gemini for embeddings. New SDK (google-genai) uses gemini-embedding-001; legacy uses text-embedding-004.
         self.embedding_model_id = os.getenv("GEMINI_EMBEDDING_MODEL") or (
@@ -200,6 +212,9 @@ class MemoryStore:
     async def embed_and_store_listing(self, listing: Dict[str, Any]) -> bool:
         """Store a listing with its embedding"""
         try:
+            if not self.supabase:
+                logger.error("Supabase not configured; cannot store listing")
+                return False
             # Normalise data first
             normalised = self._normalise_for_listings(listing)
             
@@ -244,6 +259,9 @@ class MemoryStore:
     async def clear_listings(self) -> int:
         """Delete all rows from the listings table. Returns number of ids removed."""
         try:
+            if not self.supabase:
+                logger.warning("Supabase not configured; skip clear_listings")
+                return 0
             ids = []
             page_size = 500
             offset = 0
@@ -284,6 +302,8 @@ class MemoryStore:
     async def search_similar_listings(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Search for similar listings using vector similarity"""
         try:
+            if not self.supabase:
+                return []
             # Generate query embedding
             query_embedding = await self.embed_text(query)
             
@@ -306,6 +326,8 @@ class MemoryStore:
     async def store_sold_comp(self, comp: Dict[str, Any]) -> bool:
         """Store sold comparable property"""
         try:
+            if not self.supabase:
+                return False
             # Normalise data first
             normalised = self._normalise_for_sold_comps(comp)
             
@@ -325,6 +347,8 @@ class MemoryStore:
     async def get_sold_comps_by_neighborhood(self, neighborhood: str, limit: int = 50) -> List[Dict[str, Any]]:
         """Get sold comps for a specific neighborhood"""
         try:
+            if not self.supabase:
+                return []
             result = self.supabase.table("sold_comps")\
                 .select("*")\
                 .eq("neighbourhood", neighborhood)\
@@ -341,6 +365,8 @@ class MemoryStore:
     async def get_listings(self, city: str = None, cities: List[str] = None, limit: int = 20, offset: int = 0, min_price: int = None, max_price: int = None, min_beds: float = None, min_baths: float = None) -> List[Dict[str, Any]]:
         """Get listings with filters. Pass city (single) or cities (list) for location. offset/limit for pagination."""
         try:
+            if not self.supabase:
+                return []
             query = self.supabase.table("listings").select("*")
             if cities:
                 query = query.in_("city", cities)

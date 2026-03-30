@@ -95,6 +95,10 @@ class VideoJobManager:
             "audio_url": None,
             "final_video_path": None
         }
+
+        if not self.supabase:
+            logger.error("Cannot create video job: Supabase not configured")
+            raise RuntimeError("Supabase not configured; set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_KEY)")
         
         try:
             self.supabase.table("video_jobs").insert(job_data).execute()
