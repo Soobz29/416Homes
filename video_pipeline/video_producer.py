@@ -168,6 +168,10 @@ WALKTHROUGH_ORDER = [
 
 MIN_PHOTO_BYTES = 8_000  # skip anything under 8 KB
 
+# Walkthrough sorts these first; without a shared cap, MAX_VIDEO_PHOTOS=5 can be
+# all aerial + exterior angles before any living/kitchen/bedroom.
+EXTERIOR_WALKTHROUGH_ROOMS = frozenset({"aerial", "exterior_front", "exterior_side"})
+
 
 async def smart_order_photos(photos: List[Path], listing_data: dict) -> List[Path]:
     """
@@ -269,16 +273,26 @@ async def smart_order_photos(photos: List[Path], listing_data: dict) -> List[Pat
         # Sort by walkthrough order, then by quality descending within same room
         scored.sort(key=lambda x: (x["order"], -x["quality"]))
 
+        max_exterior = max(1, int(os.getenv("MAX_WALKTHROUGH_EXTERIOR", "2") or "2"))
+
         # Deduplicate: keep only the best photo per room type
         seen_rooms: Dict[str, int] = {}
+        exterior_slots_used = 0
         final: List[Path] = []
         for s in scored:
             room = s["room"]
+            if room in EXTERIOR_WALKTHROUGH_ROOMS and exterior_slots_used >= max_exterior:
+                logger.info(
+                    f"  [smart_order] Exterior cap ({max_exterior}): skip {room} — {s['desc']}"
+                )
+                continue
             count = seen_rooms.get(room, 0)
             # Allow max 2 photos of same room type (e.g. two bedrooms)
             if room in ("bedroom", "bathroom", "other") or count < 1:
                 final.append(s["path"])
                 seen_rooms[room] = count + 1
+                if room in EXTERIOR_WALKTHROUGH_ROOMS:
+                    exterior_slots_used += 1
                 logger.info(f"  [smart_order] #{len(final)}: {s['room']} (q={s['quality']}) - {s['desc']}")
             else:
                 logger.info(f"  [smart_order] Duplicate {room} skipped: {s['desc']}")

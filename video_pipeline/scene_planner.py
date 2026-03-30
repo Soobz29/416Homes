@@ -1,6 +1,7 @@
 """Intelligent scene planning for video generation."""
 
 import logging
+import os
 from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
@@ -44,13 +45,26 @@ class ScenePlanner:
             )
             good_photos = classified_photos
 
-        # Preserve listing crawl order (original_index) for a coherent walk-through.
+        # Preserve listing crawl order (original_index), but cap exterior shots so
+        # the first frames are not all facade angles (common on MLS galleries).
         sorted_photos = sorted(
             good_photos,
             key=lambda p: int(p.get("original_index", 0) or 0),
         )
 
-        selected = sorted_photos[:max_photos]
+        max_ext = max(1, int(os.getenv("MAX_SCENE_EXTERIOR", "2") or "2"))
+        selected: List[Dict[str, Any]] = []
+        ext_used = 0
+        for p in sorted_photos:
+            if len(selected) >= max_photos:
+                break
+            rt = str(p.get("room_type") or "other").lower()
+            if rt == "exterior":
+                if ext_used >= max_ext:
+                    continue
+                ext_used += 1
+            selected.append(p)
+
         scenes = self._assign_timing(selected, target_duration_sec)
 
         logger.info("Created scene plan with %d scenes", len(scenes))
