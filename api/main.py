@@ -1,4 +1,6 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Header
+import uuid
+
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Header, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -143,13 +145,65 @@ class ValuationResponse(BaseModel):
 
 class VideoJobRequest(BaseModel):
     listing_url: str
-    customer_email: str
+    customer_email: Optional[str] = None
+    agent_email: Optional[str] = None
     customer_name: Optional[str] = None
+    agent_name: Optional[str] = None
+    voice: Optional[str] = "female_luxury"
+    tier: Optional[str] = "cinematic"
+    price_cad: Optional[float] = None
+    use_veo: Optional[bool] = True
+
 
 class VideoJobResponse(BaseModel):
     id: str
     status: str
     message: str
+
+
+def _normalize_video_job_payload(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Shape Supabase row for the Vercel video page poll loop."""
+    if not row:
+        return row
+    out = dict(row)
+    status = out.get("status") or "pending"
+    step_map = {
+        "pending": "scrape",
+        "generating_script": "script",
+        "script_generated": "audio",
+        "generating_audio": "audio",
+        "audio_generated": "animate",
+        "generating_video": "animate",
+        "completed": "assemble",
+        "failed": "assemble",
+    }
+    msg_map = {
+        "pending": "Queued — preparing photos…",
+        "generating_script": "Generating script…",
+        "script_generated": "Script ready — preparing audio…",
+        "generating_audio": "Generating audio…",
+        "audio_generated": "Rendering video…",
+        "generating_video": "Rendering video…",
+        "completed": "Done",
+        "failed": "Failed",
+    }
+    out["progress_step"] = step_map.get(status, "scrape")
+    out["progress_message"] = msg_map.get(status, "Processing…")
+    if status == "completed":
+        out["status"] = "complete"
+    ld = out.get("listing_data")
+    if isinstance(ld, str):
+        try:
+            import json as _json
+
+            ld = _json.loads(ld)
+        except Exception:
+            ld = {}
+    if isinstance(ld, dict) and ld.get("address"):
+        out["listing_address"] = ld.get("address")
+    if out.get("error_message"):
+        out["error"] = out["error_message"]
+    return out
 
 class Alert(BaseModel):
     id: str
@@ -624,44 +678,115 @@ async def valuate_property(data: dict):
 @app.post("/api/video-jobs", response_model=VideoJobResponse)
 async def create_video_job_endpoint(request: VideoJobRequest):
     """Create a new video job"""
-    
     try:
+        email = request.agent_email or request.customer_email or ""
+        name = request.agent_name or request.customer_name or ""
+        if not email:
+            raise HTTPException(status_code=422, detail="agent_email or customer_email is required")
+
+        listing_meta: Dict[str, Any] = {}
+        if request.voice is not None:
+            listing_meta["voice"] = request.voice
+        if request.tier is not None:
+            listing_meta["tier"] = request.tier
+        if request.price_cad is not None:
+            listing_meta["price_cad"] = request.price_cad
+        if request.use_veo is not None:
+            listing_meta["use_veo"] = request.use_veo
+
         job_id = await create_video_job(
             listing_url=request.listing_url,
-            customer_email=request.customer_email,
-            customer_name=request.customer_name
+            customer_email=email,
+            customer_name=name or None,
+            listing_data=listing_meta or None,
         )
         return VideoJobResponse(
             id=job_id,
             status="pending",
-            message="Video job created successfully"
+            message="Video job created successfully",
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Error creating video job: %s", e)
         raise HTTPException(status_code=500, detail="Failed to create video job")
 
+
+@app.post("/api/video-jobs/custom", response_model=VideoJobResponse)
+async def create_custom_video_job(
+    address: str = Form(...),
+    price: str = Form(""),
+    beds: str = Form(""),
+    baths: str = Form(""),
+    agent_email: str = Form(...),
+    agent_name: str = Form(""),
+    voice: str = Form("female_luxury"),
+    photos: List[UploadFile] = File(...),
+    music: Optional[UploadFile] = File(None),
+):
+    """Create video job from uploaded photos."""
+    if len(photos) < 4 or len(photos) > 10:
+        raise HTTPException(status_code=400, detail="Upload between 4 and 10 photos")
+
+    try:
+        job_id = str(uuid.uuid4())
+        tmp_root = Path(os.getenv("VIDEO_JOB_TMP", "/tmp")) / "video_jobs"
+        job_dir = tmp_root / job_id
+        photos_dir = job_dir / "photos"
+        photos_dir.mkdir(parents=True, exist_ok=True)
+
+        for i, photo in enumerate(photos):
+            ext = Path(photo.filename or "photo.jpg").suffix or ".jpg"
+            dest = photos_dir / f"photo_{i + 1:03d}{ext}"
+            contents = await photo.read()
+            dest.write_bytes(contents)
+
+        if music and music.filename:
+            music_bytes = await music.read()
+            (job_dir / "custom_bgmusic.mp3").write_bytes(music_bytes)
+
+        listing_data: Dict[str, Any] = {
+            "address": address,
+            "price": price,
+            "bedrooms": beds,
+            "bathrooms": baths,
+            "voice": voice,
+        }
+        if (job_dir / "custom_bgmusic.mp3").exists():
+            listing_data["custom_music_path"] = str((job_dir / "custom_bgmusic.mp3").resolve())
+
+        job_id = await create_video_job(
+            listing_url="custom_upload",
+            customer_email=agent_email,
+            customer_name=agent_name or None,
+            listing_data=listing_data,
+            job_dir=job_dir,
+            job_id=job_id,
+        )
+        return VideoJobResponse(
+            id=job_id,
+            status="pending",
+            message="Video job created successfully",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error creating custom video job: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/video-jobs/{job_id}")
 async def get_video_job(job_id: str):
     """Get video job status"""
-    
     try:
         job_status = await get_video_job_status(job_id)
-        
-        if job_status:
-            return job_status
-        else:
-            # Return demo job for testing
-            return {
-                "id": job_id,
-                "status": "completed",
-                "progress": 100,
-                "video_url": "https://storage.googleapis.com/416homes-videos/demo-video.mp4",
-                "created_at": "2024-03-03T22:00:00Z",
-                "updated_at": "2024-03-03T22:05:00Z"
-            }
-            
+        if not job_status:
+            raise HTTPException(status_code=404, detail="Job not found")
+        return _normalize_video_job_payload(job_status)
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error getting video job: {e}")
+        logger.error("Error getting video job: %s", e)
         raise HTTPException(status_code=500, detail="Failed to get video job status")
 
 

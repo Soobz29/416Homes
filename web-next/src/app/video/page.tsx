@@ -110,11 +110,11 @@ function VideoOrderForm({
             Listing URL *
           </label>
           <input
-            type="url"
+            type="text"
             value={formListingUrl}
             onChange={(e) => setFormListingUrl(e.target.value)}
             className="fi w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
-            placeholder="https://www.realtor.ca/real-estate/..."
+            placeholder="zoocasa.com/oakville-on-real-estate/136-n-park-blvd"
           />
         </div>
       )}
@@ -395,7 +395,7 @@ export default function VideoPage() {
     });
     setStepStates(next);
     setStepMessages((prev) => ({ ...prev, [step]: data.progress_message || "Processing..." }));
-    if (data.status === "complete") {
+    if (data.status === "complete" || data.status === "completed") {
       STEP_ORDER.forEach((s) => (next[s] = "done"));
       setStepStates(next);
       setDownloadVisible(true);
@@ -421,7 +421,7 @@ export default function VideoPage() {
     if (!currentJobId || !progressVisible) return;
     const poll = async () => {
       try {
-        const res = await fetch(`${API_BASE}/video/status/${currentJobId}`);
+        const res = await fetch(`${API_BASE}/api/video-jobs/${currentJobId}`);
         const data = await res.json();
         updateProgressFromApi(data, currentJobId);
       } catch (e) {
@@ -442,15 +442,20 @@ export default function VideoPage() {
       return;
     }
     setSubmitLoading(true);
+
     try {
       if (uploadMethod === "url") {
-        const url = formListingUrl.trim();
-        if (!url || !url.startsWith("http")) {
-          alert("Please enter a valid listing URL");
+        let url = formListingUrl.trim();
+        if (!url) {
+          alert("Please enter a listing URL");
           setSubmitLoading(false);
           return;
         }
-        const res = await fetch(`${API_BASE}/video/create-checkout`, {
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+          url = "https://" + url;
+        }
+
+        const res = await fetch(`${API_BASE}/api/video-jobs`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -460,15 +465,21 @@ export default function VideoPage() {
             voice: selectedVoice,
             tier,
             price_cad: price,
+            use_veo: tier !== "basic",
           }),
         });
-        const data = await res.json();
-        if (data.checkout_url) {
-          window.location.href = data.checkout_url;
-          return;
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error((err as { detail?: string }).detail || `Server error ${res.status}`);
         }
-        if (data.job_id) {
-          showProgress(data.job_id, url.length > 60 ? url.slice(0, 60) + "..." : url);
+
+        const data = await res.json();
+        const jobId = data.job_id || data.id;
+        if (jobId) {
+          showProgress(jobId, url.length > 60 ? url.slice(0, 60) + "..." : url);
+        } else {
+          throw new Error("No job ID returned from server");
         }
       } else {
         const address = formCustomAddress.trim();
@@ -483,27 +494,42 @@ export default function VideoPage() {
           setSubmitLoading(false);
           return;
         }
+
         const formData = new FormData();
         formData.append("address", address);
         formData.append("price", formCustomPrice);
         formData.append("beds", formCustomBeds);
         formData.append("baths", "");
-        formData.append("sqft", "");
-        formData.append("property_type", "");
-        formData.append("description", "");
         formData.append("agent_email", email);
         formData.append("agent_name", formName.trim());
         formData.append("voice", selectedVoice);
-        for (let i = 0; i < files.length; i++) formData.append("photos", files[i]);
+        for (let i = 0; i < files.length; i++) {
+          formData.append("photos", files[i]);
+        }
         if (formCustomMusic) formData.append("music", formCustomMusic);
-        const res = await fetch(`${API_BASE}/video/create-custom`, { method: "POST", body: formData });
+
+        const res = await fetch(`${API_BASE}/api/video-jobs/custom`, {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error((err as { detail?: string }).detail || `Server error ${res.status}`);
+        }
+
         const data = await res.json();
-        if (data.job_id) {
-          showProgress(data.job_id, address);
+        const jobId = data.job_id || data.id;
+        if (jobId) {
+          showProgress(jobId, address);
+        } else {
+          throw new Error("No job ID returned from server");
         }
       }
-    } catch (err) {
-      console.error(err);
+    } catch (err: unknown) {
+      console.error("Submit error:", err);
+      const message = err instanceof Error ? err.message : "Unknown error";
+      alert(`Something went wrong: ${message}. Running demo mode.`);
       simulateDemo();
     } finally {
       setSubmitLoading(false);

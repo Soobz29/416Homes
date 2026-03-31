@@ -75,14 +75,24 @@ class VideoJobManager:
         self.photo_classifier = PhotoClassifier()
         self.scene_planner = ScenePlanner()
     
-    async def create_video_job(self, listing_url: str, customer_email: str,
-                               customer_name: str = None) -> str:
+    async def create_video_job(
+        self,
+        listing_url: str,
+        customer_email: str,
+        customer_name: Optional[str] = None,
+        listing_data: Optional[Dict[str, Any]] = None,
+        job_dir: Optional[Path] = None,
+        job_id: Optional[str] = None,
+    ) -> str:
         """Create a new video job and persist to database"""
-        
-        job_id = str(uuid.uuid4())
-        
-        job_data = {
-            "id": job_id,
+
+        jid = job_id or str(uuid.uuid4())
+        merged_listing: Dict[str, Any] = dict(listing_data or {})
+        if job_dir is not None:
+            merged_listing["_job_dir"] = str(Path(job_dir).resolve())
+
+        job_data: Dict[str, Any] = {
+            "id": jid,
             "listing_url": listing_url,
             "customer_email": customer_email,
             "customer_name": customer_name or customer_email.split("@")[0],
@@ -94,8 +104,10 @@ class VideoJobManager:
             "video_url": None,
             "script_data": None,
             "audio_url": None,
-            "final_video_path": None
+            "final_video_path": None,
         }
+        if merged_listing:
+            job_data["listing_data"] = merged_listing
 
         if not self.supabase:
             logger.error("Cannot create video job: Supabase not configured")
@@ -103,9 +115,9 @@ class VideoJobManager:
         
         try:
             self.supabase.table("video_jobs").insert(job_data).execute()
-            logger.info("Created video job: %s", job_id)
-            asyncio.create_task(self.process_video_job(job_id))
-            return job_id
+            logger.info("Created video job: %s", jid)
+            asyncio.create_task(self.process_video_job(jid))
+            return jid
         except Exception as e:
             logger.error("Failed to create video job: %s", e)
             raise
@@ -256,6 +268,53 @@ class VideoJobManager:
         logger.info("Successfully uploaded %d photos", len(uploaded_urls))
         return uploaded_urls
 
+    async def _upload_local_photos_to_storage(
+        self, job_id: str, paths: List[Path]
+    ) -> List[str]:
+        """Upload on-disk listing photos to Supabase Storage and return public URLs."""
+
+        uploaded_urls: List[str] = []
+        for idx, p in enumerate(paths):
+            try:
+                data = p.read_bytes()
+                if len(data) < 1000:
+                    logger.warning("Skipping tiny local photo %s", p)
+                    continue
+                suffix = p.suffix.lower() if p.suffix else ".jpg"
+                if suffix not in (".jpg", ".jpeg", ".png", ".webp"):
+                    suffix = ".jpg"
+                ext_for_name = ".jpg" if suffix == ".jpeg" else suffix
+                path = f"{job_id}/frame_{idx:03d}{ext_for_name}"
+                ctype = {
+                    ".jpg": "image/jpeg",
+                    ".jpeg": "image/jpeg",
+                    ".png": "image/png",
+                    ".webp": "image/webp",
+                }.get(suffix, "image/jpeg")
+
+                logger.info(
+                    "Uploading local photo %d/%d → listing-photos/%s",
+                    idx + 1,
+                    len(paths),
+                    path,
+                )
+                self.supabase.storage.from_("listing-photos").upload(  # type: ignore[attr-defined]
+                    path,
+                    data,
+                    file_options={"content-type": ctype},
+                )
+                pub = self.supabase.storage.from_("listing-photos").get_public_url(path)  # type: ignore[attr-defined]
+                public_url = pub.get("publicUrl") if isinstance(pub, dict) else pub
+                if public_url:
+                    uploaded_urls.append(public_url)
+            except Exception as e:
+                logger.error("Failed to upload local photo %s: %s", p, e)
+
+        if not uploaded_urls:
+            raise RuntimeError("Failed to upload any custom-upload photos")
+        logger.info("Successfully uploaded %d custom photos", len(uploaded_urls))
+        return uploaded_urls
+
     async def _upload_video_to_storage(self, job_id: str, video_path: Path) -> str:
         """Upload rendered video file to Supabase Storage and return public URL."""
 
@@ -311,9 +370,25 @@ class VideoJobManager:
         )
 
         listing_url = job.get("listing_url") or ""
+        ld_raw = job.get("listing_data")
+        if isinstance(ld_raw, str):
+            import json as _json
+
+            try:
+                ld: Dict[str, Any] = _json.loads(ld_raw)
+            except Exception:
+                ld = {}
+        else:
+            ld = ld_raw if isinstance(ld_raw, dict) else {}
+        visible_ld = {k: v for k, v in ld.items() if not str(k).startswith("_")}
+        facts_block = ""
+        if visible_ld:
+            facts_block = f"Property facts (use verbatim where helpful): {visible_ld}\n\n"
+
         prompt = (
             "Create a 30-second real estate video script that matches the following scene sequence.\n\n"
             f"Listing URL (for context only, do not open): {listing_url}\n\n"
+            f"{facts_block}"
             "Scenes:\n"
             f"{scene_desc}\n\n"
             "Requirements:\n"
@@ -373,6 +448,19 @@ class VideoJobManager:
                 return
 
             listing_url = job.get("listing_url") or ""
+            listing_data_raw = job.get("listing_data")
+            if isinstance(listing_data_raw, str):
+                import json as _json
+
+                try:
+                    listing_data_ctx: Dict[str, Any] = _json.loads(listing_data_raw)
+                except Exception:
+                    listing_data_ctx = {}
+            else:
+                listing_data_ctx = (
+                    listing_data_raw if isinstance(listing_data_raw, dict) else {}
+                )
+
             logger.info(
                 "video_pipeline_entry=VideoJobManager.process_video_job job_id=%s url=%s",
                 job_id,
@@ -381,14 +469,27 @@ class VideoJobManager:
             # Use only statuses allowed by DB CHECK constraint
             await self.update_job_status(job_id, "generating_script", 10)
 
-            # Step 1: Fetch photos from listing URL (or use existing manifest)
-            photo_urls = await self._fetch_listing_photos(listing_url)
-            if not photo_urls:
-                raise RuntimeError("No photos found for listing_url")
-            await self.update_job_status(job_id, "generating_script", 20)
+            # Step 1–2: Resolve photos (scrape or custom disk upload) → Supabase URLs
+            if listing_url == "custom_upload":
+                base = Path(listing_data_ctx.get("_job_dir", "") or "")
+                photos_dir = base / "photos"
+                if not photos_dir.is_dir():
+                    raise RuntimeError("Custom upload photos directory missing")
+                paths_set: List[Path] = []
+                for pat in ("*.jpg", "*.jpeg", "*.png", "*.webp", "*.JPG", "*.PNG"):
+                    paths_set.extend(photos_dir.glob(pat))
+                paths = sorted({p.resolve() for p in paths_set}, key=lambda p: p.name.lower())
+                if len(paths) < 4:
+                    raise RuntimeError("Fewer than 4 photos found for custom upload")
+                await self.update_job_status(job_id, "generating_script", 20)
+                uploaded_urls = await self._upload_local_photos_to_storage(job_id, paths)
+            else:
+                photo_urls = await self._fetch_listing_photos(listing_url)
+                if not photo_urls:
+                    raise RuntimeError("No photos found for listing_url")
+                await self.update_job_status(job_id, "generating_script", 20)
+                uploaded_urls = await self._upload_photos_to_storage(job_id, photo_urls)
 
-            # Step 2: Upload photos to Supabase Storage and get public URLs
-            uploaded_urls = await self._upload_photos_to_storage(job_id, photo_urls)
             if not uploaded_urls:
                 raise RuntimeError("Failed to upload any listing photos")
             await self.update_job_status(job_id, "generating_script", 30)
@@ -548,11 +649,22 @@ class VideoJobManager:
 video_job_manager = VideoJobManager()
 
 # Convenience functions
-async def create_video_job(listing_url: str, customer_email: str, 
-                          customer_name: str = None) -> str:
+async def create_video_job(
+    listing_url: str,
+    customer_email: str,
+    customer_name: Optional[str] = None,
+    listing_data: Optional[dict] = None,
+    job_dir: Optional[Path] = None,
+    job_id: Optional[str] = None,
+) -> str:
     """Create a new video job"""
     return await video_job_manager.create_video_job(
-        listing_url, customer_email, customer_name
+        listing_url=listing_url,
+        customer_email=customer_email,
+        customer_name=customer_name,
+        listing_data=listing_data,
+        job_dir=job_dir,
+        job_id=job_id,
     )
 
 async def get_video_job_status(job_id: str) -> Optional[Dict[str, Any]]:
