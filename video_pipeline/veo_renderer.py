@@ -73,20 +73,8 @@ def _mime_from_image_bytes(data: bytes) -> str:
     return "image/jpeg"
 
 
-def _veo_generation_config(resolution: Optional[str] = None) -> "types.GenerateVideosConfig":
-    """Veo output resolution. Vertex Veo 2.0 often rejects 1080p; default is 720p.
-
-    Pass ``resolution`` (for example ``720p``) to override ``VEO_RESOLUTION`` for one call.
-    """
-    if resolution is not None:
-        res = resolution.strip().lower()
-        if res not in ("720p", "1080p"):
-            res = "720p"
-    else:
-        res = (os.getenv("VEO_RESOLUTION") or "720p").strip().lower()
-        if res not in ("720p", "1080p"):
-            res = "720p"
-    # Default optimized — lossless can yield empty generations on some Veo/Vertex builds.
+def _veo_generation_config() -> "types.GenerateVideosConfig":
+    """Veo request config. Output resolution is not set — Vertex / Veo chooses the default."""
     comp_raw = (os.getenv("VEO_COMPRESSION") or "optimized").strip().lower()
     compression = (
         types.VideoCompressionQuality.LOSSLESS
@@ -102,7 +90,6 @@ def _veo_generation_config(resolution: Optional[str] = None) -> "types.GenerateV
         duration_seconds=CLIP_DURATION_SECONDS,
         enhance_prompt=False,
         aspect_ratio="16:9",
-        resolution=res,
         compression_quality=compression,
         **fps_kw,
     )
@@ -392,7 +379,7 @@ class VeoRenderer:
         photo_paths.sort(key=lambda x: x[1])
         return photo_paths
 
-    async def _generate_clip_at_resolution(
+    async def _run_veo_clip(
         self,
         clip_path: Path,
         prompt: str,
@@ -400,9 +387,8 @@ class VeoRenderer:
         idx: int,
         scene: Dict[str, Any],
         loop: asyncio.AbstractEventLoop,
-        resolution: str,
     ) -> Path:
-        """Submit Veo job at ``resolution``, poll, write ``clip_path``."""
+        """Submit Veo job, poll, write ``clip_path``."""
 
         def _submit() -> Any:
             return self.client.models.generate_videos(
@@ -411,7 +397,7 @@ class VeoRenderer:
                     prompt=prompt,
                     image=image,
                 ),
-                config=_veo_generation_config(resolution=resolution),
+                config=_veo_generation_config(),
             )
 
         try:
@@ -496,15 +482,6 @@ class VeoRenderer:
         )
         return clip_path
 
-    def _veo_resolution_attempts(self) -> List[str]:
-        """Order of resolutions to try (1080p first only if env asks, then 720p fallback)."""
-        env_res = (os.getenv("VEO_RESOLUTION") or "720p").strip().lower()
-        if env_res not in ("720p", "1080p"):
-            env_res = "720p"
-        if env_res == "1080p":
-            return ["1080p", "720p"]
-        return ["720p"]
-
     async def _generate_clip(
         self,
         photo_path: Path,
@@ -521,6 +498,13 @@ class VeoRenderer:
                 photo_path, scene, idx, total_scenes
             )
 
+            logger.info(
+                "Clip %d (%s): submitting to Veo (Vertex default output resolution)\n  Prompt: %s",
+                idx,
+                scene.get("room_type", "?"),
+                prompt,
+            )
+
             image_bytes = photo_path.read_bytes()
             mime = _mime_from_image_bytes(image_bytes)
             image = types.Image(
@@ -529,41 +513,9 @@ class VeoRenderer:
             )
 
             loop = asyncio.get_running_loop()
-            attempts = self._veo_resolution_attempts()
-            last_err: Optional[BaseException] = None
-
-            for res_try in attempts:
-                logger.info(
-                    "Clip %d (%s): submitting to Veo at %s\n  Prompt: %s",
-                    idx,
-                    scene.get("room_type", "?"),
-                    res_try,
-                    prompt,
-                )
-                try:
-                    return await self._generate_clip_at_resolution(
-                        clip_path, prompt, image, idx, scene, loop, res_try
-                    )
-                except Exception as e:
-                    msg = str(e)
-                    if (
-                        res_try == "1080p"
-                        and len(attempts) > 1
-                        and "Unsupported output video resolution" in msg
-                    ):
-                        logger.warning(
-                            "Clip %d: Veo rejected %s (%s), retrying at 720p",
-                            idx,
-                            res_try,
-                            msg[:200],
-                        )
-                        last_err = e
-                        continue
-                    raise
-
-            if last_err is not None:
-                raise last_err
-            raise RuntimeError(f"Veo clip {idx}: no resolution attempts succeeded")
+            return await self._run_veo_clip(
+                clip_path, prompt, image, idx, scene, loop
+            )
 
     async def _concat_clips(self, clip_paths: List[Path], output_path: Path) -> None:
         """Concatenate Veo clips into final video."""
