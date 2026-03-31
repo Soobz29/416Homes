@@ -24,6 +24,32 @@ POLL_INTERVAL = 15
 MAX_CLIPS = 6  # 6 × 5s = 30s final video
 
 
+def _veo_generation_config() -> "types.GenerateVideosConfig":
+    """Veo quality: default 1080p + higher-quality encode (overridable via env)."""
+    res = (os.getenv("VEO_RESOLUTION") or "1080p").strip().lower()
+    if res not in ("720p", "1080p"):
+        res = "1080p"
+    comp_raw = (os.getenv("VEO_COMPRESSION") or "lossless").strip().lower()
+    compression = (
+        types.VideoCompressionQuality.LOSSLESS
+        if comp_raw in ("lossless", "high", "best")
+        else types.VideoCompressionQuality.OPTIMIZED
+    )
+    fps_kw: Dict[str, int] = {}
+    fps_s = (os.getenv("VEO_FPS") or "").strip()
+    if fps_s.isdigit():
+        fps_kw["fps"] = max(24, min(60, int(fps_s)))
+    return types.GenerateVideosConfig(
+        number_of_videos=1,
+        duration_seconds=CLIP_DURATION_SECONDS,
+        enhance_prompt=False,
+        aspect_ratio="16:9",
+        resolution=res,
+        compression_quality=compression,
+        **fps_kw,
+    )
+
+
 async def _build_clip_prompt_from_vision(
     photo_path: Path,
     scene: Dict[str, Any],
@@ -308,7 +334,7 @@ class VeoRenderer:
                 mime_type="image/jpeg",
             )
 
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
 
             try:
                 operation = await loop.run_in_executor(
@@ -317,12 +343,7 @@ class VeoRenderer:
                         model=VEO_MODEL,
                         prompt=prompt,
                         image=image,
-                        config=types.GenerateVideosConfig(
-                            number_of_videos=1,
-                            duration_seconds=CLIP_DURATION_SECONDS,
-                            enhance_prompt=False,
-                            aspect_ratio="16:9",
-                        ),
+                        config=_veo_generation_config(),
                     ),
                 )
             except Exception as e:
@@ -429,12 +450,12 @@ class VeoRenderer:
             "-c:a",
             "aac",
             "-b:a",
-            "128k",
+            (os.getenv("VIDEO_AAC_BITRATE") or "192k").strip(),
             "-shortest",
             str(output_path),
         ]
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(
             None,
             lambda: subprocess.run(cmd, capture_output=True, text=True, timeout=120),

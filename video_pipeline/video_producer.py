@@ -45,6 +45,16 @@ except ImportError:
 load_dotenv()
 logger = logging.getLogger(__name__)
 
+
+def _x264_quality_args() -> List[str]:
+    preset = (os.getenv("VIDEO_H264_PRESET") or "medium").strip()
+    crf_s = (os.getenv("VIDEO_H264_CRF") or "20").strip()
+    try:
+        crf = max(0, min(51, int(crf_s)))
+    except ValueError:
+        crf = 20
+    return ["-preset", preset, "-crf", str(crf)]
+
 # ── Active video job tracker (shared state for Telegram /videostatus) ─────
 _active_jobs: Dict[str, Dict[str, Any]] = {}
 
@@ -1309,7 +1319,7 @@ async def create_photo_clips(photos: List[Path], job_dir: Path,
             "-t", str(duration_per_photo),
             "-c:v", "libx264",
             "-pix_fmt", "yuv420p",
-            "-preset", "ultrafast",
+            *_x264_quality_args(),
             str(clip_path),
         ]
 
@@ -1365,7 +1375,9 @@ async def assemble_video(
             "ffmpeg", "-y",
             "-f", "concat", "-safe", "0",
             "-i", str(concat_file),
-            "-c:v", "libx264", "-preset", "fast",
+            "-c:v",
+            "libx264",
+            *_x264_quality_args(),
             "-pix_fmt", "yuv420p",
             str(concat_video),
         ]
@@ -1435,7 +1447,9 @@ async def assemble_video(
                     + (f";[0:v]{','.join(drawtext_parts)}[vout]" if drawtext_parts else ""),
                     "-map", "[vout]" if drawtext_parts else "0:v",
                     "-map", "[amixed]",
-                    "-c:v", "libx264", "-preset", "fast",
+                    "-c:v",
+                    "libx264",
+                    *_x264_quality_args(),
                     "-c:a", "aac", "-b:a", "192k",
                     "-t", str(video_dur),
                     str(output_path),
@@ -1472,7 +1486,9 @@ async def assemble_video(
             if vf:
                 cmd_final += ["-vf", vf]
             cmd_final += [
-                "-c:v", "libx264", "-preset", "fast",
+                "-c:v",
+                "libx264",
+                *_x264_quality_args(),
                 "-an",
                 str(output_path),
             ]

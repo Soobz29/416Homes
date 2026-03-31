@@ -1,5 +1,6 @@
 """FFmpeg-based video renderer with Ken Burns-style effects and optional audio."""
 
+import os
 import subprocess
 import logging
 from pathlib import Path
@@ -8,6 +9,17 @@ from typing import List, Dict, Any, Optional
 import httpx
 
 logger = logging.getLogger(__name__)
+
+
+def _libx264_quality_args() -> List[str]:
+    """H.264 quality for slideshow output (tune via VIDEO_H264_PRESET / VIDEO_H264_CRF)."""
+    preset = (os.getenv("VIDEO_H264_PRESET") or "medium").strip()
+    crf_s = (os.getenv("VIDEO_H264_CRF") or "20").strip()
+    try:
+        crf = max(0, min(51, int(crf_s)))
+    except ValueError:
+        crf = 20
+    return ["-preset", preset, "-crf", str(crf)]
 
 
 class VideoRenderer:
@@ -203,11 +215,12 @@ class VideoRenderer:
             audio_map = ["-map", "1:a"]
 
         enc = self._choose_video_encoder()
-        # Fastest preset for libx264 reduces CPU time (helps tight Railway limits).
         if enc == "libx264":
-            enc_opts: List[str] = ["-preset", "ultrafast", "-crf", "30"]
+            enc_opts: List[str] = _libx264_quality_args()
         else:
-            enc_opts = ["-preset", "veryfast", "-crf", "28"]
+            enc_opts = ["-preset", "veryfast", "-crf", "23"]
+
+        aac_br = (os.getenv("VIDEO_AAC_BITRATE") or "192k").strip()
 
         cmd: List[str] = [
             "ffmpeg",
@@ -230,7 +243,7 @@ class VideoRenderer:
             "-c:a",
             "aac",
             "-b:a",
-            "128k",
+            aac_br,
             "-r",
             "25",
             "-shortest",
