@@ -24,127 +24,127 @@ POLL_INTERVAL = 15
 MAX_CLIPS = 6  # 6 × 5s = 30s final video
 
 
-_SHOT_VOCABULARY = {
-    "exterior": [
-        "Wide establishing shot. Camera slowly drifts forward toward the front entrance, "
-        "revealing the full facade. Golden warm light. Architecture is the hero.",
-        "Low angle push-in toward the front door. Slight upward tilt reveals the roofline. "
-        "Confident, impressive.",
-    ],
-    "living_room": [
-        "Camera enters the room from a low angle, gliding forward. Natural light streams "
-        "from the windows. Slow arc left reveals the full breadth of the space.",
-        "Steady push-in from the doorway threshold. The room opens up as we move deeper in.",
-    ],
-    "kitchen": [
-        "Camera tracks along the countertop at a low angle, revealing the appliances and "
-        "cabinetry. Clean, precise movement like a luxury commercial.",
-        "Slow push-in from the kitchen entrance. Island or counters fill the foreground.",
-    ],
-    "dining_room": [
-        "Slow orbit around the dining table. Chairs, light fixture, and room come alive "
-        "with subtle motion.",
-        "Push-in toward the table from the entrance. Warm ambient light.",
-    ],
-    "bedroom": [
-        "Camera floats in from the doorway, gliding low toward the bed. Soft natural light "
-        "from the window. Calm, peaceful movement.",
-        "Slow arc around the foot of the bed, revealing the full room.",
-    ],
-    "bathroom": [
-        "Slow push-in toward the vanity. Clean surfaces catch the light. "
-        "Precise, deliberate movement.",
-        "Pan from the shower to the vanity. Elegant, unhurried.",
-    ],
-    "backyard": [
-        "Wide shot. Camera slowly pushes forward across the outdoor space. "
-        "Sky and greenery fill the upper frame.",
-        "Low angle looking across the yard. Slow drift forward.",
-    ],
-    "basement": [
-        "Camera enters the space and slowly pans to reveal the full room. "
-        "Well-lit, open.",
-        "Push-in from the stairwell. The space opens up ahead.",
-    ],
-    "garage": [
-        "Wide push-in from the garage door. Clean floor and walls revealed. "
-        "Functional and spacious.",
-    ],
-}
+async def _build_clip_prompt_from_vision(
+    photo_path: Path,
+    scene: Dict[str, Any],
+    scene_index: int,
+    total_scenes: int,
+) -> str:
+    """Send photo to Gemini Vision to get a precision Veo shot card."""
+    import io
 
-_NARRATIVE_BEATS = {
-    0: (
-        "OPENING SHOT. This is the viewer's first impression of the property. "
-        "Make it cinematic and immediately compelling. "
-        "The camera movement should feel like an invitation -- come inside."
-    ),
-    "middle": (
-        "MID-TOUR SHOT. The viewer is already inside the property. "
-        "This shot continues the walk-through narrative. "
-        "Camera movement should feel like a natural continuation of exploring the space."
-    ),
-    "closing": (
-        "CLOSING SHOT. This is the final image the viewer carries away. "
-        "The movement should feel conclusive -- a slow pull-back or wide reveal "
-        "that makes the viewer want to book a showing."
-    ),
-}
+    import PIL.Image
+
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        logger.warning("No GEMINI_API_KEY -- falling back to static prompt")
+        return _build_clip_prompt_static(scene, scene_index, total_scenes)
+
+    try:
+        client = genai.Client(api_key=api_key)
+
+        photo_bytes = photo_path.read_bytes()
+        img = PIL.Image.open(io.BytesIO(photo_bytes))
+        if img.width > 1024:
+            ratio = 1024 / img.width
+            img = img.resize((1024, int(img.height * ratio)))
+
+        if scene_index == 0:
+            tour_context = (
+                "CONTINUOUS TOUR -- OPENING: Start of a single walk-through visit. "
+                "Establish arrival and invite the viewer into the home. "
+                "This shot flows into the following spaces."
+            )
+        elif scene_index == total_scenes - 1:
+            tour_context = (
+                "CONTINUOUS TOUR -- CLOSING: Final beat of the same walk-through. "
+                "Resolve the visit with a memorable last impression."
+            )
+        else:
+            tour_context = (
+                f"CONTINUOUS TOUR -- MID WALK (shot {scene_index + 1} of {total_scenes}): "
+                "Same continuous property visit. Motivate forward motion through the home "
+                "as if escorting a buyer room-to-room."
+            )
+
+        prompt = f"""You are a cinematic prompt engineer for luxury real estate video production.
+
+{tour_context}
+
+Analyze this room photo and write a single precision camera prompt for Veo 2 video generation.
+
+Your prompt must follow this exact structure:
+
+1. Camera movement type (e.g. "Extremely slow, measured, stabilized Micro Dolly-In" or "Smooth lateral slider pan")
+2. Direction and focal anchor -- what specific object/feature the camera moves toward or tracks
+3. Movement distance and easing -- e.g. "controlled 6-10 inch forward glide, slow-in and slow-out"
+4. Environmental micro-motion -- subtle realistic light behavior only (shimmer, reflection, shadow shift)
+5. Geometry lock constraints -- all architectural elements must stay perfectly static, vertical lines locked, no warping
+6. Quality tags -- end with: 4K, HDR, photorealistic, stabilized slider shot, ultra-clean detail, premium real estate
+
+Write ONE dense paragraph. No bullet points. No headers. Be specific to what you actually see in this image -- identify the exact focal anchor (island, fireplace, window, staircase etc). Under 120 words."""
+
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: client.models.generate_content(
+                model="gemini-2.5-flash-lite",
+                contents=[prompt, img],
+            ),
+        )
+        result = response.text.strip()
+        logger.info("Clip %d vision prompt: %s", scene_index, result[:100])
+        return result
+
+    except Exception as e:
+        logger.warning(
+            "Vision prompt failed for clip %d: %s -- using static fallback",
+            scene_index,
+            e,
+        )
+        return _build_clip_prompt_static(scene, scene_index, total_scenes)
 
 
-def _build_clip_prompt(scene: Dict[str, Any], scene_index: int, total_scenes: int) -> str:
-    """Build a videographer-directed Veo prompt grounded in the reference photo."""
-
-    room_type = str(scene.get("room_type") or "room").lower()
+def _build_clip_prompt_static(
+    scene: Dict[str, Any],
+    scene_index: int,
+    total_scenes: int,
+) -> str:
+    """Static fallback prompt when Gemini Vision is unavailable."""
+    room_type = str(scene.get("room_type") or "room").replace("_", " ")
     features = scene.get("features") or []
     ken_burns = scene.get("ken_burns") or {}
     pan = ken_burns.get("pan", "center")
     zoom = ken_burns.get("zoom", "in")
 
-    shots = _SHOT_VOCABULARY.get(
-        room_type,
-        [
-            "Slow cinematic push-in. Camera glides forward into the space.",
-        ],
-    )
-    shot_desc = shots[scene_index % len(shots)]
-
-    if scene_index == 0:
-        beat = _NARRATIVE_BEATS[0]
-    elif scene_index == total_scenes - 1:
-        beat = _NARRATIVE_BEATS["closing"]
-    else:
-        beat = _NARRATIVE_BEATS["middle"]
-
-    camera_override = {
-        ("center", "in"): "slow dolly push-in",
-        ("right", "in"): "slow push-in arcing right",
-        ("left", "in"): "slow push-in arcing left",
-        ("center", "out"): "slow dolly pull-back",
+    camera = {
+        ("center", "in"): "extremely slow stabilized micro dolly-in",
+        ("right", "in"): "slow push-in with gentle rightward arc",
+        ("left", "in"): "slow push-in tracking slightly left",
+        ("center", "out"): "graceful slow pull-back dolly",
         ("right", "out"): "slow pull-back panning right",
         ("left", "out"): "slow pull-back panning left",
-    }.get((pan, zoom), "slow cinematic drift")
+    }.get((pan, zoom), "smooth slow stabilized camera drift")
 
     anchor = ""
     if features:
-        clean = [str(f).strip() for f in features[:3] if str(f).strip()]
+        clean = [str(f).strip() for f in features[:2] if str(f).strip()]
         if clean:
-            anchor = (
-                f"The reference image shows: {', '.join(clean)}. "
-                "These must remain accurate in the generated clip. "
-                "Do not replace or remove any element visible in the photo."
-            )
+            anchor = f" Focal anchor: {' and '.join(clean)}."
+
+    if scene_index == 0:
+        beat = "OPENING: establish the property and invite the viewer in."
+    elif scene_index == total_scenes - 1:
+        beat = "CLOSING: resolve the tour with a memorable final impression."
+    else:
+        beat = (
+            f"MID-TOUR shot {scene_index + 1} of {total_scenes}: continue the walk-through."
+        )
 
     return (
-        f"Real estate walk-through video. Reference image: {room_type.replace('_', ' ')}.\n\n"
-        f"SHOT DIRECTION: {shot_desc}\n"
-        f"CAMERA: {camera_override}. Movement is slow, smooth, and deliberate -- "
-        f"never shaky, never fast.\n"
-        f"NARRATIVE: {beat}\n"
-        f"{anchor}\n"
-        "TECHNICAL: Photorealistic. Natural lighting preserved from reference image. "
-        "No added people, text, watermarks, or props not in the original photo. "
-        "Preserve all colors, materials, and proportions from the reference. "
-        "Shot on cinema camera, shallow depth of field, smooth stabilised motion."
+        f"{beat} {room_type.capitalize()} -- {camera}.{anchor} "
+        "Natural lighting preserved. Vertical lines locked, no warping. "
+        "4K, HDR, photorealistic, stabilized slider shot, premium real estate presentation."
     )
 
 
@@ -291,7 +291,9 @@ class VeoRenderer:
 
         async with semaphore:
             clip_path = self.work_dir / f"veo_clip_{idx:03d}.mp4"
-            prompt = _build_clip_prompt(scene, idx, total_scenes)
+            prompt = await _build_clip_prompt_from_vision(
+                photo_path, scene, idx, total_scenes
+            )
 
             logger.info(
                 "Clip %d (%s): submitting to Veo\n  Prompt: %s",
