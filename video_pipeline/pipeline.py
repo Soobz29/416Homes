@@ -1,4 +1,5 @@
 import asyncio
+import functools
 import logging
 import subprocess
 from typing import Dict, Any, Optional, List
@@ -35,6 +36,18 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
+def _tts_chunk_to_bytes(chunk: object) -> bytes:
+    """ElevenLabs streams httpx byte chunks; tolerate buffer-like objects."""
+    if isinstance(chunk, bytes):
+        return chunk
+    if isinstance(chunk, (bytearray, memoryview)):
+        return bytes(chunk)
+    try:
+        return memoryview(chunk).tobytes()
+    except TypeError:
+        return bytes(chunk)
+
+
 def _generate_elevenlabs_audio(text: str, voice_id: str, api_key: str, out_path: Path) -> None:
     """Synchronous ElevenLabs TTS call — run in executor."""
     from elevenlabs.client import ElevenLabs
@@ -54,10 +67,34 @@ def _generate_elevenlabs_audio(text: str, voice_id: str, api_key: str, out_path:
         ),
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    total = 0
     with open(out_path, "wb") as f:
         for chunk in stream:
-            if isinstance(chunk, bytes):
-                f.write(chunk)
+            if not chunk:
+                continue
+            b = _tts_chunk_to_bytes(chunk)
+            if b:
+                f.write(b)
+                total += len(b)
+    if total < 800:
+        raise RuntimeError(
+            f"ElevenLabs returned too little audio ({total} bytes); check API key, quota, and text length"
+        )
+
+
+def _normalize_script_json(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Ensure voiceover_script is populated when the model uses alternate keys."""
+    vo = data.get("voiceover_script")
+    if isinstance(vo, str) and vo.strip():
+        data["voiceover_script"] = vo.strip()
+        return data
+    for alt in ("voiceOverScript", "voice_over_script", "narration", "script"):
+        v = data.get(alt)
+        if isinstance(v, str) and v.strip():
+            data["voiceover_script"] = v.strip()
+            return data
+    data["voiceover_script"] = ""
+    return data
 
 
 class VideoJobManager:
@@ -462,7 +499,7 @@ class VideoJobManager:
 
         import json as _json
 
-        return _json.loads(raw)
+        return _normalize_script_json(_json.loads(raw))
     
     async def process_video_job(self, job_id: str):
         """Process a video job through the intelligent photo-aware pipeline."""
@@ -554,6 +591,8 @@ class VideoJobManager:
                 work_dir = Path(tmpdir)
 
                 elevenlabs_key = (os.getenv("ELEVENLABS_API_KEY") or "").strip()
+                if elevenlabs_key.lower().startswith("your_"):
+                    elevenlabs_key = ""
                 voice_id_map = {
                     "female_luxury": "21m00Tcm4TlvDq8ikWAM",
                     "male_luxury": "29vD33N1CtxCmqQRPOHJ",
@@ -564,14 +603,24 @@ class VideoJobManager:
                 vo_text = (script_data.get("voiceover_script") or "").strip()
 
                 audio_path: Optional[Path] = None
+                logger.info(
+                    "Voiceover precheck job=%s: key_loaded=%s script_chars=%d",
+                    job_id,
+                    bool(elevenlabs_key),
+                    len(vo_text),
+                )
                 if elevenlabs_key and vo_text:
                     await self.update_job_status(job_id, "generating_audio", 72)
                     try:
                         audio_path = work_dir / "voiceover.mp3"
                         await loop.run_in_executor(
                             None,
-                            lambda: _generate_elevenlabs_audio(
-                                vo_text, voice_id, elevenlabs_key, audio_path
+                            functools.partial(
+                                _generate_elevenlabs_audio,
+                                vo_text,
+                                voice_id,
+                                elevenlabs_key,
+                                audio_path,
                             ),
                         )
                         if audio_path.exists():
@@ -602,9 +651,17 @@ class VideoJobManager:
                         )
                         audio_path = None
                 else:
-                    logger.info(
-                        "Skipping voiceover (no ELEVENLABS_API_KEY or empty script)"
-                    )
+                    if not elevenlabs_key:
+                        logger.warning(
+                            "Skipping voiceover job=%s: ELEVENLABS_API_KEY missing or placeholder "
+                            "in this process (set on the same host/service that runs the API worker, then redeploy)",
+                            job_id,
+                        )
+                    else:
+                        logger.warning(
+                            "Skipping voiceover job=%s: voiceover_script empty after script generation",
+                            job_id,
+                        )
 
                 await self.update_job_status(
                     job_id,
@@ -673,7 +730,8 @@ class VideoJobManager:
                     ]
                     mux_res = await loop.run_in_executor(
                         None,
-                        lambda: subprocess.run(
+                        functools.partial(
+                            subprocess.run,
                             mux_cmd,
                             capture_output=True,
                             text=True,
@@ -684,10 +742,47 @@ class VideoJobManager:
                         video_path = muxed
                         logger.info("Voiceover muxed into final video")
                     else:
-                        logger.warning(
-                            "Voiceover mux failed: %s",
-                            (mux_res.stderr or "")[-300:],
+                        err_tail = (mux_res.stderr or mux_res.stdout or "")[-2000:]
+                        logger.warning("Voiceover mux failed (rc=%s): %s", mux_res.returncode, err_tail)
+                        mux_cmd_alt = [
+                            "ffmpeg",
+                            "-y",
+                            "-i",
+                            str(video_path),
+                            "-i",
+                            str(audio_path),
+                            "-map",
+                            "0:v",
+                            "-map",
+                            "1:a:0",
+                            "-c:v",
+                            "copy",
+                            "-c:a",
+                            "aac",
+                            "-b:a",
+                            "192k",
+                            "-shortest",
+                            str(muxed),
+                        ]
+                        mux_res2 = await loop.run_in_executor(
+                            None,
+                            functools.partial(
+                                subprocess.run,
+                                mux_cmd_alt,
+                                capture_output=True,
+                                text=True,
+                                timeout=120,
+                            ),
                         )
+                        if mux_res2.returncode == 0:
+                            video_path = muxed
+                            logger.info("Voiceover muxed (alternate stream mapping)")
+                        else:
+                            logger.warning(
+                                "Voiceover alternate mux failed (rc=%s): %s",
+                                mux_res2.returncode,
+                                (mux_res2.stderr or mux_res2.stdout or "")[-2000:],
+                            )
 
                 video_url = await self._upload_video_to_storage(job_id, video_path)
 
