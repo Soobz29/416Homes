@@ -52,17 +52,36 @@ class ScenePlanner:
             key=lambda p: int(p.get("original_index", 0) or 0),
         )
 
-        max_ext = max(1, int(os.getenv("MAX_SCENE_EXTERIOR", "2") or "2"))
+        max_ext = max(1, int(os.getenv("MAX_SCENE_EXTERIOR", "1") or "1"))
+
+        def _scene_key(photo: Dict[str, Any]) -> tuple:
+            return (
+                str(photo.get("url") or ""),
+                int(photo.get("original_index", 0) or 0),
+            )
+
+        exterior_candidates = [
+            p
+            for p in sorted_photos
+            if str(p.get("room_type") or "other").lower() == "exterior"
+        ]
+        ext_chosen = sorted(
+            exterior_candidates,
+            key=lambda p: (
+                -float(p.get("quality_score", 0) or 0),
+                int(p.get("original_index", 0) or 0),
+            ),
+        )[:max_ext]
+        ext_allowed = {_scene_key(p) for p in ext_chosen}
+
         selected: List[Dict[str, Any]] = []
-        ext_used = 0
         for p in sorted_photos:
             if len(selected) >= max_photos:
                 break
             rt = str(p.get("room_type") or "other").lower()
             if rt == "exterior":
-                if ext_used >= max_ext:
+                if _scene_key(p) not in ext_allowed:
                     continue
-                ext_used += 1
             selected.append(p)
 
         scenes = self._assign_timing(selected, target_duration_sec)

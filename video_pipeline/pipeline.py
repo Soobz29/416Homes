@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import subprocess
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 from pathlib import Path
@@ -32,6 +33,31 @@ except Exception:  # pragma: no cover
 
 load_dotenv()
 logger = logging.getLogger(__name__)
+
+
+def _generate_elevenlabs_audio(text: str, voice_id: str, api_key: str, out_path: Path) -> None:
+    """Synchronous ElevenLabs TTS call — run in executor."""
+    from elevenlabs.client import ElevenLabs
+    from elevenlabs import VoiceSettings
+
+    client = ElevenLabs(api_key=api_key)
+    stream = client.text_to_speech.convert(
+        text=text,
+        voice_id=voice_id,
+        model_id="eleven_turbo_v2_5",
+        output_format="mp3_44100_128",
+        voice_settings=VoiceSettings(
+            stability=0.4,
+            similarity_boost=0.8,
+            style=0.0,
+            use_speaker_boost=True,
+        ),
+    )
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "wb") as f:
+        for chunk in stream:
+            if isinstance(chunk, bytes):
+                f.write(chunk)
 
 
 class VideoJobManager:
@@ -517,19 +543,77 @@ class VideoJobManager:
                 script_data=script_data,
             )
 
-            # Step 6: Generate audio (placeholder for ElevenLabs)
-            audio_url: Optional[str] = None
-            await self.update_job_status(job_id, "generating_audio", 75, audio_url=audio_url)
-            await self.update_job_status(job_id, "audio_generated", 80, audio_url=audio_url)
-
-            # Step 7: Render video (FFmpeg by default; Veo via VIDEO_RENDERER=veo +
-            # GOOGLE_APPLICATION_CREDENTIALS_JSON for Vertex)
+            # Step 6–7: ElevenLabs voiceover (inside job temp dir), render, mux audio
             video_renderer = (os.getenv("VIDEO_RENDERER") or "ffmpeg").strip().lower()
             vertex_creds = (os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON") or "").strip()
 
-            await self.update_job_status(job_id, "generating_video", 90)
+            audio_url: Optional[str] = None
+            loop = asyncio.get_running_loop()
+
             with tempfile.TemporaryDirectory() as tmpdir:
                 work_dir = Path(tmpdir)
+
+                elevenlabs_key = (os.getenv("ELEVENLABS_API_KEY") or "").strip()
+                voice_id_map = {
+                    "female_luxury": "21m00Tcm4TlvDq8ikWAM",
+                    "male_luxury": "29vD33N1CtxCmqQRPOHJ",
+                    "male_deep": "ErXwobaYiN019PkySvjV",
+                }
+                voice = listing_data_ctx.get("voice", "female_luxury")
+                voice_id = voice_id_map.get(str(voice), voice_id_map["female_luxury"])
+                vo_text = (script_data.get("voiceover_script") or "").strip()
+
+                audio_path: Optional[Path] = None
+                if elevenlabs_key and vo_text:
+                    await self.update_job_status(job_id, "generating_audio", 72)
+                    try:
+                        audio_path = work_dir / "voiceover.mp3"
+                        await loop.run_in_executor(
+                            None,
+                            lambda: _generate_elevenlabs_audio(
+                                vo_text, voice_id, elevenlabs_key, audio_path
+                            ),
+                        )
+                        if audio_path.exists():
+                            logger.info(
+                                "Voiceover generated: %s bytes",
+                                audio_path.stat().st_size,
+                            )
+                            try:
+                                with audio_path.open("rb") as af:
+                                    self.supabase.storage.from_("videos").upload(  # type: ignore[attr-defined]
+                                        f"{job_id}_voiceover.mp3",
+                                        af,
+                                        file_options={"content-type": "audio/mpeg"},
+                                    )
+                                pub = self.supabase.storage.from_("videos").get_public_url(  # type: ignore[attr-defined]
+                                    f"{job_id}_voiceover.mp3"
+                                )
+                                audio_url = (
+                                    pub.get("publicUrl") if isinstance(pub, dict) else pub
+                                )
+                                logger.info("Voiceover uploaded: %s", audio_url)
+                            except Exception as up_e:
+                                logger.warning("Voiceover storage upload failed: %s", up_e)
+                    except Exception as e:
+                        logger.warning(
+                            "ElevenLabs voiceover failed, continuing without audio: %s",
+                            e,
+                        )
+                        audio_path = None
+                else:
+                    logger.info(
+                        "Skipping voiceover (no ELEVENLABS_API_KEY or empty script)"
+                    )
+
+                await self.update_job_status(
+                    job_id,
+                    "audio_generated",
+                    78,
+                    audio_url=audio_url,
+                )
+                await self.update_job_status(job_id, "generating_video", 80)
+
                 if video_renderer == "veo" and vertex_creds:
                     logger.info("Using Veo renderer (service account credentials found)")
                     renderer: Any = VeoRenderer(work_dir=work_dir)
@@ -554,10 +638,56 @@ class VideoJobManager:
                 )
                 video_path = await renderer.render_video(
                     scene_plan=scene_plan,
-                    audio_url=audio_url,
+                    audio_url=None,
                     headline=script_data.get("headline", "Luxury Property"),
                     output_filename=f"{job_id}.mp4",
                 )
+
+                if (
+                    audio_path
+                    and audio_path.exists()
+                    and audio_path.stat().st_size > 1000
+                    and video_path
+                    and video_path.exists()
+                ):
+                    muxed = work_dir / f"{job_id}_final.mp4"
+                    mux_cmd = [
+                        "ffmpeg",
+                        "-y",
+                        "-i",
+                        str(video_path),
+                        "-i",
+                        str(audio_path),
+                        "-map",
+                        "0:v:0",
+                        "-map",
+                        "1:a:0",
+                        "-c:v",
+                        "copy",
+                        "-c:a",
+                        "aac",
+                        "-b:a",
+                        "192k",
+                        "-shortest",
+                        str(muxed),
+                    ]
+                    mux_res = await loop.run_in_executor(
+                        None,
+                        lambda: subprocess.run(
+                            mux_cmd,
+                            capture_output=True,
+                            text=True,
+                            timeout=120,
+                        ),
+                    )
+                    if mux_res.returncode == 0:
+                        video_path = muxed
+                        logger.info("Voiceover muxed into final video")
+                    else:
+                        logger.warning(
+                            "Voiceover mux failed: %s",
+                            (mux_res.stderr or "")[-300:],
+                        )
 
                 video_url = await self._upload_video_to_storage(job_id, video_path)
 
