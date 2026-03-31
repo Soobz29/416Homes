@@ -73,11 +73,19 @@ def _mime_from_image_bytes(data: bytes) -> str:
     return "image/jpeg"
 
 
-def _veo_generation_config() -> "types.GenerateVideosConfig":
-    """Veo quality: default 1080p + optimized encode (overridable via env)."""
-    res = (os.getenv("VEO_RESOLUTION") or "1080p").strip().lower()
-    if res not in ("720p", "1080p"):
-        res = "1080p"
+def _veo_generation_config(resolution: Optional[str] = None) -> "types.GenerateVideosConfig":
+    """Veo output resolution. Vertex Veo 2.0 often rejects 1080p; default is 720p.
+
+    Pass ``resolution`` (for example ``720p``) to override ``VEO_RESOLUTION`` for one call.
+    """
+    if resolution is not None:
+        res = resolution.strip().lower()
+        if res not in ("720p", "1080p"):
+            res = "720p"
+    else:
+        res = (os.getenv("VEO_RESOLUTION") or "720p").strip().lower()
+        if res not in ("720p", "1080p"):
+            res = "720p"
     # Default optimized — lossless can yield empty generations on some Veo/Vertex builds.
     comp_raw = (os.getenv("VEO_COMPRESSION") or "optimized").strip().lower()
     compression = (
@@ -384,6 +392,119 @@ class VeoRenderer:
         photo_paths.sort(key=lambda x: x[1])
         return photo_paths
 
+    async def _generate_clip_at_resolution(
+        self,
+        clip_path: Path,
+        prompt: str,
+        image: types.Image,
+        idx: int,
+        scene: Dict[str, Any],
+        loop: asyncio.AbstractEventLoop,
+        resolution: str,
+    ) -> Path:
+        """Submit Veo job at ``resolution``, poll, write ``clip_path``."""
+
+        def _submit() -> Any:
+            return self.client.models.generate_videos(
+                model=VEO_MODEL,
+                source=types.GenerateVideosSource(
+                    prompt=prompt,
+                    image=image,
+                ),
+                config=_veo_generation_config(resolution=resolution),
+            )
+
+        try:
+            operation = await loop.run_in_executor(None, _submit)
+        except Exception as e:
+            logger.error("Veo submission failed for clip %d: %s", idx, e)
+            raise
+
+        start = time.time()
+        op = operation
+        while not op.done:
+            await asyncio.sleep(POLL_INTERVAL)
+            try:
+                op = await loop.run_in_executor(
+                    None,
+                    lambda current=op: self.client.operations.get(operation=current),
+                )
+            except Exception as e:
+                logger.warning("Poll error clip %d: %s", idx, e)
+
+            elapsed = time.time() - start
+            logger.info("Clip %d polling... %.0fs elapsed", idx, elapsed)
+
+            if elapsed > 360:
+                raise TimeoutError(f"Veo clip {idx} timed out after 6 minutes")
+
+        if getattr(op, "error", None):
+            raise RuntimeError(f"Veo operation failed for clip {idx}: {op.error}")
+
+        gv_list = _generated_videos_from_operation(op)
+        if not gv_list:
+            _log_veo_empty_response(idx, op)
+            raise RuntimeError(f"Veo returned no generated_videos for clip {idx}")
+
+        generated = gv_list[0]
+        video_obj = getattr(generated, "video", None)
+        video_bytes: Optional[bytes] = None
+
+        if video_obj is not None:
+            try:
+                vb = getattr(video_obj, "video_bytes", None)
+                if vb:
+                    video_bytes = vb if isinstance(vb, (bytes, bytearray)) else bytes(vb)
+            except Exception:
+                video_bytes = None
+
+        if not video_bytes:
+            try:
+                downloaded = self.client.files.download(file=video_obj)
+                if hasattr(downloaded, "read"):
+                    video_bytes = downloaded.read()
+                elif hasattr(downloaded, "content"):
+                    video_bytes = downloaded.content
+                else:
+                    video_bytes = bytes(downloaded)
+            except Exception:
+                video_bytes = None
+
+        if not video_bytes and video_obj is not None:
+            try:
+                video_obj.save(str(clip_path))
+                if clip_path.exists() and clip_path.stat().st_size > 1000:
+                    logger.info(
+                        "Clip %d (%s) saved via .save(): %d bytes",
+                        idx,
+                        scene.get("room_type", "?"),
+                        clip_path.stat().st_size,
+                    )
+                    return clip_path
+            except Exception as save_err:
+                logger.warning("Veo .save() failed for clip %d: %s", idx, save_err)
+
+        if not video_bytes:
+            raise RuntimeError(f"Veo returned empty bytes for clip {idx}")
+
+        clip_path.write_bytes(video_bytes)
+        logger.info(
+            "Clip %d (%s) saved: %d bytes",
+            idx,
+            scene.get("room_type", "?"),
+            len(video_bytes),
+        )
+        return clip_path
+
+    def _veo_resolution_attempts(self) -> List[str]:
+        """Order of resolutions to try (1080p first only if env asks, then 720p fallback)."""
+        env_res = (os.getenv("VEO_RESOLUTION") or "720p").strip().lower()
+        if env_res not in ("720p", "1080p"):
+            env_res = "720p"
+        if env_res == "1080p":
+            return ["1080p", "720p"]
+        return ["720p"]
+
     async def _generate_clip(
         self,
         photo_path: Path,
@@ -400,13 +521,6 @@ class VeoRenderer:
                 photo_path, scene, idx, total_scenes
             )
 
-            logger.info(
-                "Clip %d (%s): submitting to Veo\n  Prompt: %s",
-                idx,
-                scene.get("room_type", "?"),
-                prompt,
-            )
-
             image_bytes = photo_path.read_bytes()
             mime = _mime_from_image_bytes(image_bytes)
             image = types.Image(
@@ -415,98 +529,41 @@ class VeoRenderer:
             )
 
             loop = asyncio.get_running_loop()
+            attempts = self._veo_resolution_attempts()
+            last_err: Optional[BaseException] = None
 
-            try:
-                operation = await loop.run_in_executor(
-                    None,
-                    lambda: self.client.models.generate_videos(
-                        model=VEO_MODEL,
-                        source=types.GenerateVideosSource(
-                            prompt=prompt,
-                            image=image,
-                        ),
-                        config=_veo_generation_config(),
-                    ),
+            for res_try in attempts:
+                logger.info(
+                    "Clip %d (%s): submitting to Veo at %s\n  Prompt: %s",
+                    idx,
+                    scene.get("room_type", "?"),
+                    res_try,
+                    prompt,
                 )
-            except Exception as e:
-                logger.error("Veo submission failed for clip %d: %s", idx, e)
-                raise
-
-            start = time.time()
-            op = operation
-            while not op.done:
-                await asyncio.sleep(POLL_INTERVAL)
                 try:
-                    op = await loop.run_in_executor(
-                        None,
-                        lambda current=op: self.client.operations.get(operation=current),
+                    return await self._generate_clip_at_resolution(
+                        clip_path, prompt, image, idx, scene, loop, res_try
                     )
                 except Exception as e:
-                    logger.warning("Poll error clip %d: %s", idx, e)
-
-                elapsed = time.time() - start
-                logger.info("Clip %d polling... %.0fs elapsed", idx, elapsed)
-
-                if elapsed > 360:
-                    raise TimeoutError(f"Veo clip {idx} timed out after 6 minutes")
-
-            if getattr(op, "error", None):
-                raise RuntimeError(f"Veo operation failed for clip {idx}: {op.error}")
-
-            gv_list = _generated_videos_from_operation(op)
-            if not gv_list:
-                _log_veo_empty_response(idx, op)
-                raise RuntimeError(f"Veo returned no generated_videos for clip {idx}")
-
-            generated = gv_list[0]
-            video_obj = getattr(generated, "video", None)
-            video_bytes: Optional[bytes] = None
-
-            if video_obj is not None:
-                try:
-                    vb = getattr(video_obj, "video_bytes", None)
-                    if vb:
-                        video_bytes = vb if isinstance(vb, (bytes, bytearray)) else bytes(vb)
-                except Exception:
-                    video_bytes = None
-
-            if not video_bytes:
-                try:
-                    downloaded = self.client.files.download(file=video_obj)
-                    if hasattr(downloaded, "read"):
-                        video_bytes = downloaded.read()
-                    elif hasattr(downloaded, "content"):
-                        video_bytes = downloaded.content
-                    else:
-                        video_bytes = bytes(downloaded)
-                except Exception:
-                    video_bytes = None
-
-            if not video_bytes and video_obj is not None:
-                try:
-                    video_obj.save(str(clip_path))
-                    if clip_path.exists() and clip_path.stat().st_size > 1000:
-                        logger.info(
-                            "Clip %d (%s) saved via .save(): %d bytes",
+                    msg = str(e)
+                    if (
+                        res_try == "1080p"
+                        and len(attempts) > 1
+                        and "Unsupported output video resolution" in msg
+                    ):
+                        logger.warning(
+                            "Clip %d: Veo rejected %s (%s), retrying at 720p",
                             idx,
-                            scene.get("room_type", "?"),
-                            clip_path.stat().st_size,
+                            res_try,
+                            msg[:200],
                         )
-                        return clip_path
-                except Exception as save_err:
-                    logger.warning("Veo .save() failed for clip %d: %s", idx, save_err)
+                        last_err = e
+                        continue
+                    raise
 
-            if not video_bytes:
-                raise RuntimeError(f"Veo returned empty bytes for clip {idx}")
-
-            clip_path.write_bytes(video_bytes)
-            logger.info(
-                "Clip %d (%s) saved: %d bytes",
-                idx,
-                scene.get("room_type", "?"),
-                len(video_bytes),
-            )
-            return clip_path
+            if last_err is not None:
+                raise last_err
+            raise RuntimeError(f"Veo clip {idx}: no resolution attempts succeeded")
 
     async def _concat_clips(self, clip_paths: List[Path], output_path: Path) -> None:
         """Concatenate Veo clips into final video."""
