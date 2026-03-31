@@ -24,12 +24,62 @@ POLL_INTERVAL = 15
 MAX_CLIPS = 6  # 6 × 5s = 30s final video
 
 
+def _patch_vertex_generate_videos_response_parser() -> None:
+    """Vertex sometimes returns generatedSamples (ML-dev shape); SDK only maps `videos`.
+
+    Without this, `generated_videos` stays empty and every clip fails.
+    """
+    try:
+        from google.genai import models as genai_models
+    except Exception as e:
+        logger.warning("Veo SDK patch skipped (import): %s", e)
+        return
+
+    orig = genai_models._GenerateVideosResponse_from_vertex
+
+    def _extended(
+        from_object: Any,
+        parent_object: Any = None,
+        root_object: Any = None,
+    ) -> Any:
+        out = orig(from_object, parent_object, root_object)
+        if out.get("generated_videos"):
+            return out
+        if not isinstance(from_object, dict):
+            return out
+        alt = from_object.get("generatedSamples") or from_object.get("generatedVideos")
+        if not alt:
+            return out
+        out["generated_videos"] = [
+            genai_models._GeneratedVideo_from_vertex(item, out, root_object)
+            for item in alt
+        ]
+        return out
+
+    genai_models._GenerateVideosResponse_from_vertex = _extended  # type: ignore[assignment]
+    logger.debug("Patched google.genai.models._GenerateVideosResponse_from_vertex for Veo")
+
+
+_patch_vertex_generate_videos_response_parser()
+
+
+def _mime_from_image_bytes(data: bytes) -> str:
+    if len(data) >= 8 and data[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if len(data) >= 3 and data[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    return "image/jpeg"
+
+
 def _veo_generation_config() -> "types.GenerateVideosConfig":
-    """Veo quality: default 1080p + higher-quality encode (overridable via env)."""
+    """Veo quality: default 1080p + optimized encode (overridable via env)."""
     res = (os.getenv("VEO_RESOLUTION") or "1080p").strip().lower()
     if res not in ("720p", "1080p"):
         res = "1080p"
-    comp_raw = (os.getenv("VEO_COMPRESSION") or "lossless").strip().lower()
+    # Default optimized — lossless can yield empty generations on some Veo/Vertex builds.
+    comp_raw = (os.getenv("VEO_COMPRESSION") or "optimized").strip().lower()
     compression = (
         types.VideoCompressionQuality.LOSSLESS
         if comp_raw in ("lossless", "high", "best")
@@ -172,6 +222,35 @@ def _build_clip_prompt_static(
         "Natural lighting preserved. Vertical lines locked, no warping. "
         "4K, HDR, photorealistic, stabilized slider shot, premium real estate presentation."
     )
+
+
+def _generated_videos_from_operation(op: Any) -> Optional[List[Any]]:
+    """Prefer `result` (SDK examples); fall back to `response`."""
+    for container in (getattr(op, "result", None), getattr(op, "response", None)):
+        if container is None:
+            continue
+        gv = getattr(container, "generated_videos", None)
+        if gv:
+            return list(gv)
+    return None
+
+
+def _log_veo_empty_response(idx: int, op: Any) -> None:
+    for container in (getattr(op, "result", None), getattr(op, "response", None)):
+        if container is None:
+            continue
+        rai_n = getattr(container, "rai_media_filtered_count", None)
+        rai_r = getattr(container, "rai_media_filtered_reasons", None)
+        if rai_n is not None or rai_r:
+            logger.warning(
+                "Veo clip %d RAI: count=%s reasons=%s",
+                idx,
+                rai_n,
+                rai_r,
+            )
+    err = getattr(op, "error", None)
+    if err:
+        logger.error("Veo clip %d operation error: %s", idx, err)
 
 
 class VeoRenderer:
@@ -329,9 +408,10 @@ class VeoRenderer:
             )
 
             image_bytes = photo_path.read_bytes()
+            mime = _mime_from_image_bytes(image_bytes)
             image = types.Image(
                 image_bytes=image_bytes,
-                mime_type="image/jpeg",
+                mime_type=mime,
             )
 
             loop = asyncio.get_running_loop()
@@ -341,8 +421,10 @@ class VeoRenderer:
                     None,
                     lambda: self.client.models.generate_videos(
                         model=VEO_MODEL,
-                        prompt=prompt,
-                        image=image,
+                        source=types.GenerateVideosSource(
+                            prompt=prompt,
+                            image=image,
+                        ),
                         config=_veo_generation_config(),
                     ),
                 )
@@ -368,10 +450,15 @@ class VeoRenderer:
                 if elapsed > 360:
                     raise TimeoutError(f"Veo clip {idx} timed out after 6 minutes")
 
-            if not (op.response and op.response.generated_videos):
+            if getattr(op, "error", None):
+                raise RuntimeError(f"Veo operation failed for clip {idx}: {op.error}")
+
+            gv_list = _generated_videos_from_operation(op)
+            if not gv_list:
+                _log_veo_empty_response(idx, op)
                 raise RuntimeError(f"Veo returned no generated_videos for clip {idx}")
 
-            generated = op.response.generated_videos[0]
+            generated = gv_list[0]
             video_obj = getattr(generated, "video", None)
             video_bytes: Optional[bytes] = None
 
