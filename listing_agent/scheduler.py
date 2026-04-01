@@ -80,7 +80,7 @@ class AgentScheduler:
             agent_memory.data["metrics"] = {}
         agent_memory.data["metrics"]["emails_sent_today"] = 0
         agent_memory.data["metrics"]["alerts_today"] = 0
-        agent_memory.save()
+        agent_memory._save()
         log_activity("SYSTEM", "Daily metrics reset (midnight)")
 
 # Singleton instance
