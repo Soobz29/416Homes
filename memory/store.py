@@ -59,7 +59,10 @@ class MemoryStore:
                 _genai.configure(api_key=api_key)
         except Exception as e:
             logger.warning("Gemini client init failed (%s): %s", _GENAI_SDK, e)
-    
+
+        # In-memory LRU cache for embeddings (text → vector), avoids redundant API calls
+        self._embedding_cache: Dict[str, List[float]] = {}
+
     @staticmethod
     def _safe_scalar(value: Any, default: Any = None, prefer_int: bool = False) -> Any:
         """Coerce value to a scalar for DB (no dicts/lists). For int columns use prefer_int=True."""
@@ -175,7 +178,20 @@ class MemoryStore:
         }
     
     async def embed_text(self, text: str) -> List[float]:
-        """Generate embedding for text using Gemini"""
+        """Generate embedding for text using Gemini (in-memory LRU cache, 1024 entries)."""
+        if not text:
+            return [0.0] * 768
+        if text in self._embedding_cache:
+            return self._embedding_cache[text]
+        embedding = await self._embed_text_uncached(text)
+        if len(self._embedding_cache) >= 1024:
+            # Evict oldest entry
+            self._embedding_cache.pop(next(iter(self._embedding_cache)))
+        self._embedding_cache[text] = embedding
+        return embedding
+
+    async def _embed_text_uncached(self, text: str) -> List[float]:
+        """Internal: call Gemini API without caching."""
         try:
             if not text:
                 return [0.0] * 768

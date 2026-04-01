@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS sold_comps (
     bedrooms TEXT,
     bathrooms TEXT,
     area TEXT,
-    neighborhood TEXT,
+    neighbourhood TEXT,
     sold_date TIMESTAMP WITH TIME ZONE,
     lat DECIMAL(10, 8),
     lng DECIMAL(11, 8),
@@ -151,7 +151,7 @@ $$;
 CREATE INDEX IF NOT EXISTS idx_listings_source ON listings(source);
 CREATE INDEX IF NOT EXISTS idx_listings_scraped_at ON listings(scraped_at);
 CREATE INDEX IF NOT EXISTS idx_listings_price ON listings(price);
-CREATE INDEX IF NOT EXISTS idx_sold_comps_neighborhood ON sold_comps(neighborhood);
+CREATE INDEX IF NOT EXISTS idx_sold_comps_neighbourhood ON sold_comps(neighbourhood);
 CREATE INDEX IF NOT EXISTS idx_sold_comps_sold_date ON sold_comps(sold_date);
 CREATE INDEX IF NOT EXISTS idx_video_jobs_status ON video_jobs(status);
 CREATE INDEX IF NOT EXISTS idx_video_jobs_customer_email ON video_jobs(customer_email);

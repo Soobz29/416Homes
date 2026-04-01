@@ -104,13 +104,11 @@
     <input id="email" type="email" placeholder="you@example.com" />
     <button id="sendBtn" onclick="sendMagicLink()">Send Magic Link</button>
     <div id="msg" class="msg"></div>
-    <p class="note">
-      This is a placeholder login page. In production we would integrate Supabase Auth
-      magic links and store a session token used by the dashboard and video pages.
-    </p>
   </div>
   <script>
-    function sendMagicLink() {
+    const API_BASE = window.location.origin + '/api';
+
+    async function sendMagicLink() {
       const emailInput = document.getElementById('email');
       const msg = document.getElementById('msg');
       const btn = document.getElementById('sendBtn');
@@ -122,11 +120,27 @@
       }
       btn.disabled = true;
       msg.style.color = '#c8a96e';
-      msg.textContent = '⏳ Simulating magic link send...';
-      setTimeout(() => {
-        msg.style.color = '#2ed573';
-        msg.textContent = '✅ Magic link sent (demo). Check your email.';
-      }, 1200);
+      msg.textContent = '⏳ Sending magic link...';
+      try {
+        const resp = await fetch(`${API_BASE}/auth/magic-link`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        if (resp.ok) {
+          msg.style.color = '#2ed573';
+          msg.textContent = '✅ Magic link sent! Check your email to sign in.';
+        } else {
+          const err = await resp.json().catch(() => ({}));
+          msg.style.color = '#c0392b';
+          msg.textContent = `⚠ ${err.detail || 'Failed to send magic link. Please try again.'}`;
+          btn.disabled = false;
+        }
+      } catch {
+        msg.style.color = '#c0392b';
+        msg.textContent = '⚠ Network error. Please check your connection and try again.';
+        btn.disabled = false;
+      }
     }
   </script>
 </body>

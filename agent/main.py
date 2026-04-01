@@ -202,7 +202,7 @@ class PropertyAgent:
         
         try:
             # Extract agent email from listing URL or use default
-            agent_email = "listing@realestate.com"  # Default - in production, scrape from listing
+            agent_email = os.getenv("LISTING_AGENT_EMAIL", "listing@realestate.com")
             
             params = {
                 "from": f"416Homes Agent <{self.agent_email}>",
@@ -263,29 +263,27 @@ class PropertyAgent:
             logger.info("No new listings to process")
             return
         
-        matches_found = 0
-        
-        for listing in listings:
-            # Calculate match score
-            match_score = self.calculate_match_score(listing, alert)
-            
-            # Only process good matches (score >= 0.6)
-            if match_score >= 0.6:
-                matches_found += 1
-                
-                # Generate outreach email
+        good_matches = [
+            (listing, self.calculate_match_score(listing, alert))
+            for listing in listings
+        ]
+        good_matches = [(l, s) for l, s in good_matches if s >= 0.6]
+
+        if not good_matches:
+            logger.info("No matching listings found for this alert")
+            return
+
+        # Process up to 5 matches concurrently; semaphore prevents Resend rate limit
+        semaphore = asyncio.Semaphore(5)
+
+        async def _process_match(listing, match_score):
+            async with semaphore:
                 email_content = await self.generate_outreach_email(listing, alert, match_score)
-                
-                # Send email
                 email_sent = await self.send_outreach_email(listing, alert, email_content)
-                
-                # Record the match
                 await self.record_match(listing, alert, match_score, email_sent)
-                
-                # Add delay between emails to avoid spam filters
-                await asyncio.sleep(2)
-        
-        logger.info(f"Alert processing complete: {matches_found} matches found and processed")
+
+        await asyncio.gather(*[_process_match(l, s) for l, s in good_matches])
+        logger.info(f"Alert processing complete: {len(good_matches)} matches found and processed")
     
     async def run_agent_loop(self):
         """Main agent loop"""

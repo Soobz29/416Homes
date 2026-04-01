@@ -34,8 +34,8 @@ def dedupe_listings(listings: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 async def run_all_sources(area: str = "gta") -> List[Dict[str, Any]]:
     """Run all scrapers concurrently and return deduplicated results"""
     
-    # Prioritize Zoocasa for GTA and temporarily exclude realtor.ca
-    # (realtor.ca has been returning persistent 403s in CI).
+    # realtor.ca is excluded: persistent Cloudflare 403s make it unreliable in CI/CD.
+    # To re-enable, add:  "realtor_ca": scrape_realtor_ca  and import scrape_realtor_ca above.
     sources = {
         "zoocasa": scrape_zoocasa,
         "housesigma": scrape_housesigma,

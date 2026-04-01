@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Header, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Header, UploadFile, File, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -51,10 +51,11 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS middleware
+# CORS middleware – restrict to APP_URL in production, localhost as fallback
+_allowed_origins = [o.strip() for o in os.getenv("APP_URL", "http://localhost:3000").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify allowed origins
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -250,6 +251,27 @@ from scraper.crawler import (
 )
 
 
+# ── Auth endpoints ────────────────────────────────────────────────────────
+class MagicLinkRequest(BaseModel):
+    email: str
+
+
+@app.post("/api/auth/magic-link")
+async def send_magic_link(payload: MagicLinkRequest):
+    """Send a Supabase Auth magic link email to the given address."""
+    email = payload.email.strip()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=422, detail="Invalid email address")
+    if not supabase_client:
+        raise HTTPException(status_code=503, detail="Auth not configured")
+    try:
+        supabase_client.auth.sign_in_with_otp({"email": email})
+        return {"status": "sent", "email": email}
+    except Exception as e:
+        logger.error(f"Magic link error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send magic link")
+
+
 # Health check
 @app.get("/api/health")
 async def health_check():
@@ -327,8 +349,8 @@ def _generate_link_code(length: int = 6) -> str:
 @app.get("/api/listings")
 async def get_listings(
     city: str = "GTA",
-    limit: int = 20,
-    offset: int = 0,
+    limit: int = Query(default=20, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     min_price: Optional[int] = None,
     max_price: Optional[int] = None,
     bedrooms: Optional[str] = None,
@@ -935,6 +957,89 @@ def _get_comps(neighbourhood: str, limit: int = 5) -> list:
         return result.data or []
     except Exception:
         return []
+
+# ── Agent control routes (used by web/agent.html) ──────────────────────────
+_agent_task: Optional[asyncio.Task] = None  # type: ignore[type-arg]
+_agent_status: Dict[str, Any] = {"running": False, "started_at": None, "last_run": None}
+
+
+@app.post("/agent/start")
+async def agent_start(background_tasks: BackgroundTasks):
+    """Trigger the agent matching loop in the background."""
+    global _agent_task, _agent_status
+    if _agent_status.get("running"):
+        return {"status": "already_running", "started_at": _agent_status.get("started_at")}
+
+    async def _run():
+        global _agent_status
+        try:
+            from agent.main import PropertyAgent
+            ag = PropertyAgent()
+            await ag.run_agent_loop()
+        except Exception as e:
+            logger.error(f"Agent loop error: {e}")
+        finally:
+            _agent_status["running"] = False
+            _agent_status["last_run"] = datetime.utcnow().isoformat()
+
+    _agent_status["running"] = True
+    _agent_status["started_at"] = datetime.utcnow().isoformat()
+    background_tasks.add_task(_run)
+    return {"status": "started", "started_at": _agent_status["started_at"]}
+
+
+@app.post("/agent/stop")
+async def agent_stop():
+    """Mark agent as stopped (background task finishes on its own)."""
+    global _agent_status
+    _agent_status["running"] = False
+    return {"status": "stopped"}
+
+
+@app.get("/agent/status")
+async def agent_status_route():
+    return _agent_status
+
+
+@app.get("/agent/alerts")
+async def agent_alerts(limit: int = Query(default=50, ge=1, le=200)):
+    """Return active buyer alerts (proxy to /api/alerts without user filter)."""
+    try:
+        if not supabase_client:
+            return []
+        result = supabase_client.table("buyer_alerts").select("*").eq("is_active", True).limit(limit).execute()
+        return result.data or []
+    except Exception as e:
+        logger.error(f"agent_alerts error: {e}")
+        return []
+
+
+@app.post("/agent/alerts/{alert_id}/seen")
+async def mark_alert_seen(alert_id: str):
+    try:
+        if not supabase_client:
+            raise HTTPException(status_code=503, detail="Database not configured")
+        supabase_client.table("buyer_alerts").update({"last_notified_at": datetime.utcnow().isoformat()}).eq("id", alert_id).execute()
+        return {"status": "ok"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"mark_alert_seen error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update alert")
+
+
+# ── Protected agent trigger ─────────────────────────────────────────────────
+@app.post("/api/run-agent")
+async def run_agent_endpoint(
+    background_tasks: BackgroundTasks,
+    x_agent_secret: Optional[str] = Header(None, alias="x-agent-secret"),
+):
+    """Trigger one agent loop run. Requires X-Agent-Secret header matching AGENT_SECRET env var."""
+    secret = os.getenv("AGENT_SECRET")
+    if secret and x_agent_secret != secret:
+        raise HTTPException(status_code=403, detail="Invalid agent secret")
+    return await agent_start(background_tasks)
+
 
 if __name__ == "__main__":
     import uvicorn
