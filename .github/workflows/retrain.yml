@@ -135,19 +135,15 @@ jobs:
             print('⚠️ No validation data available')
         "
         
-    - name: Backup old model
+    - name: Commit and push trained model
       if: success()
       run: |
-        echo "Backing up previous model..."
-        mkdir -p backups
-        cp valuation_model.pkl backups/valuation_model_$(date +%Y%m%d_%H%M%S).pkl 2>/dev/null || echo "No existing model to backup"
-        
-    - name: Deploy new model
-      if: success()
-      run: |
-        echo "Deploying new model..."
-        # Model is already in place - just log deployment
-        echo "Model deployed successfully"
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add valuation_model.pkl valuation_model_encoders.pkl
+        git diff --cached --quiet && echo "No model changes to commit" || \
+          git commit -m "chore: update trained valuation model [skip ci]"
+        git push origin main
         
     - name: Send retraining notification
       if: success()
