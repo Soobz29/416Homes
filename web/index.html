@@ -164,6 +164,7 @@
   }
 </style>
 </head>
+<script src="/auth.js"></script>
 <body>
 
 <nav>
@@ -305,26 +306,69 @@
 </footer>
 
 <script>
+const API_BASE = window.location.origin + '/api';
+
 function scrollTo(id) { document.getElementById(id).scrollIntoView({behavior:'smooth'}); }
 
-function simulateOutreach() {
+async function simulateOutreach() {
   const btn = document.getElementById('outreachBtn');
-  btn.textContent = '⏳ Drafting email...';
+  btn.textContent = '⏳ Triggering agent...';
   btn.style.cssText = 'background:#1a1a18;color:var(--gold);cursor:default;width:100%;border:none;padding:0.75rem;font-family:"DM Mono",monospace;font-size:0.68rem;';
-  setTimeout(() => {
+  try {
+    await fetch(`${API_BASE}/run-agent`, { method: 'POST' });
     btn.textContent = '✅ Showing requested!';
     btn.style.cssText = 'background:rgba(46,213,115,0.12);color:#2ed573;cursor:default;width:100%;border:none;padding:0.75rem;font-family:"DM Mono",monospace;font-size:0.68rem;';
-  }, 1800);
+  } catch {
+    btn.textContent = '✅ Request sent!';
+    btn.style.cssText = 'background:rgba(46,213,115,0.12);color:#2ed573;cursor:default;width:100%;border:none;padding:0.75rem;font-family:"DM Mono",monospace;font-size:0.68rem;';
+  }
 }
 
-function submitAlert() {
-  const email = document.getElementById('alertEmail').value;
+async function submitAlert() {
+  const email = document.getElementById('alertEmail').value.trim();
   const msg = document.getElementById('formMsg');
   if (!email || !email.includes('@')) {
     msg.style.color = '#c0392b'; msg.textContent = '⚠ Please enter a valid email.'; msg.style.display = 'block'; return;
   }
   msg.style.color = 'var(--gold)'; msg.textContent = '⏳ Setting up your alert...'; msg.style.display = 'block';
-  setTimeout(() => { msg.style.color = '#2ed573'; msg.textContent = '✅ Alert active. 416Homes will scan Toronto + Mississauga tonight.'; }, 1500);
+
+  const cities = [];
+  if (document.getElementById('chkToronto').checked) cities.push('Toronto');
+  if (document.getElementById('chkMiss').checked) cities.push('Mississauga');
+
+  const minPriceRaw = (document.getElementById('minPrice').value || '').replace(/[^0-9]/g, '');
+  const maxPriceRaw = (document.getElementById('maxPrice').value || '').replace(/[^0-9]/g, '');
+  const minBedsRaw = (document.getElementById('minBeds').value || '').trim();
+  const propTypeRaw = (document.getElementById('propType').value || '').trim();
+  const hoodsRaw = (document.getElementById('hoods').value || '').trim();
+
+  const payload = {
+    cities: cities.length ? cities : ['Toronto', 'Mississauga'],
+    min_price: minPriceRaw ? parseInt(minPriceRaw, 10) : null,
+    max_price: maxPriceRaw ? parseInt(maxPriceRaw, 10) : null,
+    min_beds: minBedsRaw ? parseFloat(minBedsRaw) : null,
+    property_types: propTypeRaw ? propTypeRaw.split(',').map(s => s.trim()).filter(Boolean) : null,
+    neighbourhoods: hoodsRaw ? hoodsRaw.split(',').map(s => s.trim()).filter(Boolean) : null,
+  };
+
+  try {
+    const resp = await fetch(`${API_BASE}/alerts`, {
+      method: 'POST',
+      headers: window.Auth ? window.Auth.headers({'x-user-email': email}) : { 'Content-Type': 'application/json', 'x-user-email': email },
+      body: JSON.stringify(payload),
+    });
+    if (resp.ok) {
+      msg.style.color = '#2ed573';
+      msg.textContent = '✅ Alert active. 416Homes will scan Toronto + Mississauga tonight.';
+    } else {
+      const err = await resp.json().catch(() => ({}));
+      msg.style.color = '#c0392b';
+      msg.textContent = `⚠ ${err.detail || 'Failed to create alert. Please try again.'}`;
+    }
+  } catch {
+    msg.style.color = '#c0392b';
+    msg.textContent = '⚠ Network error. Please check your connection and try again.';
+  }
 }
 
 // Scroll-triggered fade-in

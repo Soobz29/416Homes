@@ -846,7 +846,7 @@
     }
   </style>
 </head>
-
+<script src="/auth.js"></script>
 <body>
 
   <nav>
@@ -1125,6 +1125,17 @@
           <div id="dlVideoError" style="display:none;background:#1a1a1a;color:#888;padding:2rem;font-size:0.9rem;text-align:center;border-radius:8px;">Video could not be loaded. Use the Download button below.</div>
         </div>
         <a class="dl-btn" id="dlBtn" href="#" download>⬇ Download Video</a>
+
+        <!-- Free revision request (shown after video is ready) -->
+        <div id="revisionBlock" style="margin-top:2rem;padding:1.5rem;border:1px solid rgba(200,169,110,0.25);border-radius:12px;display:none;">
+          <div style="font-family:'DM Mono',monospace;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold);margin-bottom:0.75rem;">Request Free Revision</div>
+          <p style="font-size:0.85rem;color:rgba(245,244,239,0.7);margin-bottom:1rem;line-height:1.5;">One free revision is included. Describe what you'd like changed — different voice tone, music style, scene order, or script edits.</p>
+          <textarea id="revisionNotes" placeholder="e.g. Make the voiceover slower and use jazz music instead of orchestral. Open with the kitchen shot." style="width:100%;min-height:80px;background:rgba(255,255,255,0.05);border:1px solid rgba(200,169,110,0.25);border-radius:8px;color:#f5f4ef;font-family:'DM Mono',monospace;font-size:0.82rem;padding:0.75rem;resize:vertical;box-sizing:border-box;"></textarea>
+          <div style="margin-top:0.75rem;display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;">
+            <button id="revisionBtn" onclick="submitRevision()" style="background:var(--gold);color:#0a0a08;border:none;padding:0.65rem 1.5rem;font-family:'DM Mono',monospace;font-size:0.75rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;border-radius:6px;cursor:pointer;">Submit Revision</button>
+            <span id="revisionMsg" style="font-family:'DM Mono',monospace;font-size:0.72rem;display:none;"></span>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -1380,9 +1391,22 @@
         }
 
       } catch (err) {
-        // Demo mode when no API available
-        simulateDemo();
+        console.error('Video order error:', err);
+        showOrderError('Could not reach the 416Homes API. Please try again or contact support.');
       }
+    }
+
+    function showOrderError(message) {
+      const form = document.getElementById('orderForm');
+      let errEl = document.getElementById('orderFormError');
+      if (!errEl) {
+        errEl = document.createElement('div');
+        errEl.id = 'orderFormError';
+        errEl.style.cssText = 'background:rgba(192,57,43,0.12);border:1px solid rgba(192,57,43,0.4);border-radius:8px;padding:1rem;margin-top:1rem;color:#e74c3c;font-family:\'DM Mono\',monospace;font-size:0.78rem;';
+        form.appendChild(errEl);
+      }
+      errEl.textContent = '⚠ ' + message;
+      errEl.style.display = 'block';
     }
 
     function showProgressPanel() {
@@ -1454,58 +1478,53 @@
           videoEl.onerror = function() { videoEl.style.display = 'none'; if (errEl) errEl.style.display = 'block'; };
           videoEl.src = downloadUrl;
         }
+        // Show revision block (1 free revision included)
+        const revBlock = document.getElementById('revisionBlock');
+        if (revBlock && !data.revision_count) revBlock.style.display = 'block';
       }
 
       if (data.status === 'failed') {
         document.getElementById('mAssemble').textContent = `Error: ${data.error}`;
       }
+
+      if (data.status === 'revision_requested') {
+        const revMsg = document.getElementById('revisionMsg');
+        if (revMsg) { revMsg.style.color = '#2ed573'; revMsg.textContent = '✅ Revision submitted — we\'ll send the updated video within 24 hours.'; revMsg.style.display = 'inline'; }
+        const revBtn = document.getElementById('revisionBtn');
+        if (revBtn) revBtn.disabled = true;
+      }
     }
 
-    // Demo simulation when no backend available
-    function simulateDemo() {
-      showProgressPanel();
-      const steps = [
-        { id: 'iScrape', msgId: 'mScrape', msg: 'Found 6 photos · 218 Broadview Ave', delay: 1500 },
-        { id: 'iScript', msgId: 'mScript', msg: 'Script complete · "Where Heritage Meets Modern Luxury"', delay: 3500 },
-        { id: 'iAudio', msgId: 'mAudio', msg: 'Voiceover recorded · Cinematic music generated', delay: 6000 },
-        { id: 'iAnimate', msgId: 'mAnimate', msg: 'All 6 clips animated with dolly shots', delay: 10000 },
-        { id: 'iAssemble', msgId: 'mAssemble', msg: 'Final video assembled · 1920×1080 MP4', delay: 13000 },
-      ];
-
-      steps.forEach((step, idx) => {
-        setTimeout(() => {
-          // Mark previous as done
-          if (idx > 0) {
-            const prev = steps[idx - 1];
-            const prevIcon = document.getElementById(prev.id);
-            prevIcon.className = 'prog-icon done';
-            prevIcon.textContent = '✓';
-          }
-          // Activate current
-          const icon = document.getElementById(step.id);
-          icon.className = 'prog-icon active';
-          document.getElementById(step.msgId).textContent = step.msg;
-        }, step.delay);
-      });
-
-      // Complete
-      setTimeout(() => {
-        steps.forEach(step => {
-          const icon = document.getElementById(step.id);
-          icon.className = 'prog-icon done';
-          icon.textContent = '✓';
+    async function submitRevision() {
+      const notes = (document.getElementById('revisionNotes').value || '').trim();
+      const msg = document.getElementById('revisionMsg');
+      const btn = document.getElementById('revisionBtn');
+      if (!notes) { msg.style.color = '#e74c3c'; msg.textContent = '⚠ Please describe what you\'d like changed.'; msg.style.display = 'inline'; return; }
+      if (!currentJobId) { msg.style.color = '#e74c3c'; msg.textContent = '⚠ No active job found.'; msg.style.display = 'inline'; return; }
+      btn.disabled = true;
+      msg.style.color = 'var(--gold)'; msg.textContent = '⏳ Submitting...'; msg.style.display = 'inline';
+      try {
+        const resp = await fetch(`${API_BASE}/video-jobs/${currentJobId}/revision`, {
+          method: 'POST',
+          headers: window.Auth ? window.Auth.headers() : { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notes }),
         });
-        const dl = document.getElementById('downloadBlock');
-        dl.classList.add('visible');
-        const downloadUrl = `${API_BASE}/video/download/${currentJobId}`;
-        document.getElementById('dlBtn').href = downloadUrl;
-        const videoEl = document.getElementById('dlVideo');
-        if (videoEl) videoEl.src = downloadUrl;
-        document.getElementById('dlSubtitle').textContent = 'Demo mode — connect API for real video generation';
-        document.getElementById('dlBtn').href = '#';
-        document.getElementById('dlBtn').onclick = () => alert('Connect the 416Homes Video API to enable real downloads.');
-      }, 15000);
+        if (resp.ok) {
+          msg.style.color = '#2ed573';
+          msg.textContent = '✅ Revision submitted — we\'ll send the updated video within 24 hours.';
+        } else {
+          const err = await resp.json().catch(() => ({}));
+          msg.style.color = '#e74c3c';
+          msg.textContent = `⚠ ${err.detail || 'Failed to submit revision. Please email us directly.'}`;
+          btn.disabled = false;
+        }
+      } catch {
+        msg.style.color = '#e74c3c';
+        msg.textContent = '⚠ Network error. Please email us directly.';
+        btn.disabled = false;
+      }
     }
+
   </script>
 
 </body>

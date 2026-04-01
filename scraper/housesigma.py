@@ -13,8 +13,10 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 AREA_URLS = {
+    # municipality IDs: Toronto=10343, Mississauga=10420
+    # list_status=[3] = sold
     "toronto": "https://housesigma.com/web/en/map?municipality=10343&community=all&house_type=all&list_status=%5B3%5D",
-    "mississauga": "https://housesigma.com/web/en/map?municipality=10343&community=all&house_type=all&list_status=%5B3%5D",
+    "mississauga": "https://housesigma.com/web/en/map?municipality=10420&community=all&house_type=all&list_status=%5B3%5D",
     "gta": "https://housesigma.com/web/en/map?municipality=10343&community=all&house_type=all&list_status=%5B3%5D",
 }
 

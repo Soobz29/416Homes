@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS sold_comps (
     bedrooms TEXT,
     bathrooms TEXT,
     area TEXT,
-    neighborhood TEXT,
+    neighbourhood TEXT,
     sold_date TIMESTAMP WITH TIME ZONE,
     lat DECIMAL(10, 8),
     lng DECIMAL(11, 8),
@@ -61,13 +61,15 @@ CREATE TABLE IF NOT EXISTS video_jobs (
     listing_url TEXT NOT NULL,
     customer_email TEXT NOT NULL,
     customer_name TEXT,
-    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'generating_script', 'script_generated', 'generating_audio', 'audio_generated', 'generating_video', 'completed', 'failed')),
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'generating_script', 'script_generated', 'generating_audio', 'audio_generated', 'generating_video', 'complete', 'completed', 'failed', 'revision_requested')),
     progress INTEGER DEFAULT 0 CHECK (progress >= 0 AND progress <= 100),
     error_message TEXT,
     video_url TEXT,
     script_data JSONB,
     audio_url TEXT,
     final_video_path TEXT,
+    revision_count INTEGER DEFAULT 0,
+    revision_notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -77,7 +79,7 @@ CREATE TABLE IF NOT EXISTS buyer_alerts (
     id TEXT PRIMARY KEY,
     email TEXT NOT NULL,
     name TEXT,
-    neighborhoods TEXT[] DEFAULT '{}',
+    neighbourhoods TEXT[] DEFAULT '{}',
     min_price INTEGER,
     max_price INTEGER,
     min_bedrooms INTEGER,
@@ -151,7 +153,7 @@ $$;
 CREATE INDEX IF NOT EXISTS idx_listings_source ON listings(source);
 CREATE INDEX IF NOT EXISTS idx_listings_scraped_at ON listings(scraped_at);
 CREATE INDEX IF NOT EXISTS idx_listings_price ON listings(price);
-CREATE INDEX IF NOT EXISTS idx_sold_comps_neighborhood ON sold_comps(neighborhood);
+CREATE INDEX IF NOT EXISTS idx_sold_comps_neighbourhood ON sold_comps(neighbourhood);
 CREATE INDEX IF NOT EXISTS idx_sold_comps_sold_date ON sold_comps(sold_date);
 CREATE INDEX IF NOT EXISTS idx_video_jobs_status ON video_jobs(status);
 CREATE INDEX IF NOT EXISTS idx_video_jobs_customer_email ON video_jobs(customer_email);

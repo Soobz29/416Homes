@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Header, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Header, UploadFile, File, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -51,10 +51,11 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS middleware
+# CORS middleware – restrict to APP_URL in production, localhost as fallback
+_allowed_origins = [o.strip() for o in os.getenv("APP_URL", "http://localhost:3000").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify allowed origins
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -67,6 +68,15 @@ if _static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 else:
     logger.warning("Static directory missing (%s). Skipping /static mount.", _static_dir)
+
+
+@app.get("/auth.js")
+async def serve_auth_js():
+    """Serve shared auth helper used by all HTML pages."""
+    path = WEB_ROOT / "auth.js"
+    if path.exists():
+        return FileResponse(str(path), media_type="application/javascript")
+    return HTMLResponse("", status_code=404)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -250,6 +260,53 @@ from scraper.crawler import (
 )
 
 
+# ── Auth endpoints ────────────────────────────────────────────────────────
+class MagicLinkRequest(BaseModel):
+    email: str
+
+
+class SessionRequest(BaseModel):
+    access_token: str
+
+
+@app.post("/api/auth/magic-link")
+async def send_magic_link(payload: MagicLinkRequest):
+    """Send a Supabase Auth magic link email to the given address."""
+    email = payload.email.strip()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=422, detail="Invalid email address")
+    if not supabase_client:
+        raise HTTPException(status_code=503, detail="Auth not configured")
+    try:
+        supabase_client.auth.sign_in_with_otp({"email": email})
+        return {"status": "sent", "email": email}
+    except Exception as e:
+        logger.error(f"Magic link error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send magic link")
+
+
+@app.post("/api/auth/session")
+async def resolve_session(payload: SessionRequest):
+    """
+    Exchange a Supabase access_token (from magic-link callback hash) for the user's email.
+    The frontend calls this after detecting #access_token= in the URL.
+    """
+    if not supabase_client:
+        raise HTTPException(status_code=503, detail="Auth not configured")
+    try:
+        resp = supabase_client.auth.get_user(payload.access_token)
+        user = resp.user if hasattr(resp, "user") else None
+        email = (user.email if user else None) or ""
+        if not email:
+            raise HTTPException(status_code=401, detail="Could not resolve user from token")
+        return {"email": email}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Session resolve error: {e}")
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+
 # Health check
 @app.get("/api/health")
 async def health_check():
@@ -327,8 +384,8 @@ def _generate_link_code(length: int = 6) -> str:
 @app.get("/api/listings")
 async def get_listings(
     city: str = "GTA",
-    limit: int = 20,
-    offset: int = 0,
+    limit: int = Query(default=20, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     min_price: Optional[int] = None,
     max_price: Optional[int] = None,
     bedrooms: Optional[str] = None,
@@ -800,6 +857,48 @@ async def get_video_job(job_id: str):
         raise HTTPException(status_code=500, detail="Failed to get video job status")
 
 
+class RevisionRequest(BaseModel):
+    notes: str  # What the customer wants changed
+    customer_email: Optional[str] = None
+
+
+@app.post("/api/video-jobs/{job_id}/revision")
+async def request_video_revision(job_id: str, payload: RevisionRequest):
+    """
+    Customer requests one free revision on a completed video.
+    Sets job status to 'revision_requested' and stores the notes.
+    """
+    if not supabase_client:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    notes = (payload.notes or "").strip()
+    if not notes:
+        raise HTTPException(status_code=422, detail="Revision notes are required")
+    try:
+        result = supabase_client.table("video_jobs").select("id,status,revision_count").eq("id", job_id).limit(1).execute()
+        rows = result.data or []
+        if not rows:
+            raise HTTPException(status_code=404, detail="Video job not found")
+        job = rows[0]
+        if job.get("status") not in ("complete", "revision_requested"):
+            raise HTTPException(status_code=409, detail=f"Cannot request revision on a job with status '{job.get('status')}'")
+        revision_count = int(job.get("revision_count") or 0)
+        if revision_count >= 1:
+            raise HTTPException(status_code=409, detail="Free revision already used for this job")
+        supabase_client.table("video_jobs").update({
+            "status": "revision_requested",
+            "revision_notes": notes,
+            "revision_count": revision_count + 1,
+            "updated_at": datetime.utcnow().isoformat(),
+        }).eq("id", job_id).execute()
+        logger.info("Revision requested for job %s: %s", job_id, notes)
+        return {"status": "revision_requested", "job_id": job_id, "notes": notes}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Revision request error for job %s: %s", job_id, e)
+        raise HTTPException(status_code=500, detail="Failed to submit revision request")
+
+
 @app.post("/api/crawl", response_model=CrawlResult)
 async def crawl_endpoint(body: CrawlRequest):
     """
@@ -935,6 +1034,89 @@ def _get_comps(neighbourhood: str, limit: int = 5) -> list:
         return result.data or []
     except Exception:
         return []
+
+# ── Agent control routes (used by web/agent.html) ──────────────────────────
+_agent_task: Optional[asyncio.Task] = None  # type: ignore[type-arg]
+_agent_status: Dict[str, Any] = {"running": False, "started_at": None, "last_run": None}
+
+
+@app.post("/agent/start")
+async def agent_start(background_tasks: BackgroundTasks):
+    """Trigger the agent matching loop in the background."""
+    global _agent_task, _agent_status
+    if _agent_status.get("running"):
+        return {"status": "already_running", "started_at": _agent_status.get("started_at")}
+
+    async def _run():
+        global _agent_status
+        try:
+            from agent.main import PropertyAgent
+            ag = PropertyAgent()
+            await ag.run_agent_loop()
+        except Exception as e:
+            logger.error(f"Agent loop error: {e}")
+        finally:
+            _agent_status["running"] = False
+            _agent_status["last_run"] = datetime.utcnow().isoformat()
+
+    _agent_status["running"] = True
+    _agent_status["started_at"] = datetime.utcnow().isoformat()
+    background_tasks.add_task(_run)
+    return {"status": "started", "started_at": _agent_status["started_at"]}
+
+
+@app.post("/agent/stop")
+async def agent_stop():
+    """Mark agent as stopped (background task finishes on its own)."""
+    global _agent_status
+    _agent_status["running"] = False
+    return {"status": "stopped"}
+
+
+@app.get("/agent/status")
+async def agent_status_route():
+    return _agent_status
+
+
+@app.get("/agent/alerts")
+async def agent_alerts(limit: int = Query(default=50, ge=1, le=200)):
+    """Return active buyer alerts (proxy to /api/alerts without user filter)."""
+    try:
+        if not supabase_client:
+            return []
+        result = supabase_client.table("buyer_alerts").select("*").eq("is_active", True).limit(limit).execute()
+        return result.data or []
+    except Exception as e:
+        logger.error(f"agent_alerts error: {e}")
+        return []
+
+
+@app.post("/agent/alerts/{alert_id}/seen")
+async def mark_alert_seen(alert_id: str):
+    try:
+        if not supabase_client:
+            raise HTTPException(status_code=503, detail="Database not configured")
+        supabase_client.table("buyer_alerts").update({"last_notified_at": datetime.utcnow().isoformat()}).eq("id", alert_id).execute()
+        return {"status": "ok"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"mark_alert_seen error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update alert")
+
+
+# ── Protected agent trigger ─────────────────────────────────────────────────
+@app.post("/api/run-agent")
+async def run_agent_endpoint(
+    background_tasks: BackgroundTasks,
+    x_agent_secret: Optional[str] = Header(None, alias="x-agent-secret"),
+):
+    """Trigger one agent loop run. Requires X-Agent-Secret header matching AGENT_SECRET env var."""
+    secret = os.getenv("AGENT_SECRET")
+    if secret and x_agent_secret != secret:
+        raise HTTPException(status_code=403, detail="Invalid agent secret")
+    return await agent_start(background_tasks)
+
 
 if __name__ == "__main__":
     import uvicorn

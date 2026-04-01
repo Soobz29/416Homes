@@ -122,6 +122,9 @@ class ValuationModel:
             median_val = float(df[col].median())
             self.numeric_medians[col] = median_val
             df[col] = df[col].fillna(median_val)
+        # Store price_per_sqft median for confidence calculation at inference time
+        if 'price_per_sqft' in df.columns:
+            self.numeric_medians['price_per_sqft'] = float(df['price_per_sqft'].median())
 
         return df
     
@@ -269,9 +272,9 @@ class ValuationModel:
             sqft_val = float(input_df['sqft'].iloc[0]) or self.numeric_medians.get('sqft', 1000)
             estimated_price = price_per_sqft_pred[0] * sqft_val
 
-            # Confidence: tighter range reflecting typical GTA $/sqft spread ($400–$1,200)
-            median_ppsf = self.numeric_medians.get('sqft', 800)  # reuse as rough market anchor
-            deviation = abs(price_per_sqft_pred[0] - 700) / 700
+            # Confidence: distance of prediction from the training median $/sqft
+            median_ppsf = self.numeric_medians.get('price_per_sqft', 700)
+            deviation = abs(price_per_sqft_pred[0] - median_ppsf) / max(median_ppsf, 1)
             confidence = round(min(0.92, max(0.65, 1.0 - deviation * 0.5)), 2)
             
             return {
