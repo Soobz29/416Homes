@@ -558,14 +558,18 @@ class VeoRenderer:
         for cp in clip_paths:
             inputs += ["-i", str(cp)]
 
-        # Chain: [0:v][1:v]xfade=...[v1]; [v1][2:v]xfade=...[v2]; ...
+        # Convert each clip to yuv420p first (Veo outputs yuv444p which OOMs xfade),
+        # then chain xfade transitions.
         filter_parts = []
-        label_in = "[0:v]"
+        for i in range(len(clip_paths)):
+            filter_parts.append(f"[{i}:v]format=yuv420p[fmt{i}]")
+
+        label_in = "[fmt0]"
         for i in range(1, len(clip_paths)):
             offset = round(i * (clip_dur - XFADE_DUR), 3)
             label_out = f"[v{i}]" if i < len(clip_paths) - 1 else "[vout]"
             filter_parts.append(
-                f"{label_in}[{i}:v]xfade=transition=fade:duration={XFADE_DUR}:offset={offset}{label_out}"
+                f"{label_in}[fmt{i}]xfade=transition=fade:duration={XFADE_DUR}:offset={offset}{label_out}"
             )
             label_in = label_out
 
@@ -577,6 +581,8 @@ class VeoRenderer:
             "-map", "[vout]",
             "-map", f"{len(clip_paths)}:a",
             "-c:v", "libx264", "-preset", "fast", "-crf", "20",
+            "-pix_fmt", "yuv420p",
+            "-threads", "2",
             "-c:a", "aac", "-b:a", aac_bitrate,
             "-shortest", str(output_path),
         ]
