@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Listing } from "@/types";
-import { fetchListings } from "@/lib/api";
+import { fetchListings, fetchValuation } from "@/lib/api";
 import { getSession, signInWithEmail, signOut } from "@/lib/supabase";
 import { Alert, fetchAlerts, createAlert, updateAlert, deleteAlert, generateLinkCode, fetchMe } from "@/lib/alerts";
 import { DropdownSelect } from "@/components/DropdownSelect";
@@ -90,6 +90,12 @@ export default function DashboardPage() {
   const [checkingLinked, setCheckingLinked] = useState(false);
   const [meError, setMeError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [valuationForm, setValuationForm] = useState({
+    neighbourhood: "", city: "Toronto", bedrooms: "", bathrooms: "", sqft: "", list_price: "",
+  });
+  const [valuationResult, setValuationResult] = useState<null | { estimated_value: number; confidence: number; price_per_sqft?: number; market_analysis: string }>(null);
+  const [valuationLoading, setValuationLoading] = useState(false);
+  const [valuationError, setValuationError] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -753,7 +759,19 @@ export default function DashboardPage() {
                       </a>
                       <button
                         className="btn bg-[#c8a96e] px-4 py-2 font-['Syne',sans-serif] text-[0.8rem] font-bold uppercase tracking-[0.08em] text-black hover:bg-[#e4c98a]"
-                        onClick={() => setActiveTab("valuation")}
+                        onClick={() => {
+                          setValuationForm({
+                            neighbourhood: "",
+                            city: l.city || "Toronto",
+                            bedrooms: l.beds > 0 ? String(l.beds) : "",
+                            bathrooms: l.baths > 0 ? String(l.baths) : "",
+                            sqft: l.sqft > 0 ? String(l.sqft) : "",
+                            list_price: l.price > 0 ? String(l.price) : "",
+                          });
+                          setValuationResult(null);
+                          setValuationError(null);
+                          setActiveTab("valuation");
+                        }}
                       >
                         Valuate
                       </button>
@@ -768,13 +786,79 @@ export default function DashboardPage() {
         {activeTab === "valuation" && (
           <div className="tab-content mx-auto max-w-[60rem]">
             <div className="card border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] p-6 backdrop-blur-md">
-              <h2 className="mb-12 text-[clamp(1.6rem,2.5vw,2.8rem)] font-extrabold tracking-[-0.02em]">
+              <h2 className="mb-6 text-[clamp(1.4rem,2vw,2.2rem)] font-extrabold tracking-[-0.02em]">
                 Property Valuation
               </h2>
-              <p className="font-['DM Mono',monospace] text-[0.8rem] text-[#6b6b60]">
-                The full valuation form from the HTML dashboard can be ported here 1:1. Right now this tab is a visual
-                placeholder; we can wire it to `/api/valuate` the same way if you’d like.
-              </p>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {[
+                  { label: "City", key: "city", placeholder: "Toronto" },
+                  { label: "Neighbourhood", key: "neighbourhood", placeholder: "King West" },
+                  { label: "Bedrooms", key: "bedrooms", placeholder: "3" },
+                  { label: "Bathrooms", key: "bathrooms", placeholder: "2" },
+                  { label: "Sq Ft", key: "sqft", placeholder: "1200" },
+                  { label: "List Price", key: "list_price", placeholder: "750000" },
+                ].map(({ label, key, placeholder }) => (
+                  <div key={key} className="flex flex-col gap-1">
+                    <label className="font-[‘DM Mono’,monospace] text-[0.65rem] uppercase tracking-[0.08em] text-[#6b6b60]">{label}</label>
+                    <input
+                      type="text"
+                      placeholder={placeholder}
+                      value={valuationForm[key as keyof typeof valuationForm]}
+                      onChange={e => setValuationForm(f => ({ ...f, [key]: e.target.value }))}
+                      className="border border-[rgba(200,169,110,0.2)] bg-transparent px-3 py-2 font-[‘DM Mono’,monospace] text-[0.8rem] text-[#f5f4ef] outline-none placeholder:text-[#6b6b60] focus:border-[#c8a96e]"
+                    />
+                  </div>
+                ))}
+              </div>
+              <button
+                disabled={valuationLoading}
+                className="mt-5 bg-[#c8a96e] px-6 py-2.5 font-[‘Syne’,sans-serif] text-[0.85rem] font-bold uppercase tracking-[0.08em] text-black hover:bg-[#e4c98a] disabled:opacity-50"
+                onClick={async () => {
+                  setValuationLoading(true);
+                  setValuationError(null);
+                  setValuationResult(null);
+                  try {
+                    const result = await fetchValuation({
+                      neighbourhood: valuationForm.neighbourhood,
+                      property_type: "",
+                      city: valuationForm.city,
+                      bedrooms: Number(valuationForm.bedrooms) || 0,
+                      bathrooms: Number(valuationForm.bathrooms) || 0,
+                      sqft: Number(valuationForm.sqft) || 0,
+                      list_price: Number(valuationForm.list_price) || 0,
+                    });
+                    setValuationResult(result);
+                  } catch {
+                    setValuationError("Valuation failed — check API connection.");
+                  } finally {
+                    setValuationLoading(false);
+                  }
+                }}
+              >
+                {valuationLoading ? "Estimating…" : "Get Valuation"}
+              </button>
+              {valuationError && (
+                <p className="mt-4 font-[‘DM Mono’,monospace] text-[0.78rem] text-red-400">{valuationError}</p>
+              )}
+              {valuationResult && (
+                <div className="mt-6 border border-[rgba(200,169,110,0.2)] p-5">
+                  <p className="font-[‘DM Mono’,monospace] text-[0.65rem] uppercase tracking-[0.1em] text-[#6b6b60]">Estimated Value</p>
+                  <p className="text-[2rem] font-extrabold text-[#c8a96e]">
+                    ${valuationResult.estimated_value.toLocaleString()}
+                  </p>
+                  {valuationResult.price_per_sqft && (
+                    <p className="mt-1 font-[‘DM Mono’,monospace] text-[0.78rem] text-[#f5f4ef]">
+                      ${Math.round(valuationResult.price_per_sqft).toLocaleString()} / sqft
+                    </p>
+                  )}
+                  <p className="mt-2 font-[‘DM Mono’,monospace] text-[0.78rem] text-[#6b6b60]">
+                    {valuationResult.market_analysis}
+                  </p>
+                  <p className="mt-1 font-[‘DM Mono’,monospace] text-[0.65rem] text-[#6b6b60]">
+                    Confidence: {Math.round(valuationResult.confidence * 100)}%
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}
