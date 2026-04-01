@@ -336,10 +336,10 @@ export default function DashboardPage() {
               Toronto · Mississauga · GTA
             </p>
             <h1 className="dashboard-hero-title mb-3 text-[clamp(2rem,3vw,2.8rem)] font-extrabold tracking-[-0.02em]">
-              Your <span className="text-[#c8a96e]">always‑on</span> real estate dashboard.
+              Your <span className="text-[#c8a96e]">GTA real estate</span> dashboard.
             </h1>
             <p className="dashboard-hero-sub max-w-xl font-['DM Mono',monospace] text-[0.8rem] leading-relaxed text-[#6b6b60]">
-              One surface for the three things you do most: scan fresh GTA listings, stress‑test prices, and spin up
+              Browse fresh listings across Toronto and Mississauga, run quick valuations on any address, and order
               listing videos when it&apos;s time to sell.
             </p>
             <div className="mt-6" suppressHydrationWarning>
@@ -788,8 +788,8 @@ export default function DashboardPage() {
               Turn any listing into a <span className="text-[#c8a96e]">cinematic video</span>
             </h2>
             <p className="mb-10 max-w-xl font-['DM Mono',monospace] text-[0.8rem] text-[#6b6b60]">
-              Paste a Realtor.ca or Zillow URL. AI writes script, records voiceover, adds music — delivers a polished
-              30-second video in under 15 minutes.
+              Paste a Realtor.ca or Zillow URL. We write the script, record the voiceover, and add music — your
+              polished 30-second video is ready in under 15 minutes.
             </p>
             <Link
               href="/video"

@@ -210,7 +210,7 @@ export default function LandingPage() {
         <div className="flex flex-col justify-center px-16 pb-16 pt-24 max-md:px-6">
           <div className="mb-8 flex items-center gap-3 font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.18em] text-[#c8a96e]">
             <span className="h-px w-8 bg-[#c8a96e]" />
-            Toronto &amp; Mississauga&apos;s First Autonomous Property Agent
+            Toronto &amp; Mississauga property search, done for you
           </div>
           <h1 className="mb-8 text-[clamp(2.8rem,4.5vw,5rem)] font-extrabold leading-[0.95] tracking-[-0.03em]">
             Stop chasing.
@@ -231,8 +231,8 @@ export default function LandingPage() {
             </span>
           </div>
           <p className="mb-10 max-w-[40ch] font-['DM_Mono',monospace] text-[0.88rem] leading-[1.75] text-[#6b6b60]">
-            416Homes monitors 4 listing platforms 24/7 across Toronto and Mississauga, valuates every property against
-            real sold comps, and emails listing agents on your behalf — while you sleep.
+            416Homes watches 4 listing platforms around the clock, checks each property against what homes in that
+            neighbourhood actually sold for, and reaches out to listing agents on your behalf — so you don&apos;t have to.
           </p>
           <div className="flex items-center gap-4">
             <Button
@@ -256,7 +256,7 @@ export default function LandingPage() {
           <div className="w-[340px] animate-[float_6s_ease-in-out_infinite] border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.03)] p-8 backdrop-blur-md">
             <div className="mb-6 flex items-center gap-2 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.15em] text-[#c8a96e]">
               <span className="h-[6px] w-[6px] animate-[pulse_2s_ease-in-out_infinite] rounded-full bg-[#c8a96e]" aria-hidden="true" />
-              Agent Working Now
+              Live Update
             </div>
             <div className="mb-2 inline-block bg-[rgba(200,169,110,0.1)] px-2 py-1 font-['DM_Mono',monospace] text-[0.6rem] uppercase tracking-[0.15em] text-[#c8a96e]">
               Mississauga
@@ -313,33 +313,33 @@ export default function LandingPage() {
           Process
         </div>
         <h2 className="mb-16 max-w-[22ch] text-[clamp(1.8rem,3vw,3.2rem)] font-extrabold leading-[1.05] tracking-[-0.02em]">
-          Four steps while you live your life
+          Four steps, then you&apos;re done
         </h2>
         <div className="grid gap-[2px] md:grid-cols-4">
           {[
             {
               n: "01 / 04",
               icon: "🔍",
-              t: "You set your criteria",
-              d: "Price, city (Toronto, Mississauga, or both), neighbourhood, property type, beds. Takes 90 seconds.",
+              t: "Tell us what you want",
+              d: "Set your price range, cities, neighbourhood, property type and minimum beds. Takes about 90 seconds.",
             },
             {
               n: "02 / 04",
-              icon: "🤖",
-              t: "Agent scrapes nightly",
-              d: "Hits Realtor.ca, HouseSigma, Zolo, and Zoocasa every night. New listings in your dashboard every morning.",
+              icon: "🏠",
+              t: "We scan every night",
+              d: "Checks Realtor.ca, HouseSigma, Zolo, and Zoocasa nightly. Fresh listings appear in your dashboard every morning.",
             },
             {
               n: "03 / 04",
               icon: "📊",
-              t: "AI valuates each match",
-              d: "Every listing is priced against real sold comps. Overpriced listings are filtered. Underpriced ones flagged with a delta.",
+              t: "Every listing gets priced",
+              d: "Each property is compared against what similar homes in that area actually sold for — not the asking price. Good deals get flagged with a clear number.",
             },
             {
               n: "04 / 04",
               icon: "📨",
-              t: "Agent contacts listing agents",
-              d: "For qualified matches, 416Homes drafts and sends professional outreach requesting showings — fully autonomous.",
+              t: "We reach out to the agent",
+              d: "When something matches your criteria, a professional note goes to the listing agent requesting a showing — so the email is already sent by the time you wake up.",
             },
           ].map((s) => (
             <div
@@ -360,32 +360,32 @@ export default function LandingPage() {
       {/* Intelligence */}
       <section id="features" className="border-y border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.01)] px-16 py-28 max-md:px-6 max-md:py-16">
         <div className="mb-3 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.2em] text-[#c8a96e]">
-          Intelligence
+          Why it&apos;s different
         </div>
         <h2 className="mb-16 max-w-[22ch] text-[clamp(1.8rem,3vw,3.2rem)] font-extrabold leading-[1.05] tracking-[-0.02em]">
-          Built specifically for the GTA + Mississauga market
+          Built for the way the GTA actually works
         </h2>
         <div className="grid gap-[2px] md:grid-cols-2">
           {[
             {
-              label: "Valuation Engine",
-              title: "Real Sold Prices, Not Asking",
-              desc: "416Homes scrapes actual sold prices from HouseSigma across 50+ Toronto and Mississauga neighbourhoods. The pricing model trains on real transaction data — not agent estimates — and flags listings with a concrete percentage delta versus fair value.",
+              label: "Pricing",
+              title: "What homes actually sold for",
+              desc: "We pull real transaction prices from HouseSigma across 50+ Toronto and Mississauga neighbourhoods — not estimates, not guesses. Every listing gets compared against actual closes in the same area, so you know if you're looking at a deal or a trap.",
             },
             {
-              label: "Dual-City Coverage",
-              title: "Toronto & Mississauga Together",
-              desc: "Most tools treat the two cities separately. 416Homes lets you search across both in a single alert — so if you're open to Port Credit or Leslieville, you see the best of both markets ranked by value, not just city.",
+              label: "Coverage",
+              title: "Toronto & Mississauga in one search",
+              desc: "Most tools make you pick a city and stick to it. 416Homes searches both at once — so if you're open to Port Credit or Leslieville, you're seeing the best options from both markets, sorted by value rather than geography.",
             },
             {
-              label: "Transit Intelligence",
-              title: "Ontario Line & Eglinton Crosstown Scoring",
-              desc: "Both lines are still under construction. 416Homes scores each listing's proximity to planned stops, factoring the forward premium these corridors will command — a signal most buyers aren't considering.",
+              label: "Transit",
+              title: "Ontario Line & Eglinton Crosstown",
+              desc: "Both lines are still under construction but the price premiums are already forming. 416Homes flags each listing's proximity to planned stops — a detail most buyers aren't factoring into their search.",
             },
             {
-              label: "Unique GTA Segment",
-              title: "Pre-Construction Assignment Tracking",
-              desc: "The GTA has one of North America's largest pre-construction markets. 416Homes tracks assignment sales — original buyers flipping purchase agreements before closing — a segment invisible to most search tools.",
+              label: "Pre-Construction",
+              title: "Assignment sales, tracked",
+              desc: "The GTA has one of North America's largest pre-construction markets. 416Homes watches assignment sales — where the original buyer transfers their purchase contract before closing — a segment that most search tools don't show at all.",
             },
           ].map((f) => (
             <div
@@ -408,24 +408,24 @@ export default function LandingPage() {
       <section id="alert" className="grid gap-20 px-16 py-28 md:grid-cols-2 max-md:px-6 max-md:py-16">
         <div>
           <div className="mb-3 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.2em] text-[#c8a96e]">
-            Early Access — Free
+            Free to start
           </div>
           <h2 className="mb-5 text-[clamp(1.8rem,3vw,3.2rem)] font-extrabold leading-[1.05] tracking-[-0.02em]">
-            Set your search.
+            Set it once.
             <br />
-            Walk away.
+            We handle the rest.
           </h2>
           <p className="max-w-[38ch] font-['DM_Mono',monospace] text-[0.8rem] leading-[1.8] text-[#6b6b60]">
-            Define your criteria once. 416Homes monitors Toronto and Mississauga every night and surfaces only the
-            listings worth your attention — with AI valuation included.
+            Tell us what you&apos;re looking for. We check Toronto and Mississauga every night and send you only the
+            listings that are actually worth a look — with a price check included.
           </p>
           <div className="mt-10">
             {[
-              ["Gemini 2.0 Flash", "Agent LLM + embeddings", "Free"],
-              ["Supabase + pgvector", "Database + semantic search", "Free"],
-              ["Browser Use + Playwright", "Autonomous web scraping", "Open Source"],
-              ["GitHub Actions", "Nightly cron scheduler", "Free"],
-              ["LightGBM + FastAPI", "Valuation model + API", "Open Source"],
+              ["Listing search", "Realtor.ca, HouseSigma, Zolo, Zoocasa", "Free"],
+              ["Price checks", "Compared against real sold comps", "Free"],
+              ["Agent outreach", "Professional email sent on your behalf", "Free"],
+              ["Morning digest", "New matches delivered daily", "Free"],
+              ["Dashboard", "All your listings, alerts, and history", "Free"],
             ].map(([name, role, badge]) => (
               <div
                 key={name}
@@ -455,7 +455,7 @@ export default function LandingPage() {
             </Link>
           </div>
           <p className="mb-8 font-['DM_Mono',monospace] text-[0.72rem] leading-[1.6] text-[#6b6b60]">
-            We&apos;ll monitor Toronto + Mississauga and send matches every morning.
+            We&apos;ll watch Toronto and Mississauga every night and send you matches every morning.
           </p>
 
           {formSuccess ? (
@@ -463,7 +463,7 @@ export default function LandingPage() {
               aria-live="polite"
               className="border border-[rgba(46,213,115,0.3)] bg-[rgba(46,213,115,0.08)] px-4 py-6 text-center font-['DM_Mono',monospace] text-[0.82rem] text-[#2ed573]"
             >
-              ✅ Alert created! Check your inbox for confirmation.
+              ✅ You&apos;re set. Check your inbox — we&apos;ll send your first matches tomorrow morning.
               <br />
               <Link href="/dashboard" className="mt-3 block text-[#c8a96e] hover:text-[#e4c98a]">
                 Manage your alerts in the dashboard →
@@ -588,7 +588,7 @@ export default function LandingPage() {
                 disabled={submitting}
                 className="mt-1 w-full bg-[#c8a96e] px-4 py-3 font-['Syne',sans-serif] text-[0.88rem] font-bold uppercase tracking-[0.05em] text-black transition-colors hover:bg-[#e4c98a] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {submitting ? "Activating..." : "Activate My Agent →"}
+                {submitting ? "Saving..." : "Activate My Alert →"}
               </button>
             </form>
           )}
@@ -601,7 +601,7 @@ export default function LandingPage() {
           <span className="text-[#c8a96e]">416</span>Homes
         </div>
         <div className="font-['DM_Mono',monospace] text-[0.62rem] text-[#6b6b60]">
-          Covering Toronto &amp; Mississauga · Powered by Gemini + open-source tooling
+          Covering Toronto &amp; Mississauga · Built on real sold data
         </div>
         <div className="font-['DM_Mono',monospace] text-[0.62rem] text-[#6b6b60]">
           © 2025 416Homes · Early Access
