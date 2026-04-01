@@ -70,6 +70,15 @@ else:
     logger.warning("Static directory missing (%s). Skipping /static mount.", _static_dir)
 
 
+@app.get("/auth.js")
+async def serve_auth_js():
+    """Serve shared auth helper used by all HTML pages."""
+    path = WEB_ROOT / "auth.js"
+    if path.exists():
+        return FileResponse(str(path), media_type="application/javascript")
+    return HTMLResponse("", status_code=404)
+
+
 @app.get("/", response_class=HTMLResponse)
 async def serve_landing():
     """Serve main landing page."""
@@ -256,6 +265,10 @@ class MagicLinkRequest(BaseModel):
     email: str
 
 
+class SessionRequest(BaseModel):
+    access_token: str
+
+
 @app.post("/api/auth/magic-link")
 async def send_magic_link(payload: MagicLinkRequest):
     """Send a Supabase Auth magic link email to the given address."""
@@ -270,6 +283,28 @@ async def send_magic_link(payload: MagicLinkRequest):
     except Exception as e:
         logger.error(f"Magic link error: {e}")
         raise HTTPException(status_code=500, detail="Failed to send magic link")
+
+
+@app.post("/api/auth/session")
+async def resolve_session(payload: SessionRequest):
+    """
+    Exchange a Supabase access_token (from magic-link callback hash) for the user's email.
+    The frontend calls this after detecting #access_token= in the URL.
+    """
+    if not supabase_client:
+        raise HTTPException(status_code=503, detail="Auth not configured")
+    try:
+        resp = supabase_client.auth.get_user(payload.access_token)
+        user = resp.user if hasattr(resp, "user") else None
+        email = (user.email if user else None) or ""
+        if not email:
+            raise HTTPException(status_code=401, detail="Could not resolve user from token")
+        return {"email": email}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Session resolve error: {e}")
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 
 # Health check
@@ -820,6 +855,48 @@ async def get_video_job(job_id: str):
     except Exception as e:
         logger.error("Error getting video job: %s", e)
         raise HTTPException(status_code=500, detail="Failed to get video job status")
+
+
+class RevisionRequest(BaseModel):
+    notes: str  # What the customer wants changed
+    customer_email: Optional[str] = None
+
+
+@app.post("/api/video-jobs/{job_id}/revision")
+async def request_video_revision(job_id: str, payload: RevisionRequest):
+    """
+    Customer requests one free revision on a completed video.
+    Sets job status to 'revision_requested' and stores the notes.
+    """
+    if not supabase_client:
+        raise HTTPException(status_code=503, detail="Database not configured")
+    notes = (payload.notes or "").strip()
+    if not notes:
+        raise HTTPException(status_code=422, detail="Revision notes are required")
+    try:
+        result = supabase_client.table("video_jobs").select("id,status,revision_count").eq("id", job_id).limit(1).execute()
+        rows = result.data or []
+        if not rows:
+            raise HTTPException(status_code=404, detail="Video job not found")
+        job = rows[0]
+        if job.get("status") not in ("complete", "revision_requested"):
+            raise HTTPException(status_code=409, detail=f"Cannot request revision on a job with status '{job.get('status')}'")
+        revision_count = int(job.get("revision_count") or 0)
+        if revision_count >= 1:
+            raise HTTPException(status_code=409, detail="Free revision already used for this job")
+        supabase_client.table("video_jobs").update({
+            "status": "revision_requested",
+            "revision_notes": notes,
+            "revision_count": revision_count + 1,
+            "updated_at": datetime.utcnow().isoformat(),
+        }).eq("id", job_id).execute()
+        logger.info("Revision requested for job %s: %s", job_id, notes)
+        return {"status": "revision_requested", "job_id": job_id, "notes": notes}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Revision request error for job %s: %s", job_id, e)
+        raise HTTPException(status_code=500, detail="Failed to submit revision request")
 
 
 @app.post("/api/crawl", response_model=CrawlResult)

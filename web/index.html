@@ -164,6 +164,7 @@
   }
 </style>
 </head>
+<script src="/auth.js"></script>
 <body>
 
 <nav>
@@ -353,7 +354,7 @@ async function submitAlert() {
   try {
     const resp = await fetch(`${API_BASE}/alerts`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-user-email': email },
+      headers: window.Auth ? window.Auth.headers({'x-user-email': email}) : { 'Content-Type': 'application/json', 'x-user-email': email },
       body: JSON.stringify(payload),
     });
     if (resp.ok) {

@@ -61,13 +61,15 @@ CREATE TABLE IF NOT EXISTS video_jobs (
     listing_url TEXT NOT NULL,
     customer_email TEXT NOT NULL,
     customer_name TEXT,
-    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'generating_script', 'script_generated', 'generating_audio', 'audio_generated', 'generating_video', 'completed', 'failed')),
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'generating_script', 'script_generated', 'generating_audio', 'audio_generated', 'generating_video', 'complete', 'completed', 'failed', 'revision_requested')),
     progress INTEGER DEFAULT 0 CHECK (progress >= 0 AND progress <= 100),
     error_message TEXT,
     video_url TEXT,
     script_data JSONB,
     audio_url TEXT,
     final_video_path TEXT,
+    revision_count INTEGER DEFAULT 0,
+    revision_notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
