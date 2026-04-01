@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import json
 import logging
 import os
@@ -78,6 +79,76 @@ def _trim_clip(clip_path: Path) -> Path:
         return trimmed_path
     logger.warning("Clip trim failed (rc=%s), using original", result.returncode)
     return clip_path
+
+
+def _ffprobe_duration_sec(path: Path) -> float:
+    """Duration in seconds (float); fallback if ffprobe fails."""
+    cmd = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        str(path),
+    ]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if r.returncode == 0 and r.stdout.strip():
+            return max(0.1, float(r.stdout.strip()))
+    except (ValueError, subprocess.TimeoutExpired, OSError) as e:
+        logger.warning("ffprobe duration failed for %s: %s", path.name, e)
+    return float(CLIP_DURATION_SECONDS - 0.3)
+
+
+def _xfade_merge_two_sync(
+    left: Path,
+    right: Path,
+    out_path: Path,
+    offset: float,
+    xfade_dur: float,
+    crf: str,
+    preset: str,
+) -> None:
+    """Merge two videos with a crossfade; video only (no audio). ~2 inputs = low RAM."""
+    oc = round(offset, 3)
+    xd = round(xfade_dur, 3)
+    fc = (
+        f"[0:v]format=yuv420p,setsar=1[v0];"
+        f"[1:v]format=yuv420p,setsar=1[v1];"
+        f"[v0][v1]xfade=transition=fade:duration={xd}:offset={oc}[vout]"
+    )
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(left),
+        "-i",
+        str(right),
+        "-filter_complex",
+        fc,
+        "-map",
+        "[vout]",
+        "-an",
+        "-c:v",
+        "libx264",
+        "-preset",
+        preset,
+        "-crf",
+        crf,
+        "-pix_fmt",
+        "yuv420p",
+        "-threads",
+        "2",
+        str(out_path),
+    ]
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+    if r.returncode != 0:
+        raise RuntimeError(
+            f"FFmpeg pairwise xfade failed (rc={r.returncode}): "
+            f"{(r.stderr or '')[-1200:]}"
+        )
 
 
 def _mime_from_image_bytes(data: bytes) -> str:
@@ -549,53 +620,86 @@ class VeoRenderer:
             logger.info("Final video rendered: %s", output_path)
             return
 
-        # Multiple clips — xfade transitions
-        XFADE_DUR = 0.3
-        # Nominal per-clip duration after 0.3s trim
-        clip_dur = CLIP_DURATION_SECONDS - 0.3
+        # Multiple clips — pairwise xfade (only 2 decodes at a time). One giant
+        # filter_complex with N inputs spikes RAM and gets SIGKILL (rc=-9) on small hosts.
+        xfade_dur = 0.3
+        crf = (os.getenv("VIDEO_XFADE_CRF") or "20").strip()
+        preset = (os.getenv("VIDEO_XFADE_PRESET") or "veryfast").strip()
 
-        inputs: List[str] = []
-        for cp in clip_paths:
-            inputs += ["-i", str(cp)]
-
-        # Convert each clip to yuv420p first (Veo outputs yuv444p which OOMs xfade),
-        # then chain xfade transitions.
-        filter_parts = []
-        for i in range(len(clip_paths)):
-            filter_parts.append(f"[{i}:v]format=yuv420p[fmt{i}]")
-
-        label_in = "[fmt0]"
+        acc = clip_paths[0]
         for i in range(1, len(clip_paths)):
-            offset = round(i * (clip_dur - XFADE_DUR), 3)
-            label_out = f"[v{i}]" if i < len(clip_paths) - 1 else "[vout]"
-            filter_parts.append(
-                f"{label_in}[fmt{i}]xfade=transition=fade:duration={XFADE_DUR}:offset={offset}{label_out}"
+            prev = acc
+            dur_left = _ffprobe_duration_sec(Path(prev))
+            offset = max(0.05, dur_left - xfade_dur)
+            step_out = self.work_dir / f"_xfade_pair_{i}.mp4"
+            logger.info(
+                "xfade merge step %d/%d: offset=%.3fs (left dur=%.3fs)",
+                i,
+                len(clip_paths) - 1,
+                offset,
+                dur_left,
             )
-            label_in = label_out
+            await loop.run_in_executor(
+                None,
+                functools.partial(
+                    _xfade_merge_two_sync,
+                    Path(prev),
+                    clip_paths[i],
+                    step_out,
+                    offset,
+                    xfade_dur,
+                    crf,
+                    preset,
+                ),
+            )
+            if i > 1:
+                try:
+                    Path(prev).unlink(missing_ok=True)
+                except OSError as e:
+                    logger.warning("Could not remove temp xfade file %s: %s", prev, e)
+            acc = step_out
 
-        cmd = [
-            "ffmpeg", "-y",
-            *inputs,
-            "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
-            "-filter_complex", ";".join(filter_parts),
-            "-map", "[vout]",
-            "-map", f"{len(clip_paths)}:a",
-            "-c:v", "libx264", "-preset", "fast", "-crf", "20",
-            "-pix_fmt", "yuv420p",
-            "-threads", "2",
-            "-c:a", "aac", "-b:a", aac_bitrate,
-            "-shortest", str(output_path),
+        mux_cmd = [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(acc),
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=channel_layout=stereo:sample_rate=44100",
+            "-map",
+            "0:v:0",
+            "-map",
+            "1:a",
+            "-c:v",
+            "copy",
+            "-c:a",
+            "aac",
+            "-b:a",
+            aac_bitrate,
+            "-shortest",
+            str(output_path),
         ]
-
         result = await loop.run_in_executor(
             None,
-            lambda: subprocess.run(cmd, capture_output=True, text=True, timeout=300),
+            functools.partial(
+                subprocess.run,
+                mux_cmd,
+                capture_output=True,
+                text=True,
+                timeout=120,
+            ),
         )
+        try:
+            Path(acc).unlink(missing_ok=True)
+        except OSError:
+            pass
 
         if result.returncode != 0:
             raise RuntimeError(
-                f"FFmpeg xfade concat failed (rc={result.returncode}): "
+                f"FFmpeg final mux after xfade failed (rc={result.returncode}): "
                 f"{(result.stderr or '')[-800:]}"
             )
 
-        logger.info("Final video rendered with crossfade: %s", output_path)
+        logger.info("Final video rendered with crossfade (pairwise): %s", output_path)
