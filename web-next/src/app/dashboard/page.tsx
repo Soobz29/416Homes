@@ -7,6 +7,7 @@ import { fetchListings } from "@/lib/api";
 import { getSession, signInWithEmail, signOut } from "@/lib/supabase";
 import { Alert, fetchAlerts, createAlert, updateAlert, deleteAlert, generateLinkCode, fetchMe } from "@/lib/alerts";
 import { DropdownSelect } from "@/components/DropdownSelect";
+import { ErrorBanner } from "@/components/ui/error-banner";
 
 const CITIES = [
   { value: "GTA", label: "All GTA" },
@@ -69,8 +70,11 @@ export default function DashboardPage() {
     bathrooms: "",
     propertyType: "",
   });
+  const [listingsError, setListingsError] = useState<string | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(false);
+  const [alertsError, setAlertsError] = useState<string | null>(null);
+  const [alertActionError, setAlertActionError] = useState<string | null>(null);
   const [alertForm, setAlertForm] = useState({
     city: "GTA",
     minPrice: "",
@@ -117,6 +121,7 @@ export default function DashboardPage() {
   async function loadListings() {
     try {
       setLoading(true);
+      setListingsError(null);
       const data = await fetchListings({
         city: filters.city === "GTA" ? undefined : filters.city,
         minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
@@ -125,8 +130,8 @@ export default function DashboardPage() {
       });
       setListings(data.listings || []);
     } catch (error) {
-      // Fallback: leave listings empty
-      console.error("Failed to load listings:", error);
+      const msg = error instanceof Error ? error.message : "Failed to load listings.";
+      setListingsError(msg);
       setListings([]);
     } finally {
       setLoading(false);
@@ -136,10 +141,11 @@ export default function DashboardPage() {
   async function loadAlerts(email: string) {
     try {
       setAlertsLoading(true);
+      setAlertsError(null);
       const data = await fetchAlerts(email);
       setAlerts(data);
     } catch (e) {
-      console.error("Failed to load alerts", e);
+      setAlertsError(e instanceof Error ? e.message : "Failed to load alerts.");
     } finally {
       setAlertsLoading(false);
     }
@@ -178,6 +184,7 @@ export default function DashboardPage() {
   async function handleCreateAlert() {
     if (!sessionEmail) return;
     try {
+      setAlertActionError(null);
       const payload = {
         min_price: alertForm.minPrice ? Number(alertForm.minPrice) : undefined,
         max_price: alertForm.maxPrice ? Number(alertForm.maxPrice) : undefined,
@@ -189,7 +196,7 @@ export default function DashboardPage() {
       setAlerts((prev) => [created, ...prev]);
       setAlertForm({ city: "GTA", minPrice: "", maxPrice: "", minBeds: "", propertyTypes: [] });
     } catch (e) {
-      console.error("Failed to create alert", e);
+      setAlertActionError(e instanceof Error ? e.message : "Failed to create alert.");
     }
   }
 
@@ -197,10 +204,11 @@ export default function DashboardPage() {
     if (!sessionEmail) return;
     if (!confirm("Delete this alert?")) return;
     try {
+      setAlertActionError(null);
       await deleteAlert(sessionEmail, alert.id);
       setAlerts((prev) => prev.filter((a) => a.id !== alert.id));
     } catch (e) {
-      console.error("Failed to delete alert", e);
+      setAlertActionError(e instanceof Error ? e.message : "Failed to delete alert.");
     }
   }
 
@@ -265,12 +273,13 @@ export default function DashboardPage() {
   async function handleToggleAlert(alert: Alert) {
     if (!sessionEmail) return;
     try {
+      setAlertActionError(null);
       const updated = await updateAlert(sessionEmail, alert.id, {
         is_active: !alert.is_active,
       });
       setAlerts((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
     } catch (e) {
-      console.error("Failed to toggle alert", e);
+      setAlertActionError(e instanceof Error ? e.message : "Failed to update alert.");
     }
   }
 
@@ -617,6 +626,14 @@ export default function DashboardPage() {
                   </button>
 
                   <div className="mt-4 border-t border-[rgba(200,169,110,0.2)] pt-3">
+                    {(alertsError || alertActionError) && (
+                      <div className="mb-3">
+                        <ErrorBanner
+                          message={(alertsError || alertActionError)!}
+                          onDismiss={() => { setAlertsError(null); setAlertActionError(null); }}
+                        />
+                      </div>
+                    )}
                     {alertsLoading ? (
                       <p className="font-['DM Mono',monospace] text-[0.72rem] text-[#6b6b60]">Loading alerts...</p>
                     ) : alerts.length === 0 ? (
@@ -676,6 +693,11 @@ export default function DashboardPage() {
             </div>
 
             {/* Listings */}
+            {listingsError && (
+              <div className="mb-4">
+                <ErrorBanner message={listingsError} onDismiss={() => setListingsError(null)} />
+              </div>
+            )}
             {loading ? (
               <div className="flex h-64 items-center justify-center">
                 <div className="loading-spinner h-10 w-10 animate-spin rounded-full border-[3px] border-[rgba(200,169,110,0.2)] border-t-[#c8a96e]" />
