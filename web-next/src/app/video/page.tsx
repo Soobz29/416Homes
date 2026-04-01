@@ -691,8 +691,8 @@ export default function VideoPage() {
               n: "04",
               icon: "🎬",
               t: "Photos animated",
-              d: "Each photo gets a cinematic dolly shot, pan, or zoom — luxury motion styling from Calico AI.",
-              tool: "Calico AI",
+              d: "Each photo gets a cinematic dolly shot, pan, or zoom — luxury motion styling.",
+              tool: "Calico",
             },
             {
               n: "05",
