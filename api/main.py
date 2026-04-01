@@ -658,20 +658,30 @@ async def search_listings_endpoint(q: str, limit: int = 10):
         # Return mock results for demo
         return []
 
-# Valuation endpoint (minimal Railway deployment)
+# Valuation endpoint
 @app.post("/api/valuate")
 async def valuate_property(data: dict):
-    """Temporary mock valuation - full model disabled for Railway deployment"""
+    """Valuate a property using the LightGBM model, with a $/sqft fallback."""
+    try:
+        from valuation.model import ValuationModel, _DS_ENABLED
+        if _DS_ENABLED:
+            vm = ValuationModel()
+            model_path = os.path.join(os.path.dirname(__file__), '..', 'valuation_model.pkl')
+            if vm.load_model(model_path):
+                return vm.predict(data)
+    except Exception as e:
+        logger.warning(f"Valuation model unavailable, using fallback: {e}")
+
+    # Fallback: simple $/sqft estimate
     sqft = 1500
     try:
         sqft = int(data.get("sqft", sqft) or sqft)
     except Exception:
-        sqft = 1500
+        pass
     return {
-        "estimated_value": sqft * 600,  # Simple $600/sqft estimate
-        "confidence": 0.7,
-        "market_analysis": "Full valuation model temporarily disabled. Using simple price estimation.",
-        "note": "Upgrade to full LightGBM model coming soon",
+        "estimated_value": sqft * 600,
+        "confidence": 0.65,
+        "market_analysis": "Estimated at $600/sqft (model not yet trained — run python valuation/model.py to enable full LightGBM valuation).",
     }
 
 # Video job endpoints

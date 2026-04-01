@@ -66,6 +66,7 @@ def _scrape_housesigma_sync(area: str, days_back: int = 30) -> List[Dict[str, An
                 baths = ''
                 sold_date = None
 
+                sqft = ""
                 for line in lines:
                     if '$' in line:
                         price_str = re.sub(r'[^\d]', '', line)
@@ -79,6 +80,13 @@ def _scrape_housesigma_sync(area: str, days_back: int = 30) -> List[Dict[str, An
                     elif re.search(r'\d+\s*(bath|ba)', line, re.IGNORECASE):
                         m = re.search(r'(\d+)', line)
                         if m: baths = m.group(1)
+                    elif re.search(r'[\d,]+\s*(sq\.?\s*ft|sqft)', line, re.IGNORECASE):
+                        m = re.search(r'([\d,]+)', line)
+                        if m:
+                            try:
+                                sqft = str(int(m.group(1).replace(",", "")))
+                            except ValueError:
+                                pass
                     elif re.search(r'(st|ave|rd|dr|blvd|cres|way|ct|pl|ln|trail|circ)', line, re.IGNORECASE):
                         address = line
                     elif re.search(r'(sold|closed)', line, re.IGNORECASE):
@@ -105,7 +113,7 @@ def _scrape_housesigma_sync(area: str, days_back: int = 30) -> List[Dict[str, An
                         "list_price": 0,
                         "bedrooms": beds,
                         "bathrooms": baths,
-                        "sqft": "",
+                        "sqft": sqft,
                         "property_type": "",
                         "sold_date": sold_date or "",
                         "days_on_market": 0,

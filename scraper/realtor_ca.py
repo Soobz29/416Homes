@@ -114,6 +114,24 @@ def _realtor_post_via_curl_cffi(headers: dict, data: dict) -> tuple[int, dict | 
         logger.debug(f"curl_cffi realtor API failed: {e}")
         return 0, None
 
+def _parse_sqft(raw: str) -> str:
+    """Parse SizeInterior string like '1,200 sq ft' or '111.5 m2' into a sqft integer string."""
+    if not raw:
+        return ""
+    # Already a plain number
+    m = re.search(r"([\d,]+(?:\.\d+)?)", str(raw).replace(" ", ""))
+    if not m:
+        return ""
+    try:
+        value = float(m.group(1).replace(",", ""))
+        # If the unit mentions m2/sqm, convert to sqft
+        if re.search(r"m.?2|sqm", str(raw), re.IGNORECASE):
+            value = value * 10.7639
+        return str(int(value)) if value > 0 else ""
+    except Exception:
+        return ""
+
+
 GTA_REGIONS = {
     "Toronto Downtown": {
         "LatitudeMin": "43.63", "LatitudeMax": "43.70",
@@ -333,7 +351,7 @@ async def _scrape_region(client, headers: dict, name: str, coords: dict, min_pri
                                     "price": price,
                                     "bedrooms": item.get("Building", {}).get("Bedrooms", ""),
                                     "bathrooms": item.get("Building", {}).get("BathroomTotal", ""),
-                                    "sqft": "",
+                                    "sqft": _parse_sqft(item.get("Building", {}).get("SizeInterior", "")),
                                     "scraped_at": datetime.utcnow().isoformat(),
                                 }
                             )
@@ -354,10 +372,10 @@ async def _scrape_region(client, headers: dict, name: str, coords: dict, min_pri
                 price = int(price_raw.replace("$", "").replace(",", "").replace(" ", "").strip())
             except:
                 price = 0
-            
+
             addr_obj = item.get("Property", {}).get("Address", {})
             address_text = addr_obj.get("AddressText", "Unknown Address")
-            
+
             if price >= 100000:
                 listings.append({
                     "id": f"realtor_ca_{mls}",
@@ -369,7 +387,7 @@ async def _scrape_region(client, headers: dict, name: str, coords: dict, min_pri
                     "price": price,
                     "bedrooms": item.get("Building", {}).get("Bedrooms", ""),
                     "bathrooms": item.get("Building", {}).get("BathroomTotal", ""),
-                    "sqft": "",
+                    "sqft": _parse_sqft(item.get("Building", {}).get("SizeInterior", "")),
                     "scraped_at": datetime.utcnow().isoformat(),
                 })
     except Exception as e:
@@ -429,7 +447,7 @@ async def _scrape_region(client, headers: dict, name: str, coords: dict, min_pri
                                     "price": price,
                                     "bedrooms": item.get("Building", {}).get("Bedrooms", ""),
                                     "bathrooms": item.get("Building", {}).get("BathroomTotal", ""),
-                                    "sqft": "",
+                                    "sqft": _parse_sqft(item.get("Building", {}).get("SizeInterior", "")),
                                     "scraped_at": datetime.utcnow().isoformat(),
                                 }
                             )
