@@ -16,9 +16,9 @@ const STEP_MAP: Record<string, [string, string]> = {
 
 type Tier = "basic" | "cinematic" | "premium";
 const TIERS: { id: Tier; price: number; title: string; badge?: string; features: string[] }[] = [
-  { id: "basic", price: 99, title: "Basic", features: ["Ken Burns photo transitions", "AI voiceover narration", "Background music", "40–60 second video"] },
-  { id: "cinematic", price: 249, title: "Cinematic", badge: "Most Popular", features: ["Everything in Basic", "Veo 2.0 AI-generated clips", "Smooth camera movements", "Professional transitions"] },
-  { id: "premium", price: 299, title: "Premium", features: ["Everything in Cinematic", "AI photo enhancement", "Color grading", "Priority processing"] },
+  { id: "basic", price: 99, title: "Basic", features: ["Ken Burns photo transitions", "Professional voiceover narration", "Background music", "40–60 second video"] },
+  { id: "cinematic", price: 249, title: "Cinematic", badge: "Most Popular", features: ["Everything in Basic", "Cinematic animated clips", "Smooth camera movements", "Professional transitions"] },
+  { id: "premium", price: 299, title: "Premium", features: ["Everything in Cinematic", "Photo enhancement", "Color grading", "Priority processing"] },
 ];
 
 const VOICES: { id: string; name: string; desc: string }[] = [
@@ -181,7 +181,7 @@ function VideoOrderForm({
               onChange={(e) => setFormCustomMusic(e.target.files?.[0] ?? null)}
             />
             <p className="mt-1 font-['DM Mono',monospace] text-[0.6rem] text-[#6b6b60]">
-              If provided, we&apos;ll use this track instead of AI generated music.
+              If provided, we&apos;ll use this track instead of the default background music.
             </p>
           </div>
         </>
@@ -602,8 +602,8 @@ export default function VideoPage() {
             Not $5,000.
           </h1>
           <p className="hero-sub mb-8 max-w-[44ch] font-['DM Mono',monospace] text-[0.85rem] leading-[1.8] text-[#6b6b60]">
-            Paste any Realtor.ca or Zillow URL. Our AI pipeline animates your listing photos, writes the narration,
-            records the voiceover, and delivers a polished 30-second video — in under 15 minutes.
+            Paste any Realtor.ca or Zillow URL. We animate your listing photos, write the narration,
+            record the voiceover, and deliver a polished 30-second video — in under 15 minutes.
           </p>
           <div className="price-block mb-10 flex items-baseline gap-6">
             <div className="price-main text-[3rem] font-extrabold text-[#c8a96e]">
@@ -650,7 +650,7 @@ export default function VideoPage() {
               </div>
             </div>
             <div className="vp-badge absolute right-[5%] top-[10%] border border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.7)] px-2 py-1 font-['DM Mono',monospace] text-[0.6rem] uppercase tracking-[0.1em] text-[#c8a96e]">
-              AI Generated
+              Sample Video
             </div>
           </div>
         </div>
@@ -662,7 +662,7 @@ export default function VideoPage() {
           How It Works
         </div>
         <h2 className="sec-h mb-12 text-[clamp(1.6rem,2.5vw,2.8rem)] font-extrabold tracking-[-0.02em]">
-          Five AI tools, one URL, one video.
+          Five steps, one URL, one video.
         </h2>
         <div className="steps grid gap-0 md:grid-cols-5">
           {[
@@ -676,14 +676,14 @@ export default function VideoPage() {
             {
               n: "02",
               icon: "✍️",
-              t: "AI writes the script",
-              d: "Gemini analyzes the listing and writes a 30-second cinematic voiceover script tailored to the property.",
+              t: "Script written for your listing",
+              d: "We write a 30-second cinematic voiceover script tailored to the property details and neighbourhood.",
               tool: "Gemini 2.0",
             },
             {
               n: "03",
               icon: "🎙️",
-              t: "AI records narration",
+              t: "Voiceover recorded",
               d: "ElevenLabs generates professional narration. Choose from warm female or deep male voice.",
               tool: "ElevenLabs",
             },
