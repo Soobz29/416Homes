@@ -48,6 +48,49 @@ def _tts_chunk_to_bytes(chunk: object) -> bytes:
         return bytes(chunk)
 
 
+def _generate_google_tts_audio(text: str, voice_name: str, out_path: Path) -> None:
+    """Google Cloud TTS — uses GOOGLE_APPLICATION_CREDENTIALS_JSON service account."""
+    import json as _json
+    from google.cloud import texttospeech  # type: ignore[import]
+    from google.oauth2 import service_account  # type: ignore[import]
+
+    creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON", "")
+    client_kwargs: dict = {}
+    if creds_json:
+        creds = service_account.Credentials.from_service_account_info(
+            _json.loads(creds_json),
+            scopes=["https://www.googleapis.com/auth/cloud-platform"],
+        )
+        client_kwargs["credentials"] = creds
+
+    client = texttospeech.TextToSpeechClient(**client_kwargs)
+    response = client.synthesize_speech(
+        input=texttospeech.SynthesisInput(text=text),
+        voice=texttospeech.VoiceSelectionParams(language_code="en-US", name=voice_name),
+        audio_config=texttospeech.AudioConfig(
+            audio_encoding=texttospeech.AudioEncoding.MP3,
+            sample_rate_hertz=24000,
+        ),
+    )
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_bytes(response.audio_content)
+    if len(response.audio_content) < 800:
+        raise RuntimeError(
+            f"Google TTS returned too little audio ({len(response.audio_content)} bytes)"
+        )
+
+
+def _generate_gtts_audio(text: str, out_path: Path) -> None:
+    """gTTS fallback — no API key required."""
+    from gtts import gTTS  # type: ignore[import]
+
+    tts = gTTS(text=text, lang="en", slow=False)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    tts.save(str(out_path))
+    if not out_path.exists() or out_path.stat().st_size < 800:
+        raise RuntimeError("gTTS produced no output")
+
+
 def _generate_elevenlabs_audio(text: str, voice_id: str, api_key: str, out_path: Path) -> None:
     """Synchronous ElevenLabs TTS call — run in executor."""
     from elevenlabs.client import ElevenLabs
@@ -590,78 +633,103 @@ class VideoJobManager:
             with tempfile.TemporaryDirectory() as tmpdir:
                 work_dir = Path(tmpdir)
 
-                elevenlabs_key = (os.getenv("ELEVENLABS_API_KEY") or "").strip()
-                if elevenlabs_key.lower().startswith("your_"):
-                    elevenlabs_key = ""
-                voice_id_map = {
+                voice = listing_data_ctx.get("voice", "female_luxury")
+                google_voice_map = {
+                    "female_luxury": "en-US-Neural2-F",
+                    "male_luxury": "en-US-Neural2-D",
+                    "male_deep": "en-US-Neural2-J",
+                }
+                elevenlabs_voice_map = {
                     "female_luxury": "21m00Tcm4TlvDq8ikWAM",
                     "male_luxury": "29vD33N1CtxCmqQRPOHJ",
                     "male_deep": "ErXwobaYiN019PkySvjV",
                 }
-                voice = listing_data_ctx.get("voice", "female_luxury")
-                voice_id = voice_id_map.get(str(voice), voice_id_map["female_luxury"])
+                google_voice_name = google_voice_map.get(str(voice), google_voice_map["female_luxury"])
+                elevenlabs_voice_id = elevenlabs_voice_map.get(str(voice), elevenlabs_voice_map["female_luxury"])
+                elevenlabs_key = (os.getenv("ELEVENLABS_API_KEY") or "").strip()
+                if elevenlabs_key.lower().startswith("your_"):
+                    elevenlabs_key = ""
                 vo_text = (script_data.get("voiceover_script") or "").strip()
 
                 audio_path: Optional[Path] = None
                 logger.info(
-                    "Voiceover precheck job=%s: key_loaded=%s script_chars=%d",
+                    "Voiceover precheck job=%s: script_chars=%d",
                     job_id,
-                    bool(elevenlabs_key),
                     len(vo_text),
                 )
-                if elevenlabs_key and vo_text:
+
+                if vo_text:
                     await self.update_job_status(job_id, "generating_audio", 72)
+                    audio_path = work_dir / "voiceover.mp3"
+
+                    # 1. Google Cloud TTS (primary — uses existing service account)
                     try:
-                        audio_path = work_dir / "voiceover.mp3"
                         await loop.run_in_executor(
                             None,
                             functools.partial(
-                                _generate_elevenlabs_audio,
+                                _generate_google_tts_audio,
                                 vo_text,
-                                voice_id,
-                                elevenlabs_key,
+                                google_voice_name,
                                 audio_path,
                             ),
                         )
-                        if audio_path.exists():
-                            logger.info(
-                                "Voiceover generated: %s bytes",
-                                audio_path.stat().st_size,
-                            )
-                            try:
-                                with audio_path.open("rb") as af:
-                                    self.supabase.storage.from_("videos").upload(  # type: ignore[attr-defined]
-                                        f"{job_id}_voiceover.mp3",
-                                        af,
-                                        file_options={"content-type": "audio/mpeg"},
-                                    )
-                                pub = self.supabase.storage.from_("videos").get_public_url(  # type: ignore[attr-defined]
-                                    f"{job_id}_voiceover.mp3"
-                                )
-                                audio_url = (
-                                    pub.get("publicUrl") if isinstance(pub, dict) else pub
-                                )
-                                logger.info("Voiceover uploaded: %s", audio_url)
-                            except Exception as up_e:
-                                logger.warning("Voiceover storage upload failed: %s", up_e)
+                        logger.info("Voiceover generated via Google TTS: %d bytes", audio_path.stat().st_size)
                     except Exception as e:
-                        logger.warning(
-                            "ElevenLabs voiceover failed, continuing without audio: %s",
-                            e,
-                        )
+                        logger.warning("Google TTS failed: %s — trying ElevenLabs", e)
                         audio_path = None
+
+                    # 2. ElevenLabs fallback
+                    if audio_path is None and elevenlabs_key:
+                        try:
+                            audio_path = work_dir / "voiceover.mp3"
+                            await loop.run_in_executor(
+                                None,
+                                functools.partial(
+                                    _generate_elevenlabs_audio,
+                                    vo_text,
+                                    elevenlabs_voice_id,
+                                    elevenlabs_key,
+                                    audio_path,
+                                ),
+                            )
+                            logger.info("Voiceover generated via ElevenLabs: %d bytes", audio_path.stat().st_size)
+                        except Exception as e:
+                            logger.warning("ElevenLabs voiceover failed: %s — trying gTTS", e)
+                            audio_path = None
+
+                    # 3. gTTS last resort
+                    if audio_path is None:
+                        try:
+                            audio_path = work_dir / "voiceover.mp3"
+                            await loop.run_in_executor(
+                                None,
+                                functools.partial(_generate_gtts_audio, vo_text, audio_path),
+                            )
+                            logger.info("Voiceover generated via gTTS: %d bytes", audio_path.stat().st_size)
+                        except Exception as e:
+                            logger.warning("gTTS fallback failed: %s — continuing without audio", e)
+                            audio_path = None
+
+                    if audio_path and audio_path.exists():
+                        try:
+                            with audio_path.open("rb") as af:
+                                self.supabase.storage.from_("videos").upload(  # type: ignore[attr-defined]
+                                    f"{job_id}_voiceover.mp3",
+                                    af,
+                                    file_options={"content-type": "audio/mpeg"},
+                                )
+                            pub = self.supabase.storage.from_("videos").get_public_url(  # type: ignore[attr-defined]
+                                f"{job_id}_voiceover.mp3"
+                            )
+                            audio_url = pub.get("publicUrl") if isinstance(pub, dict) else pub
+                            logger.info("Voiceover uploaded: %s", audio_url)
+                        except Exception as up_e:
+                            logger.warning("Voiceover storage upload failed: %s", up_e)
                 else:
-                    if not elevenlabs_key:
-                        logger.warning(
-                            "Skipping voiceover job=%s: ELEVENLABS_API_KEY missing or placeholder "
-                            "in this process (set on the same host/service that runs the API worker, then redeploy)",
-                            job_id,
-                        )
-                    else:
-                        logger.warning(
-                            "Skipping voiceover job=%s: voiceover_script empty after script generation",
-                            job_id,
-                        )
+                    logger.warning(
+                        "Skipping voiceover job=%s: voiceover_script empty after script generation",
+                        job_id,
+                    )
 
                 await self.update_job_status(
                     job_id,

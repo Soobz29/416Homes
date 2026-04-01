@@ -63,6 +63,23 @@ def _patch_vertex_generate_videos_response_parser() -> None:
 _patch_vertex_generate_videos_response_parser()
 
 
+def _trim_clip(clip_path: Path) -> Path:
+    """Trim first 0.3 s from a Veo clip to remove the soft interpolation frame."""
+    trimmed_path = clip_path.with_stem(clip_path.stem + "_trimmed")
+    trim_cmd = [
+        "ffmpeg", "-y",
+        "-ss", "0.3",
+        "-i", str(clip_path),
+        "-c", "copy",
+        str(trimmed_path),
+    ]
+    result = subprocess.run(trim_cmd, capture_output=True, text=True, timeout=30)
+    if result.returncode == 0 and trimmed_path.exists() and trimmed_path.stat().st_size > 1000:
+        return trimmed_path
+    logger.warning("Clip trim failed (rc=%s), using original", result.returncode)
+    return clip_path
+
+
 def _mime_from_image_bytes(data: bytes) -> str:
     if len(data) >= 8 and data[:8] == b"\x89PNG\r\n\x1a\n":
         return "image/png"
@@ -120,40 +137,27 @@ async def _build_clip_prompt_from_vision(
             ratio = 1024 / img.width
             img = img.resize((1024, int(img.height * ratio)))
 
-        if scene_index == 0:
-            tour_context = (
-                "CONTINUOUS TOUR -- OPENING: Start of a single walk-through visit. "
-                "Establish arrival and invite the viewer into the home. "
-                "This shot flows into the following spaces."
-            )
-        elif scene_index == total_scenes - 1:
-            tour_context = (
-                "CONTINUOUS TOUR -- CLOSING: Final beat of the same walk-through. "
-                "Resolve the visit with a memorable last impression."
-            )
-        else:
-            tour_context = (
-                f"CONTINUOUS TOUR -- MID WALK (shot {scene_index + 1} of {total_scenes}): "
-                "Same continuous property visit. Motivate forward motion through the home "
-                "as if escorting a buyer room-to-room."
-            )
+        prompt = """You are a cinematographer directing a real estate video clip from a single still photograph.
 
-        prompt = f"""You are a cinematic prompt engineer for luxury real estate video production.
+STRICT RULES — the generated video must look like the photo came to life, NOT like AI art:
+- Camera moves only. The room/space must not change.
+- No new objects, people, furniture, windows, or architectural elements.
+- No lighting changes beyond subtle natural variation (no dramatic golden hour shifts).
+- No depth-of-field bokeh that wasn't in the photo.
+- Preserve exact colors, materials, textures from the photo.
 
-{tour_context}
+Prescribe ONE camera movement only. Choose from:
+- Imperceptibly slow push-in (2-4cm forward over 5 seconds)
+- Imperceptibly slow pull-back (2-4cm backward over 5 seconds)
+- Slow lateral drift (2-3cm left or right over 5 seconds)
+- Slow tilt down or up (1-2 degrees over 5 seconds)
 
-Analyze this room photo and write a single precision camera prompt for Veo 2 video generation.
+Write a single sentence under 30 words.
+Format: "[Camera movement]. [What the camera moves toward]. Preserve all room elements exactly as photographed."
 
-Your prompt must follow this exact structure:
+Example: "Imperceptibly slow push-in toward the kitchen island. Preserve all room elements exactly as photographed."
 
-1. Camera movement type (e.g. "Extremely slow, measured, stabilized Micro Dolly-In" or "Smooth lateral slider pan")
-2. Direction and focal anchor -- what specific object/feature the camera moves toward or tracks
-3. Movement distance and easing -- e.g. "controlled 6-10 inch forward glide, slow-in and slow-out"
-4. Environmental micro-motion -- subtle realistic light behavior only (shimmer, reflection, shadow shift)
-5. Geometry lock constraints -- all architectural elements must stay perfectly static, vertical lines locked, no warping
-6. Quality tags -- end with: 4K, HDR, photorealistic, stabilized slider shot, ultra-clean detail, premium real estate
-
-Write ONE dense paragraph. No bullet points. No headers. Be specific to what you actually see in this image -- identify the exact focal anchor (island, fireplace, window, staircase etc). Under 120 words."""
+Analyze this photo and write the camera direction:"""
 
         loop = asyncio.get_event_loop()
         response = await loop.run_in_executor(
@@ -466,6 +470,7 @@ class VeoRenderer:
                         scene.get("room_type", "?"),
                         clip_path.stat().st_size,
                     )
+                    clip_path = await loop.run_in_executor(None, _trim_clip, clip_path)
                     return clip_path
             except Exception as save_err:
                 logger.warning("Veo .save() failed for clip %d: %s", idx, save_err)
@@ -480,6 +485,7 @@ class VeoRenderer:
             scene.get("room_type", "?"),
             len(video_bytes),
         )
+        clip_path = await loop.run_in_executor(None, _trim_clip, clip_path)
         return clip_path
 
     async def _generate_clip(
@@ -518,49 +524,72 @@ class VeoRenderer:
             )
 
     async def _concat_clips(self, clip_paths: List[Path], output_path: Path) -> None:
-        """Concatenate Veo clips into final video."""
-        concat_file = self.work_dir / "veo_concat.txt"
-        with open(concat_file, "w", encoding="utf-8") as f:
-            for clip in clip_paths:
-                f.write(f"file '{clip.resolve().as_posix()}'\n")
+        """Concatenate Veo clips into final video with 0.3s crossfade between clips."""
+        loop = asyncio.get_running_loop()
+        aac_bitrate = (os.getenv("VIDEO_AAC_BITRATE") or "192k").strip()
+
+        if len(clip_paths) == 1:
+            cmd = [
+                "ffmpeg", "-y",
+                "-i", str(clip_paths[0]),
+                "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+                "-map", "0:v:0", "-map", "1:a",
+                "-c:v", "copy", "-c:a", "aac", "-b:a", aac_bitrate,
+                "-shortest", str(output_path),
+            ]
+            result = await loop.run_in_executor(
+                None,
+                lambda: subprocess.run(cmd, capture_output=True, text=True, timeout=120),
+            )
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"FFmpeg single-clip failed (rc={result.returncode}): "
+                    f"{(result.stderr or '')[-800:]}"
+                )
+            logger.info("Final video rendered: %s", output_path)
+            return
+
+        # Multiple clips — xfade transitions
+        XFADE_DUR = 0.3
+        # Nominal per-clip duration after 0.3s trim
+        clip_dur = CLIP_DURATION_SECONDS - 0.3
+
+        inputs: List[str] = []
+        for cp in clip_paths:
+            inputs += ["-i", str(cp)]
+
+        # Chain: [0:v][1:v]xfade=...[v1]; [v1][2:v]xfade=...[v2]; ...
+        filter_parts = []
+        label_in = "[0:v]"
+        for i in range(1, len(clip_paths)):
+            offset = round(i * (clip_dur - XFADE_DUR), 3)
+            label_out = f"[v{i}]" if i < len(clip_paths) - 1 else "[vout]"
+            filter_parts.append(
+                f"{label_in}[{i}:v]xfade=transition=fade:duration={XFADE_DUR}:offset={offset}{label_out}"
+            )
+            label_in = label_out
 
         cmd = [
-            "ffmpeg",
-            "-y",
-            "-f",
-            "concat",
-            "-safe",
-            "0",
-            "-i",
-            str(concat_file),
-            "-f",
-            "lavfi",
-            "-i",
-            "anullsrc=channel_layout=stereo:sample_rate=44100",
-            "-map",
-            "0:v:0",
-            "-map",
-            "1:a",
-            "-c:v",
-            "copy",
-            "-c:a",
-            "aac",
-            "-b:a",
-            (os.getenv("VIDEO_AAC_BITRATE") or "192k").strip(),
-            "-shortest",
-            str(output_path),
+            "ffmpeg", "-y",
+            *inputs,
+            "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+            "-filter_complex", ";".join(filter_parts),
+            "-map", "[vout]",
+            "-map", f"{len(clip_paths)}:a",
+            "-c:v", "libx264", "-preset", "fast", "-crf", "20",
+            "-c:a", "aac", "-b:a", aac_bitrate,
+            "-shortest", str(output_path),
         ]
 
-        loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(
             None,
-            lambda: subprocess.run(cmd, capture_output=True, text=True, timeout=120),
+            lambda: subprocess.run(cmd, capture_output=True, text=True, timeout=300),
         )
 
         if result.returncode != 0:
             raise RuntimeError(
-                f"FFmpeg concat failed (rc={result.returncode}): "
+                f"FFmpeg xfade concat failed (rc={result.returncode}): "
                 f"{(result.stderr or '')[-800:]}"
             )
 
-        logger.info("Final video rendered: %s", output_path)
+        logger.info("Final video rendered with crossfade: %s", output_path)
