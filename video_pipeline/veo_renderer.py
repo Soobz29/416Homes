@@ -216,8 +216,9 @@ def _veo_generation_config() -> "types.GenerateVideosConfig":
         if comp_raw in ("lossless", "high", "best")
         else types.VideoCompressionQuality.OPTIMIZED
     )
+    # Many Vertex Veo deployments reject 30 fps (code 3). Omit fps unless set explicitly.
     fps_kw: Dict[str, int] = {}
-    fps_s = (os.getenv("VEO_FPS") or "30").strip()
+    fps_s = (os.getenv("VEO_FPS") or "").strip()
     if fps_s.isdigit():
         fps_kw["fps"] = max(24, min(60, int(fps_s)))
     return types.GenerateVideosConfig(
