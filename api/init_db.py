@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS buyer_alerts (
     id TEXT PRIMARY KEY,
     email TEXT NOT NULL,
     name TEXT,
-    neighborhoods TEXT[] DEFAULT '{}',
+    neighbourhoods TEXT[] DEFAULT '{}',
     min_price INTEGER,
     max_price INTEGER,
     min_bedrooms INTEGER,
