@@ -65,16 +65,53 @@ _patch_vertex_generate_videos_response_parser()
 
 
 def _trim_clip(clip_path: Path) -> Path:
-    """Trim first 0.3 s from a Veo clip to remove the soft interpolation frame."""
+    """Drop the soft Veo ramp at the start.
+
+    ``VEO_TRIM_MODE=copy`` uses stream copy (fast) but the first output frame can sit on a
+    non-ideal packet and look blurry. Default ``reencode`` places ``-ss`` after ``-i`` and
+    re-encodes so frame 0 is a clean IDR that matches the photo.
+    """
     trimmed_path = clip_path.with_stem(clip_path.stem + "_trimmed")
-    trim_cmd = [
-        "ffmpeg", "-y",
-        "-ss", "0.3",
-        "-i", str(clip_path),
-        "-c", "copy",
-        str(trimmed_path),
-    ]
-    result = subprocess.run(trim_cmd, capture_output=True, text=True, timeout=30)
+    trim_sec = float(os.getenv("VEO_TRIM_START_SEC", "0.35"))
+    mode = (os.getenv("VEO_TRIM_MODE") or "reencode").strip().lower()
+
+    if mode == "copy":
+        trim_cmd = [
+            "ffmpeg",
+            "-y",
+            "-ss",
+            str(trim_sec),
+            "-i",
+            str(clip_path),
+            "-c",
+            "copy",
+            str(trimmed_path),
+        ]
+    else:
+        preset = (os.getenv("VEO_TRIM_PRESET") or "fast").strip()
+        crf = (os.getenv("VEO_TRIM_CRF") or "18").strip()
+        trim_cmd = [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(clip_path),
+            "-ss",
+            str(trim_sec),
+            "-c:v",
+            "libx264",
+            "-preset",
+            preset,
+            "-crf",
+            crf,
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "+faststart",
+            "-an",
+            str(trimmed_path),
+        ]
+
+    result = subprocess.run(trim_cmd, capture_output=True, text=True, timeout=120)
     if result.returncode == 0 and trimmed_path.exists() and trimmed_path.stat().st_size > 1000:
         return trimmed_path
     logger.warning("Clip trim failed (rc=%s), using original", result.returncode)
@@ -99,7 +136,7 @@ def _ffprobe_duration_sec(path: Path) -> float:
             return max(0.1, float(r.stdout.strip()))
     except (ValueError, subprocess.TimeoutExpired, OSError) as e:
         logger.warning("ffprobe duration failed for %s: %s", path.name, e)
-    return float(CLIP_DURATION_SECONDS - 0.3)
+    return max(0.1, float(CLIP_DURATION_SECONDS) - float(os.getenv("VEO_TRIM_START_SEC", "0.35")))
 
 
 def _xfade_merge_two_sync(
@@ -114,10 +151,30 @@ def _xfade_merge_two_sync(
     """Merge two videos with a crossfade; video only (no audio). ~2 inputs = low RAM."""
     oc = round(offset, 3)
     xd = round(xfade_dur, 3)
+    tune = (os.getenv("VIDEO_XFADE_TUNE") or "stillimage").strip()
     fc = (
         f"[0:v]format=yuv420p,setsar=1[v0];"
         f"[1:v]format=yuv420p,setsar=1[v1];"
         f"[v0][v1]xfade=transition=fade:duration={xd}:offset={oc}[vout]"
+    )
+    x264_args: List[str] = [
+        "-c:v",
+        "libx264",
+        "-preset",
+        preset,
+        "-crf",
+        crf,
+    ]
+    if tune and tune.lower() not in ("none", "off", "0"):
+        x264_args.extend(["-tune", tune])
+    x264_args.extend(
+        [
+            "-pix_fmt",
+            "yuv420p",
+            "-threads",
+            "2",
+            str(out_path),
+        ]
     )
     cmd = [
         "ffmpeg",
@@ -131,17 +188,7 @@ def _xfade_merge_two_sync(
         "-map",
         "[vout]",
         "-an",
-        "-c:v",
-        "libx264",
-        "-preset",
-        preset,
-        "-crf",
-        crf,
-        "-pix_fmt",
-        "yuv420p",
-        "-threads",
-        "2",
-        str(out_path),
+        *x264_args,
     ]
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
     if r.returncode != 0:
@@ -170,7 +217,7 @@ def _veo_generation_config() -> "types.GenerateVideosConfig":
         else types.VideoCompressionQuality.OPTIMIZED
     )
     fps_kw: Dict[str, int] = {}
-    fps_s = (os.getenv("VEO_FPS") or "").strip()
+    fps_s = (os.getenv("VEO_FPS") or "30").strip()
     if fps_s.isdigit():
         fps_kw["fps"] = max(24, min(60, int(fps_s)))
     return types.GenerateVideosConfig(
@@ -208,8 +255,15 @@ async def _build_clip_prompt_from_vision(
             ratio = 1024 / img.width
             img = img.resize((1024, int(img.height * ratio)))
 
-        prompt = """You are a cinematographer directing a real estate video clip from a single still photograph.
+        opening_extra = ""
+        if scene_index == 0:
+            opening_extra = (
+                "\nOPENING SHOT: The very first frame must be tack-sharp and identical in clarity to the still photo — "
+                "no fade-in from black, no soft morph, no motion blur on walls or cabinetry.\n"
+            )
 
+        prompt = f"""You are a cinematographer directing a real estate video clip from a single still photograph.
+{opening_extra}
 STRICT RULES — the generated video must look like the photo came to life, NOT like AI art:
 - Camera moves only. The room/space must not change.
 - No new objects, people, furniture, windows, or architectural elements.
@@ -217,16 +271,16 @@ STRICT RULES — the generated video must look like the photo came to life, NOT 
 - No depth-of-field bokeh that wasn't in the photo.
 - Preserve exact colors, materials, textures from the photo.
 
-Prescribe ONE camera movement only. Choose from:
-- Imperceptibly slow push-in (2-4cm forward over 5 seconds)
-- Imperceptibly slow pull-back (2-4cm backward over 5 seconds)
-- Slow lateral drift (2-3cm left or right over 5 seconds)
-- Slow tilt down or up (1-2 degrees over 5 seconds)
+Prescribe ONE smooth camera movement that reads clearly as video (not a slideshow). Choose from:
+- Slow push-in (about 8–15 cm forward over the full 5 seconds)
+- Slow pull-back (about 8–15 cm backward over 5 seconds)
+- Slow lateral slide or arc (about 8–12 cm side-to-side over 5 seconds)
+- Slow tilt down or up (about 2–4 degrees over 5 seconds)
 
-Write a single sentence under 30 words.
+Write a single sentence under 35 words.
 Format: "[Camera movement]. [What the camera moves toward]. Preserve all room elements exactly as photographed."
 
-Example: "Imperceptibly slow push-in toward the kitchen island. Preserve all room elements exactly as photographed."
+Example: "Slow smooth push-in toward the kitchen island. Preserve all room elements exactly as photographed."
 
 Analyze this photo and write the camera direction:"""
 
@@ -264,13 +318,13 @@ def _build_clip_prompt_static(
     zoom = ken_burns.get("zoom", "in")
 
     camera = {
-        ("center", "in"): "extremely slow stabilized micro dolly-in",
-        ("right", "in"): "slow push-in with gentle rightward arc",
-        ("left", "in"): "slow push-in tracking slightly left",
-        ("center", "out"): "graceful slow pull-back dolly",
+        ("center", "in"): "slow smooth stabilized dolly-in with visible forward motion",
+        ("right", "in"): "slow push-in with gentle rightward arc and clear parallax",
+        ("left", "in"): "slow push-in tracking slightly left with clear parallax",
+        ("center", "out"): "graceful slow pull-back dolly with visible depth change",
         ("right", "out"): "slow pull-back panning right",
         ("left", "out"): "slow pull-back panning left",
-    }.get((pan, zoom), "smooth slow stabilized camera drift")
+    }.get((pan, zoom), "smooth slow stabilized camera move with readable motion")
 
     anchor = ""
     if features:
@@ -279,7 +333,10 @@ def _build_clip_prompt_static(
             anchor = f" Focal anchor: {' and '.join(clean)}."
 
     if scene_index == 0:
-        beat = "OPENING: establish the property and invite the viewer in."
+        beat = (
+            "OPENING: first frame must be tack-sharp like the photograph — no soft morph or blur; "
+            "establish the property and invite the viewer in."
+        )
     elif scene_index == total_scenes - 1:
         beat = "CLOSING: resolve the tour with a memorable final impression."
     else:
@@ -623,8 +680,8 @@ class VeoRenderer:
         # Multiple clips — pairwise xfade (only 2 decodes at a time). One giant
         # filter_complex with N inputs spikes RAM and gets SIGKILL (rc=-9) on small hosts.
         xfade_dur = 0.3
-        crf = (os.getenv("VIDEO_XFADE_CRF") or "20").strip()
-        preset = (os.getenv("VIDEO_XFADE_PRESET") or "veryfast").strip()
+        crf = (os.getenv("VIDEO_XFADE_CRF") or "18").strip()
+        preset = (os.getenv("VIDEO_XFADE_PRESET") or "fast").strip()
 
         acc = clip_paths[0]
         for i in range(1, len(clip_paths)):
