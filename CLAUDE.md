@@ -68,6 +68,13 @@ api/init_db.py      prints Supabase schema SQL to paste and run
 
 ---
 
+## Current State (as of 2026-04-01)
+- sqft: fixed in realtor_ca (parses Building.SizeInterior) + housesigma (parses card text). Zoocasa API returns null sqft for most listings — nothing to fix there.
+- Valuation tab: fully wired to /api/valuate with pre-fill from VALUATE button
+- Valuation model: API uses real LightGBM with $600/sqft fallback. Model not yet trained — needs `python valuation/model.py` run once with sold_comps in Supabase.
+- retrain.yml: fixed to commit valuation_model.pkl back to main after training so Railway gets it. Trigger manually from GitHub Actions → "416Homes Model Retraining" → Run workflow.
+- All code on main, deployed to Vercel + Railway.
+
 ## Test Commands
 
 ```bash
