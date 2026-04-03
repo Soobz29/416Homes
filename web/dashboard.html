@@ -452,6 +452,12 @@
     </style>
 </head>
 <script src="/auth.js"></script>
+<script>
+    // Auth guard — redirect to login if not authenticated
+    if (window.Auth && !window.Auth.isLoggedIn()) {
+        window.location.href = '/login';
+    }
+</script>
 <body>
     <div id="root"></div>
 

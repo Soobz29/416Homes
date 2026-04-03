@@ -273,7 +273,7 @@ class ValuationModel:
             estimated_price = price_per_sqft_pred[0] * sqft_val
 
             # Confidence: distance of prediction from the training median $/sqft
-            median_ppsf = self.numeric_medians.get('price_per_sqft', 700)
+            median_ppsf = self.numeric_medians.get('price_per_sqft', 900)
             deviation = abs(price_per_sqft_pred[0] - median_ppsf) / max(median_ppsf, 1)
             confidence = round(min(0.92, max(0.65, 1.0 - deviation * 0.5)), 2)
             
@@ -299,12 +299,13 @@ class ValuationModel:
             sqft = 1000
         price_per_sqft = estimated_price / sqft
         
-        if price_per_sqft < 400:
-            return "Priced below market value - good opportunity"
-        elif price_per_sqft < 600:
-            return "Priced competitively for market"
-        elif price_per_sqft < 800:
-            return "Priced above market value - negotiate"
+        # Toronto 2026: inner city $950–$1,100/sqft; suburbs/condos $700–$850/sqft
+        if price_per_sqft < 650:
+            return "Priced below market value — strong buying opportunity"
+        elif price_per_sqft < 900:
+            return "Priced competitively for the GTA market"
+        elif price_per_sqft < 1100:
+            return "Priced above market — room to negotiate"
         else:
             return "Priced significantly above market value"
 

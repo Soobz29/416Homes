@@ -1,7 +1,7 @@
 import uuid
 import asyncio
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Header, UploadFile, File, Form, Query
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Header, Request, UploadFile, File, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -730,17 +730,142 @@ async def valuate_property(data: dict):
     except Exception as e:
         logger.warning(f"Valuation model unavailable, using fallback: {e}")
 
-    # Fallback: simple $/sqft estimate
+    # Fallback: simple $/sqft estimate (Toronto 2026 median ~$900/sqft)
     sqft = 1500
     try:
         sqft = int(data.get("sqft", sqft) or sqft)
     except Exception:
         pass
     return {
-        "estimated_value": sqft * 600,
+        "estimated_value": sqft * 900,
         "confidence": 0.65,
-        "market_analysis": "Estimated at $600/sqft (model not yet trained — run python valuation/model.py to enable full LightGBM valuation).",
+        "market_analysis": "Estimated at $900/sqft — Toronto 2026 market median (train LightGBM model for neighbourhood-level precision).",
     }
+
+
+# ── Stripe checkout ───────────────────────────────────────────────────────────
+
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+
+try:
+    import stripe as _stripe  # type: ignore
+    _stripe.api_key = STRIPE_SECRET_KEY
+    _STRIPE_AVAILABLE = bool(STRIPE_SECRET_KEY)
+except ImportError:
+    _stripe = None  # type: ignore
+    _STRIPE_AVAILABLE = False
+
+_TIER_PRICES_CAD = {"basic": 99, "cinematic": 249, "premium": 299}
+
+class CheckoutRequest(BaseModel):
+    listing_url: str
+    agent_email: str
+    agent_name: Optional[str] = ""
+    voice: Optional[str] = "female_luxury"
+    tier: Optional[str] = "cinematic"
+    price_cad: Optional[float] = None
+
+
+@app.post("/video/create-checkout")
+async def create_checkout(request: CheckoutRequest):
+    """Create a Stripe Checkout session for a video order."""
+    if not _STRIPE_AVAILABLE or _stripe is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Payment processing is not configured. Set STRIPE_SECRET_KEY.",
+        )
+
+    tier = (request.tier or "cinematic").lower()
+    price_cad = request.price_cad or _TIER_PRICES_CAD.get(tier, 249)
+    amount_cents = int(price_cad * 100)  # Stripe uses cents
+
+    app_url = os.getenv("APP_URL", "https://416homes.ca").rstrip("/")
+
+    try:
+        session = _stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            line_items=[
+                {
+                    "price_data": {
+                        "currency": "cad",
+                        "unit_amount": amount_cents,
+                        "product_data": {
+                            "name": f"416Homes {tier.capitalize()} Listing Video",
+                            "description": f"Cinematic listing video for {request.listing_url}",
+                        },
+                    },
+                    "quantity": 1,
+                }
+            ],
+            mode="payment",
+            customer_email=request.agent_email,
+            success_url=f"{app_url}/video.html?session_id={{CHECKOUT_SESSION_ID}}&status=success",
+            cancel_url=f"{app_url}/video.html?status=cancelled",
+            metadata={
+                "listing_url": request.listing_url,
+                "agent_email": request.agent_email,
+                "agent_name": request.agent_name or "",
+                "voice": request.voice or "female_luxury",
+                "tier": tier,
+                "price_cad": str(price_cad),
+            },
+        )
+        return {"checkout_url": session.url, "session_id": session.id}
+    except Exception as e:
+        logger.error("Stripe checkout creation failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to create checkout session")
+
+
+@app.post("/video/stripe-webhook")
+async def stripe_webhook(request: Request, background_tasks: BackgroundTasks):
+    """Handle Stripe webhook events. Triggers video job on successful payment."""
+    body = await request.body()
+    sig = request.headers.get("stripe-signature", "")
+    background_tasks.add_task(_handle_stripe_webhook, body, sig)
+    return JSONResponse({"received": True})
+
+
+@app.post("/api/video/stripe-webhook")
+async def stripe_webhook_api(request: "Request", background_tasks: BackgroundTasks):
+    """Alias under /api prefix — Stripe dashboard should point here."""
+    body = await request.body()
+    sig = request.headers.get("stripe-signature", "")
+    background_tasks.add_task(_handle_stripe_webhook, body, sig)
+    return JSONResponse({"received": True})
+
+
+# Internal helper used by both webhook routes
+async def _handle_stripe_webhook(body: bytes, sig_header: str) -> None:
+    if not _STRIPE_AVAILABLE or _stripe is None or not STRIPE_WEBHOOK_SECRET:
+        return
+    try:
+        event = _stripe.Webhook.construct_event(body, sig_header, STRIPE_WEBHOOK_SECRET)
+    except Exception as e:
+        logger.error("Stripe webhook signature verification failed: %s", e)
+        return
+
+    if event["type"] == "checkout.session.completed":
+        session = event["data"]["object"]
+        meta = session.get("metadata", {})
+        listing_url = meta.get("listing_url", "")
+        email = meta.get("agent_email", "")
+        name = meta.get("agent_name", "")
+        voice = meta.get("voice", "female_luxury")
+        tier = meta.get("tier", "cinematic")
+        price_cad = float(meta.get("price_cad", 249))
+        if listing_url and email:
+            try:
+                await create_video_job(
+                    listing_url=listing_url,
+                    customer_email=email,
+                    customer_name=name or None,
+                    listing_data={"voice": voice, "tier": tier, "price_cad": price_cad},
+                )
+                logger.info("Video job created after Stripe payment for %s (%s)", email, listing_url)
+            except Exception as e:
+                logger.error("Failed to create video job after payment: %s", e)
+
 
 # Video job endpoints
 @app.post("/api/video-jobs", response_model=VideoJobResponse)
