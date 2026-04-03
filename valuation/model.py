@@ -290,9 +290,13 @@ class ValuationModel:
     
     def generate_market_analysis(self, estimated_price: int, property_data: Dict[str, Any]) -> str:
         """Generate market analysis text"""
-        
+
         # Simple heuristics for market analysis
-        sqft = property_data.get('sqft', 1000)
+        sqft = property_data.get('sqft') or 1000
+        try:
+            sqft = float(sqft) or 1000
+        except (TypeError, ValueError):
+            sqft = 1000
         price_per_sqft = estimated_price / sqft
         
         if price_per_sqft < 400:

@@ -479,6 +479,15 @@
                 bedrooms: '',
                 bathrooms: ''
             });
+            const [valuationData, setValuationData] = useState({
+                neighbourhood: '',
+                property_type: 'Condo Apt',
+                city: 'Toronto',
+                bedrooms: '',
+                bathrooms: '',
+                sqft: '',
+                list_price: ''
+            });
 
             // Reset and reload when tab or filters change
             useEffect(() => {
@@ -510,10 +519,11 @@
                     });
                     if (!response.ok) throw new Error(`API error ${response.status}`);
                     const data = await response.json();
-                    if (!Array.isArray(data)) throw new Error('Unexpected API response');
-                    setListings(prev => replace ? data : [...prev, ...data]);
-                    setOffset(off + data.length);
-                    setHasMore(data.length === PAGE_SIZE);
+                    const items = Array.isArray(data) ? data : (Array.isArray(data?.listings) ? data.listings : []);
+                    if (!items.length && !Array.isArray(data) && !data?.listings) throw new Error('Unexpected API response');
+                    setListings(prev => replace ? items : [...prev, ...items]);
+                    setOffset(off + items.length);
+                    setHasMore(items.length === PAGE_SIZE);
                 } catch (error) {
                     console.error('Error fetching listings:', error);
                     if (replace) { setError('Could not load listings. Please try again later.'); setListings([]); }
@@ -611,7 +621,18 @@
                                 View Listing →
                             </a>
                             <button
-                                onClick={() => setActiveTab('valuation')}
+                                onClick={() => {
+                                    setValuationData({
+                                        neighbourhood: listing.city || '',
+                                        property_type: 'Condo Apt',
+                                        city: listing.city || 'Toronto',
+                                        bedrooms: listing.bedrooms || '',
+                                        bathrooms: listing.bathrooms || '',
+                                        sqft: listing.area || '',
+                                        list_price: String(listing.price || ''),
+                                    });
+                                    setActiveTab('valuation');
+                                }}
                                 className="btn"
                                 style={{
                                     padding: '0.65rem 1.4rem',
@@ -747,16 +768,7 @@
                 </div>
             );
 
-            const ValuationTab = () => {
-                const [valuationData, setValuationData] = useState({
-                    neighbourhood: '',
-                    property_type: 'Condo Apt',
-                    city: 'Toronto',
-                    bedrooms: '',
-                    bathrooms: '',
-                    sqft: '',
-                    list_price: ''
-                });
+            const ValuationTab = ({ valuationData, setValuationData }) => {
                 const [valuationResult, setValuationResult] = useState(null);
                 const [loading, setLoading] = useState(false);
 
@@ -1020,7 +1032,7 @@
                     <main style={{padding: '4rem'}}>
                         <div className="tab-content">
                             {activeTab === 'listings' && <ListingsTab filters={filters} />}
-                            {activeTab === 'valuation' && <ValuationTab />}
+                            {activeTab === 'valuation' && <ValuationTab valuationData={valuationData} setValuationData={setValuationData} />}
                             {activeTab === 'videos' && <VideosTab />}
                         </div>
                     </main>
