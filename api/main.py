@@ -733,13 +733,36 @@ async def valuate_property(data: dict):
     # Fallback: simple $/sqft estimate (Toronto 2026 median ~$900/sqft)
     sqft = 1500
     try:
-        sqft = int(data.get("sqft", sqft) or sqft)
+        sqft = float(data.get("sqft", sqft) or sqft) or 1500
     except Exception:
         pass
+
+    list_price = 0
+    try:
+        list_price = float(data.get("list_price", 0) or 0)
+    except Exception:
+        pass
+
+    estimated_value = sqft * 900
+
+    # Compute market analysis from actual list price vs $900/sqft baseline
+    if list_price > 0 and sqft > 0:
+        ppsf = list_price / sqft
+        if ppsf < 650:
+            market_analysis = "Priced below market value — strong buying opportunity."
+        elif ppsf < 900:
+            market_analysis = "Priced competitively for the GTA market."
+        elif ppsf < 1100:
+            market_analysis = "Priced above market — room to negotiate."
+        else:
+            market_analysis = "Priced significantly above market value."
+    else:
+        market_analysis = "Estimated at $900/sqft — Toronto 2026 market median (train LightGBM model for neighbourhood-level precision)."
+
     return {
-        "estimated_value": sqft * 900,
+        "estimated_value": int(estimated_value),
         "confidence": 0.65,
-        "market_analysis": "Estimated at $900/sqft — Toronto 2026 market median (train LightGBM model for neighbourhood-level precision).",
+        "market_analysis": market_analysis,
     }
 
 
