@@ -11,9 +11,9 @@ const STATIC_TICKER = [
   "🏠 King West 2BR — $899K → Fair Value +4.2% underpriced",
   "🏢 Square One Condo — $549K → Agent contacted ✓",
   "🏡 Port Credit Semi — $1.1M → Comp avg $1.08M -1.8%",
-  "📍 Mississauga — 5 new listings matched your alert",
+  "📍 GTA — 5 new listings matched your alert",
   "🏠 Leslieville Detached — $1.35M → Fair Value +6.1% underpriced",
-  "⚡ Eglinton Crosstown corridor — avg +$42K premium in transit-adjacent listings",
+  "⚡ Eglinton Crosstown now open — transit-adjacent listings tracking +$38K premium",
   "🏠 Erin Mills 3BR — $1.05M → 5 comps pulled, showing booked",
 ];
 
@@ -134,7 +134,7 @@ export default function LandingPage() {
           <span className="text-[#c8a96e]">416</span>
           Homes
           <sub className="ml-1 align-middle font-['DM_Mono',monospace] text-[0.6rem] font-normal tracking-[0.1em] text-[#6b6b60]">
-            GTA · MISSISSAUGA
+            GTA
           </sub>
         </div>
         <ul className="hidden list-none gap-10 font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.1em] text-[#6b6b60] md:flex">
@@ -370,17 +370,17 @@ export default function LandingPage() {
             {
               label: "Pricing",
               title: "What homes actually sold for",
-              desc: "We pull real transaction prices from HouseSigma across 50+ Toronto and Mississauga neighbourhoods — not estimates, not guesses. Every listing gets compared against actual closes in the same area, so you know if you're looking at a deal or a trap.",
+              desc: "We pull real transaction prices from HouseSigma across 50+ GTA neighbourhoods — not estimates, not guesses. Every listing gets compared against actual closes in the same area, so you know if you're looking at a deal or a trap.",
             },
             {
               label: "Coverage",
-              title: "Toronto & Mississauga in one search",
-              desc: "Most tools make you pick a city and stick to it. 416Homes searches both at once — so if you're open to Port Credit or Leslieville, you're seeing the best options from both markets, sorted by value rather than geography.",
+              title: "Full GTA Coverage",
+              desc: "From Leslieville to Port Credit, Lawrence Park to Erin Mills — one alert covers the entire GTA. No toggling between city filters. If value exists anywhere in the market, you'll see it.",
             },
             {
               label: "Transit",
               title: "Ontario Line & Eglinton Crosstown",
-              desc: "Both lines are still under construction but the price premiums are already forming. 416Homes flags each listing's proximity to planned stops — a detail most buyers aren't factoring into their search.",
+              desc: "The Eglinton Crosstown LRT opened in late 2024 and price premiums are already forming along the corridor. The Ontario Line opens ~2030. 416Homes scores every listing's proximity to both — a forward signal most buyers aren't pricing in.",
             },
             {
               label: "Pre-Construction",
