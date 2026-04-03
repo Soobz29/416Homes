@@ -838,7 +838,7 @@ export default function VideoPage() {
           Homes Video
         </div>
         <div className="footer-copy font-['DM Mono',monospace] text-[0.6rem] text-[#6b6b60]">
-          Cinematic listing videos · Toronto + Mississauga · From $199
+          Cinematic listing videos · Greater Toronto Area · From $99
         </div>
         <div className="footer-copy font-['DM Mono',monospace] text-[0.6rem] text-[#6b6b60]">
           © 2025 416Homes · hello@416homes.ca

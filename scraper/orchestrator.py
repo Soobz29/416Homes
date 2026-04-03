@@ -10,6 +10,7 @@ from .zoocasa import scrape_zoocasa
 from .housesigma import scrape_housesigma
 from .condos_ca import scrape_condos_ca
 from .zillow import scrape_zillow
+from .realtor_ca import scrape_realtor_ca
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +35,8 @@ def dedupe_listings(listings: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 async def run_all_sources(area: str = "gta") -> List[Dict[str, Any]]:
     """Run all scrapers concurrently and return deduplicated results"""
     
-    # realtor.ca is excluded: persistent Cloudflare 403s make it unreliable in CI/CD.
-    # To re-enable, add:  "realtor_ca": scrape_realtor_ca  and import scrape_realtor_ca above.
     sources = {
+        "realtor_ca": scrape_realtor_ca,
         "zoocasa": scrape_zoocasa,
         "housesigma": scrape_housesigma,
         "condos_ca": scrape_condos_ca,

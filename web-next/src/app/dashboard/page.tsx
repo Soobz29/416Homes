@@ -88,6 +88,8 @@ export default function DashboardPage() {
   const [linkLoading, setLinkLoading] = useState(false);
   const [telegramLinked, setTelegramLinked] = useState(false);
   const [checkingLinked, setCheckingLinked] = useState(false);
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanMessage, setScanMessage] = useState<string | null>(null);
   const [meError, setMeError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [valuationForm, setValuationForm] = useState({
@@ -123,6 +125,21 @@ export default function DashboardPage() {
       void loadListings();
     }
   }, [activeTab, filters]);
+
+  async function triggerScan() {
+    setScanLoading(true);
+    setScanMessage(null);
+    try {
+      const apiBase = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
+      await fetch(`${apiBase}/api/initiate-scan`, { method: "POST" });
+      setScanMessage("Scan started — listings refresh in ~2 minutes.");
+      setTimeout(() => { void loadListings(); }, 120_000);
+    } catch {
+      setScanMessage("Could not reach the API to start a scan.");
+    } finally {
+      setScanLoading(false);
+    }
+  }
 
   async function loadListings() {
     try {
@@ -339,7 +356,7 @@ export default function DashboardPage() {
         <div className="mx-auto grid max-w-[1120px] items-center gap-8 md:grid-cols-[2fr,1.2fr]">
           <div>
             <p className="dashboard-hero-eyebrow mb-3 font-['DM Mono',monospace] text-[0.7rem] uppercase tracking-[0.18em] text-[#6b6b60]">
-              Toronto · Mississauga · GTA
+              GTA
             </p>
             <h1 className="dashboard-hero-title mb-3 text-[clamp(2rem,3vw,2.8rem)] font-extrabold tracking-[-0.02em]">
               Your <span className="text-[#c8a96e]">GTA real estate</span> dashboard.
@@ -435,6 +452,18 @@ export default function DashboardPage() {
                 Nightly full scans plus on‑demand refreshes for hot listings.
               </p>
             </div>
+          </div>
+          <div className="mt-4 flex items-center gap-4">
+            <button
+              onClick={() => void triggerScan()}
+              disabled={scanLoading}
+              className="rounded border border-[rgba(200,169,110,0.4)] bg-transparent px-4 py-2 font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-[#c8a96e] transition-colors hover:bg-[rgba(200,169,110,0.1)] disabled:opacity-50"
+            >
+              {scanLoading ? "Scanning…" : "↻ Refresh Listings"}
+            </button>
+            {scanMessage && (
+              <span className="font-['DM_Mono',monospace] text-[0.68rem] text-[#6b6b60]">{scanMessage}</span>
+            )}
           </div>
         </div>
       </section>
