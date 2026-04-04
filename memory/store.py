@@ -163,7 +163,7 @@ class MemoryStore:
             "price": price,
             "bedrooms": bedrooms if not isinstance(bedrooms, dict) else "",
             "bathrooms": bathrooms if not isinstance(bathrooms, dict) else "",
-            "sqft": sqft,
+            "area": sqft,
             "property_type": str(listing.get("property_type", "Unknown") or "Unknown"),
             "days_on_market": days_on_market,
             "listing_agent_email": listing.get("listing_agent_email"),
@@ -187,7 +187,7 @@ class MemoryStore:
             "list_price": comp.get("list_price"),
             "bedrooms": comp.get("bedrooms", ""),
             "bathrooms": comp.get("bathrooms", ""),
-            "sqft": comp.get("area", comp.get("sqft", "0")),  # Map area → sqft
+            "area": comp.get("area", comp.get("sqft", "0")),
             "property_type": comp.get("property_type", "Unknown"),
             "sold_date": comp.get("sold_date"),
             "days_on_market": comp.get("days_on_market", 0),
@@ -259,7 +259,7 @@ class MemoryStore:
             {normalised['address']}
             {normalised['bedrooms']} bedrooms
             {normalised['bathrooms']} bathrooms
-            {normalised['sqft']} sqft
+            {normalised['area']} sqft
             ${normalised['price']:,}
             {normalised['source']}
             """.strip()
