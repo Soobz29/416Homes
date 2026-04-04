@@ -84,7 +84,7 @@ jobs:
     if: always()
     steps:
     - name: Send success notification
-      if: ${{ needs.scrape.result == 'success' && needs.agent.result == 'success' }}
+      if: ${{ needs.scrape.result == 'success' && needs.agent.result == 'success' && secrets.AGENT_EMAIL != '' }}
       uses: dawidd6/action-send-mail@v3
       with:
         server_address: smtp.gmail.com
@@ -108,7 +108,7 @@ jobs:
           This is an automated notification from the 416Homes system.
         
     - name: Send failure notification
-      if: ${{ needs.scrape.result == 'failure' || needs.agent.result == 'failure' }}
+      if: ${{ (needs.scrape.result == 'failure' || needs.agent.result == 'failure') && secrets.AGENT_EMAIL != '' }}
       uses: dawidd6/action-send-mail@v3
       with:
         server_address: smtp.gmail.com

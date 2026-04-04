@@ -104,15 +104,21 @@ class PropertyAgent:
         if alert.get('min_bedrooms'):
             beds = listing.get('bedrooms', 0)
             if isinstance(beds, str):
-                beds = int(beds)
+                try:
+                    beds = int(beds)
+                except (ValueError, TypeError):
+                    beds = 0
             if beds >= alert['min_bedrooms']:
                 score += 0.25
-        
+
         # Bathrooms match (15% weight)
         if alert.get('min_bathrooms'):
             baths = listing.get('bathrooms', 0)
             if isinstance(baths, str):
-                baths = int(baths)
+                try:
+                    baths = int(baths)
+                except (ValueError, TypeError):
+                    baths = 0
             if baths >= alert['min_bathrooms']:
                 score += 0.15
         
@@ -214,11 +220,11 @@ class PropertyAgent:
             
             r = resend.Emails.send(params)
             
-            if r.status_code == 200:
+            if getattr(r, 'id', None):
                 logger.info(f"Outreach email sent for {listing.get('address', 'Unknown')}")
                 return True
             else:
-                logger.error(f"Failed to send email: {r.status_code}")
+                logger.error(f"Failed to send email (no id returned)")
                 return False
                 
         except Exception as e:
