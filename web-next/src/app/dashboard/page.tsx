@@ -507,7 +507,7 @@ export default function DashboardPage() {
                   placeholder="Any type"
                 />
                 <button
-                  onClick={loadListings}
+                  onClick={() => loadListings(0)}
                   className="btn w-full bg-[#c8a96e] px-4 py-3 font-['Syne',sans-serif] text-[0.88rem] font-bold uppercase tracking-[0.05em] text-black hover:bg-[#e4c98a]"
                 >
                   Search
