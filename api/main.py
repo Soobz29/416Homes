@@ -61,6 +61,43 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+_VIDEO_WORKER_POLL = int(os.getenv("VIDEO_WORKER_POLL_SECONDS", "30"))
+
+async def _video_worker_loop() -> None:
+    """Background polling loop — picks up pending video jobs and processes them.
+    Runs inside the FastAPI process. AI imports are lazy so they don't bloat
+    startup memory — they only load when the first job is actually picked up.
+    """
+    logger.info("Video worker loop started (poll every %ds)", _VIDEO_WORKER_POLL)
+    while True:
+        await asyncio.sleep(_VIDEO_WORKER_POLL)
+        if not supabase_client:
+            continue
+        try:
+            rows = (
+                supabase_client.table("video_jobs")
+                .select("id, customer_email")
+                .eq("status", "pending")
+                .order("created_at")
+                .limit(1)
+                .execute()
+            )
+            if rows.data:
+                job = rows.data[0]
+                jid = job["id"]
+                logger.info("Video worker: processing job %s", jid)
+                supabase_client.table("video_jobs").update({"status": "generating_script"}).eq("id", jid).execute()
+                from video_pipeline.pipeline import process_pending_job  # lazy — loads AI stack on demand
+                asyncio.create_task(process_pending_job(jid))
+        except Exception as exc:
+            logger.error("Video worker poll error: %s", exc)
+
+
+@app.on_event("startup")
+async def _start_video_worker():
+    asyncio.create_task(_video_worker_loop())
+
+
 # Static + HTML pages
 WEB_ROOT = Path("web")
 _static_dir = WEB_ROOT / "static"

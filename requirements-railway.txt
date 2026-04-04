@@ -9,6 +9,13 @@ supabase>=2.28,<3
 # Telegram
 python-telegram-bot==22.6
 
+# AI APIs (lazy-loaded by video worker — not imported at startup)
+google-genai>=1.0.0,<2
+google-cloud-aiplatform>=1.45.0
+elevenlabs==1.54.0
+google-cloud-texttospeech>=2.16.0
+gtts>=2.5.0
+
 # Payments + notifications
 stripe==9.4.0
 resend==2.0.0
