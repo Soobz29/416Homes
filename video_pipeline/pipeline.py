@@ -302,54 +302,59 @@ class VideoJobManager:
         self._update_job(job_id, **fields)
 
     async def _fetch_realtor_ca_photos(self, listing_url: str) -> List[str]:
-        """Extract photos from a realtor.ca listing via their internal API."""
+        """Extract photos from a realtor.ca listing using curl_cffi (Chrome impersonation) to bypass Cloudflare."""
         import re as _re
-        # Extract MLS number from URL e.g. /real-estate/27484958/slug
         m = _re.search(r"/real-estate/(\d+)", listing_url)
         if not m:
             return []
         mls = m.group(1)
-        try:
-            async with httpx.AsyncClient(follow_redirects=True, timeout=20) as client:
-                resp = await client.post(
-                    "https://api2.realtor.ca/Listing.svc/PropertySearch_Post",
-                    headers={
-                        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                        "Origin": "https://www.realtor.ca",
-                        "Referer": listing_url,
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                    },
-                    data={
-                        "CultureId": "1", "ApplicationId": "1",
-                        "MlsNumber": mls, "Version": "7.0",
-                        "TransactionTypeId": "2",
-                    },
-                    timeout=15,
-                )
-                if resp.status_code == 200:
-                    data = resp.json()
-                    results = data.get("Results", []) or []
-                    if results:
-                        photos = results[0].get("Property", {}).get("Photo", []) or []
-                        urls = []
-                        for p in photos:
-                            url = p.get("HighResPath") or p.get("MedResPath") or p.get("LowResPath") or ""
-                            if url.startswith("http"):
-                                urls.append(url)
-                        if urls:
-                            logger.info("realtor.ca API returned %d photos for MLS %s", len(urls), mls)
-                            return urls[:15]
-        except Exception as e:
-            logger.warning("realtor.ca photo API failed for %s: %s", mls, e)
 
-        # Fallback: scrape the listing page HTML for cdn.realtor.ca URLs
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "Origin": "https://www.realtor.ca",
+            "Referer": listing_url,
+        }
+        data = {
+            "CultureId": "1", "ApplicationId": "1",
+            "MlsNumber": mls, "Version": "7.0", "TransactionTypeId": "2",
+        }
+
+        # Try curl_cffi (Chrome120 TLS impersonation — same trick as scraper)
         try:
-            async with httpx.AsyncClient(follow_redirects=True, timeout=20,
-                    headers={"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15"}) as client:
-                resp = await client.get(listing_url)
-                html = resp.text
-            import re as _re2
-            found = _re2.findall(r"https://cdn\.realtor\.ca/[^\s\"\'<>)]+\.(?:jpg|jpeg|webp|png)", html, _re2.IGNORECASE)
+            from curl_cffi import requests as cffi_requests  # type: ignore
+            import asyncio as _asyncio
+
+            def _do_post():
+                r = cffi_requests.post(
+                    "https://api2.realtor.ca/Listing.svc/PropertySearch_Post",
+                    headers=headers, data=data, impersonate="chrome120", timeout=15,
+                )
+                return r.status_code, r.json() if r.status_code == 200 else {}
+
+            status, body = await _asyncio.to_thread(_do_post)
+            if status == 200:
+                results = body.get("Results", []) or []
+                if results:
+                    photos = results[0].get("Property", {}).get("Photo", []) or []
+                    urls = [p.get("HighResPath") or p.get("MedResPath") or "" for p in photos]
+                    urls = [u for u in urls if u.startswith("http")]
+                    if urls:
+                        logger.info("realtor.ca curl_cffi returned %d photos for MLS %s", len(urls), mls)
+                        return urls[:15]
+        except Exception as e:
+            logger.warning("realtor.ca curl_cffi photo fetch failed for MLS %s: %s", mls, e)
+
+        # Fallback: scrape cdn.realtor.ca URLs from the listing page HTML
+        try:
+            from curl_cffi import requests as cffi_requests  # type: ignore
+            import asyncio as _asyncio
+
+            def _get_html():
+                r = cffi_requests.get(listing_url, impersonate="chrome120", timeout=20)
+                return r.text
+
+            html = await _asyncio.to_thread(_get_html)
+            found = _re.findall(r"https://cdn\.realtor\.ca/[^\s\"\'<>)]+\.(?:jpg|jpeg|webp|png)", html, _re.IGNORECASE)
             seen, urls = set(), []
             for u in found:
                 if u not in seen and "lowres" not in u.lower():
@@ -358,7 +363,8 @@ class VideoJobManager:
                 logger.info("realtor.ca HTML scrape found %d photos", len(urls))
                 return urls[:15]
         except Exception as e:
-            logger.warning("realtor.ca HTML scrape failed: %s", e)
+            logger.warning("realtor.ca HTML photo scrape failed: %s", e)
+
         return []
 
     async def _fetch_listing_photos(self, listing_url: str) -> List[str]:
