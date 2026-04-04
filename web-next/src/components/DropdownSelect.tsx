@@ -56,7 +56,7 @@ export function DropdownSelect({
       <div
         id={listId.current}
         role="listbox"
-        className="fixed z-[9999] max-h-64 overflow-auto rounded border border-[rgba(200,169,110,0.3)] bg-[#ffffff] shadow-xl"
+        className="fixed z-[9999] max-h-64 overflow-auto rounded border border-[rgba(200,169,110,0.35)] bg-[#141410] shadow-2xl"
         style={{
           top: position.top,
           left: position.left,
@@ -74,7 +74,7 @@ export function DropdownSelect({
               onChange(opt.value);
               setOpen(false);
             }}
-            className="block w-full px-3 py-2 text-left font-['DM Mono',monospace] text-[0.82rem] text-[#0a0a08] hover:bg-[#f0efe8] focus:bg-[#f0efe8] focus:outline-none"
+            className="block w-full px-3 py-2 text-left font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef] hover:bg-[rgba(200,169,110,0.12)] focus:bg-[rgba(200,169,110,0.12)] focus:outline-none"
           >
             {opt.label}
           </button>
