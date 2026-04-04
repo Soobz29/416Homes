@@ -513,7 +513,7 @@ export default function DashboardPage() {
         {activeTab === "listings" && (
           <div className="tab-content">
             {/* Filters */}
-            <div className="card mb-6 border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] p-6 backdrop-blur-md">
+            <div className="card relative z-10 mb-6 border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] p-6 backdrop-blur-md">
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-[1.1rem] font-bold text-[#f5f4ef]">Search Filters</h2>
                 <ExpandSearch

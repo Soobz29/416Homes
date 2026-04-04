@@ -847,6 +847,14 @@
   </style>
 </head>
 <script src="/auth.js"></script>
+<script>
+  if (window.Auth) {
+    window.Auth.init();
+    if (!window.Auth.isLoggedIn()) {
+      window.location.href = '/login';
+    }
+  }
+</script>
 <body>
 
   <nav>
