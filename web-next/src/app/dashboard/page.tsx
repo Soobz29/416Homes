@@ -77,6 +77,9 @@ export default function DashboardPage() {
   });
   const [listingsError, setListingsError] = useState<string | null>(null);
   const [addressSearch, setAddressSearch] = useState("");
+  const [page, setPage] = useState(0);
+  const [totalListings, setTotalListings] = useState(0);
+  const PAGE_SIZE = 20;
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(false);
   const [alertsError, setAlertsError] = useState<string | null>(null);
@@ -128,9 +131,16 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (activeTab === "listings") {
-      void loadListings();
+      setPage(0);
+      void loadListings(0);
     }
   }, [activeTab, filters]);
+
+  useEffect(() => {
+    if (activeTab === "listings") {
+      void loadListings(page);
+    }
+  }, [page]);
 
   async function triggerScan() {
     setScanLoading(true);
@@ -139,7 +149,7 @@ export default function DashboardPage() {
       const apiBase = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
       await fetch(`${apiBase}/api/initiate-scan`, { method: "POST" });
       setScanMessage("Scan started — listings refresh in ~2 minutes.");
-      setTimeout(() => { void loadListings(); }, 120_000);
+      setTimeout(() => { setPage(0); void loadListings(0); }, 120_000);
     } catch {
       setScanMessage("Could not reach the API to start a scan.");
     } finally {
@@ -147,7 +157,7 @@ export default function DashboardPage() {
     }
   }
 
-  async function loadListings() {
+  async function loadListings(pg = 0) {
     try {
       setLoading(true);
       setListingsError(null);
@@ -156,8 +166,11 @@ export default function DashboardPage() {
         minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
         maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
         propertyTypes: filters.propertyType ? [filters.propertyType] : undefined,
+        limit: PAGE_SIZE,
+        offset: pg * PAGE_SIZE,
       });
       setListings(data.listings || []);
+      setTotalListings(data.total || 0);
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Failed to load listings.";
       setListingsError(msg);
@@ -823,6 +836,30 @@ export default function DashboardPage() {
                   </div>
                   </HoverCardWrapper>
                 ))}
+              </div>
+            )}
+
+            {/* Pagination */}
+            {!loading && totalListings > PAGE_SIZE && (
+              <div className="mt-8 flex items-center justify-center gap-4">
+                <button
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  className="rounded border border-[rgba(200,169,110,0.4)] px-4 py-2 font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.08em] text-[#c8a96e] transition-colors hover:bg-[rgba(200,169,110,0.1)] disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  ← Prev
+                </button>
+                <span className="font-['DM_Mono',monospace] text-[0.7rem] text-[#6b6b60]">
+                  {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalListings)}{" "}
+                  <span className="text-[#c8a96e]">of {totalListings.toLocaleString()}</span>
+                </span>
+                <button
+                  disabled={(page + 1) * PAGE_SIZE >= totalListings}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="rounded border border-[rgba(200,169,110,0.4)] px-4 py-2 font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.08em] text-[#c8a96e] transition-colors hover:bg-[rgba(200,169,110,0.1)] disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  Next →
+                </button>
               </div>
             )}
           </div>
