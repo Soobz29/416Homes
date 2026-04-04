@@ -319,7 +319,38 @@ class VideoJobManager:
             "MlsNumber": mls, "Version": "7.0", "TransactionTypeId": "2",
         }
 
-        # Try curl_cffi (Chrome120 TLS impersonation — same trick as scraper)
+        # Try curl_cffi with PropertyDetails_Get (returns full media gallery)
+        try:
+            from curl_cffi import requests as cffi_requests  # type: ignore
+            import asyncio as _asyncio
+
+            def _do_details():
+                r = cffi_requests.post(
+                    "https://api2.realtor.ca/Listing.svc/PropertyDetails_Get",
+                    headers=headers,
+                    data={"ApplicationId": "1", "CultureId": "1",
+                          "PropertyId": mls, "ReferenceNumber": "0"},
+                    impersonate="chrome120", timeout=15,
+                )
+                return r.status_code, r.json() if r.status_code == 200 else {}
+
+            status, body = await _asyncio.to_thread(_do_details)
+            if status == 200:
+                # Full gallery under Media or Property.Photo
+                media = body.get("Media") or body.get("Property", {}).get("Photo") or []
+                urls = []
+                for p in media:
+                    u = (p.get("HighResPath") or p.get("MedResPath") or
+                         p.get("LargePhotoUrl") or p.get("url") or "")
+                    if u.startswith("http"):
+                        urls.append(u)
+                if urls:
+                    logger.info("realtor.ca PropertyDetails_Get returned %d photos for MLS %s", len(urls), mls)
+                    return urls[:15]
+        except Exception as e:
+            logger.warning("realtor.ca PropertyDetails_Get failed for MLS %s: %s", mls, e)
+
+        # Fallback: PropertySearch_Post (summary — fewer photos)
         try:
             from curl_cffi import requests as cffi_requests  # type: ignore
             import asyncio as _asyncio
@@ -339,7 +370,7 @@ class VideoJobManager:
                     urls = [p.get("HighResPath") or p.get("MedResPath") or "" for p in photos]
                     urls = [u for u in urls if u.startswith("http")]
                     if urls:
-                        logger.info("realtor.ca curl_cffi returned %d photos for MLS %s", len(urls), mls)
+                        logger.info("realtor.ca PropertySearch_Post returned %d photos for MLS %s", len(urls), mls)
                         return urls[:15]
         except Exception as e:
             logger.warning("realtor.ca curl_cffi photo fetch failed for MLS %s: %s", mls, e)

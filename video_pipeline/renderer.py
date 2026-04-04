@@ -189,10 +189,16 @@ class VideoRenderer:
         if not photo_paths:
             raise ValueError("photo_paths must not be empty")
 
-        duration_per_photo = 30.0 / len(photo_paths)
+        # Pad photos so we always have at least 6 scenes for a full 30-second video.
+        padded = list(photo_paths)
+        while len(padded) < 6:
+            padded.extend(photo_paths)  # cycle through existing photos
+        padded = padded[:max(6, len(photo_paths))]
+
+        duration_per_photo = 30.0 / len(padded)
 
         # Absolute paths avoid concat demuxer path bugs under /tmp and Windows.
-        abs_photos = [p.resolve() for p in photo_paths]
+        abs_photos = [p.resolve() for p in padded]
 
         images_txt = self.work_dir / "images.txt"
         with open(images_txt, "w", encoding="utf-8") as f:
@@ -202,17 +208,15 @@ class VideoRenderer:
             # FFmpeg concat demuxer requires the last file repeated without duration.
             f.write(f"file '{abs_photos[-1].as_posix()}'\n")
 
+        # Audio: pad TTS to exactly 30s with silence so video always runs the full duration.
         if audio_path:
-            audio_inputs: List[str] = ["-i", str(audio_path)]
-            audio_map = ["-map", "1:a"]
+            # apad filter appends silence until the total reaches 30 s
+            audio_inputs = ["-i", str(audio_path)]
+            audio_filter = ["-af", "apad=whole_dur=30"]
         else:
-            audio_inputs = [
-                "-f",
-                "lavfi",
-                "-i",
-                "anullsrc=channel_layout=stereo:sample_rate=44100",
-            ]
-            audio_map = ["-map", "1:a"]
+            audio_inputs = ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"]
+            audio_filter = []
+        audio_map = ["-map", "1:a"]
 
         enc = self._choose_video_encoder()
         if enc == "libx264":
@@ -225,30 +229,20 @@ class VideoRenderer:
         cmd: List[str] = [
             "ffmpeg",
             "-y",
-            "-f",
-            "concat",
-            "-safe",
-            "0",
-            "-i",
-            str(images_txt),
+            "-f", "concat",
+            "-safe", "0",
+            "-i", str(images_txt),
             *audio_inputs,
-            "-map",
-            "0:v:0",
+            "-map", "0:v:0",
             *audio_map,
-            "-vf",
-            "scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,format=yuv420p",
-            "-c:v",
-            enc,
+            *audio_filter,
+            "-vf", "scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,format=yuv420p",
+            "-c:v", enc,
             *enc_opts,
-            "-c:a",
-            "aac",
-            "-b:a",
-            aac_br,
-            "-r",
-            "25",
-            "-shortest",
-            "-t",
-            "30",
+            "-c:a", "aac",
+            "-b:a", aac_br,
+            "-r", "25",
+            "-t", "30",
             str(output_path),
         ]
 
