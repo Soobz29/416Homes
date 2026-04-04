@@ -16,7 +16,6 @@ import random
 import string
 
 from memory.store import memory_store, search_listings, replace_listings, embed_and_store_listings
-from video_pipeline.pipeline import create_video_job, get_video_job_status
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -877,17 +876,23 @@ async def _handle_stripe_webhook(body: bytes, sig_header: str) -> None:
         voice = meta.get("voice", "female_luxury")
         tier = meta.get("tier", "cinematic")
         price_cad = float(meta.get("price_cad", 249))
-        if listing_url and email:
+        if listing_url and email and supabase_client:
             try:
-                await create_video_job(
-                    listing_url=listing_url,
-                    customer_email=email,
-                    customer_name=name or None,
-                    listing_data={"voice": voice, "tier": tier, "price_cad": price_cad},
-                )
-                logger.info("Video job created after Stripe payment for %s (%s)", email, listing_url)
+                jid = str(uuid.uuid4())
+                supabase_client.table("video_jobs").insert({
+                    "id": jid,
+                    "listing_url": listing_url,
+                    "customer_email": email,
+                    "customer_name": name or email.split("@")[0],
+                    "listing_data": {"voice": voice, "tier": tier, "price_cad": price_cad},
+                    "status": "pending",
+                    "progress": 0,
+                    "created_at": datetime.utcnow().isoformat(),
+                    "updated_at": datetime.utcnow().isoformat(),
+                }).execute()
+                logger.info("Video job %s queued after Stripe payment for %s", jid, email)
             except Exception as e:
-                logger.error("Failed to create video job after payment: %s", e)
+                logger.error("Failed to queue video job after payment: %s", e)
 
 
 # Video job endpoints
@@ -910,16 +915,24 @@ async def create_video_job_endpoint(request: VideoJobRequest):
         if request.use_veo is not None:
             listing_meta["use_veo"] = request.use_veo
 
-        job_id = await create_video_job(
-            listing_url=request.listing_url,
-            customer_email=email,
-            customer_name=name or None,
-            listing_data=listing_meta or None,
-        )
+        if not supabase_client:
+            raise HTTPException(status_code=503, detail="Database not configured")
+        jid = str(uuid.uuid4())
+        supabase_client.table("video_jobs").insert({
+            "id": jid,
+            "listing_url": request.listing_url,
+            "customer_email": email,
+            "customer_name": name or email.split("@")[0],
+            "listing_data": listing_meta or {},
+            "status": "pending",
+            "progress": 0,
+            "created_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat(),
+        }).execute()
         return VideoJobResponse(
-            id=job_id,
+            id=jid,
             status="pending",
-            message="Video job created successfully",
+            message="Video job queued — processing starts within 30 seconds",
         )
     except HTTPException:
         raise
@@ -971,18 +984,24 @@ async def create_custom_video_job(
         if (job_dir / "custom_bgmusic.mp3").exists():
             listing_data["custom_music_path"] = str((job_dir / "custom_bgmusic.mp3").resolve())
 
-        job_id = await create_video_job(
-            listing_url="custom_upload",
-            customer_email=agent_email,
-            customer_name=agent_name or None,
-            listing_data=listing_data,
-            job_dir=job_dir,
-            job_id=job_id,
-        )
+        listing_data["_job_dir"] = str(job_dir.resolve())
+        if not supabase_client:
+            raise HTTPException(status_code=503, detail="Database not configured")
+        supabase_client.table("video_jobs").insert({
+            "id": job_id,
+            "listing_url": "custom_upload",
+            "customer_email": agent_email,
+            "customer_name": agent_name or agent_email.split("@")[0],
+            "listing_data": listing_data,
+            "status": "pending",
+            "progress": 0,
+            "created_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat(),
+        }).execute()
         return VideoJobResponse(
             id=job_id,
             status="pending",
-            message="Video job created successfully",
+            message="Video job queued — processing starts within 30 seconds",
         )
     except HTTPException:
         raise
@@ -995,7 +1014,10 @@ async def create_custom_video_job(
 async def get_video_job(job_id: str):
     """Get video job status"""
     try:
-        job_status = await get_video_job_status(job_id)
+        if not supabase_client:
+            raise HTTPException(status_code=503, detail="Database not configured")
+        result = supabase_client.table("video_jobs").select("*").eq("id", job_id).single().execute()
+        job_status = result.data if result else None
         if not job_status:
             raise HTTPException(status_code=404, detail="Job not found")
         return _normalize_video_job_payload(job_status)

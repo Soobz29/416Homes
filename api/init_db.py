@@ -68,11 +68,15 @@ CREATE TABLE IF NOT EXISTS video_jobs (
     script_data JSONB,
     audio_url TEXT,
     final_video_path TEXT,
+    listing_data JSONB DEFAULT '{}',
     revision_count INTEGER DEFAULT 0,
     revision_notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Add listing_data column if upgrading an existing database
+ALTER TABLE video_jobs ADD COLUMN IF NOT EXISTS listing_data JSONB DEFAULT '{}';
 
 -- Buyer alerts table
 CREATE TABLE IF NOT EXISTS buyer_alerts (

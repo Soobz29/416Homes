@@ -9,18 +9,11 @@ supabase>=2.28,<3
 # Telegram
 python-telegram-bot==22.6
 
-# AI APIs
-google-genai>=1.0.0,<2
-google-cloud-aiplatform>=1.45.0
-elevenlabs==1.54.0
-google-cloud-texttospeech>=2.16.0
-gtts>=2.5.0
+# Payments + notifications
+stripe==9.4.0
 resend==2.0.0
 
-# Payments
-stripe==9.4.0
-
-# Scraping / API client
+# HTTP / scraping helpers
 requests==2.31.0
 httpx>=0.28.1,<0.29
 beautifulsoup4==4.12.3
@@ -36,4 +29,3 @@ python-jose[cryptography]==3.3.0
 python-multipart==0.0.9
 aiohttp==3.9.3
 Pillow>=10.0.0
-

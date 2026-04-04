@@ -964,6 +964,10 @@ async def get_video_job_status(job_id: str) -> Optional[Dict[str, Any]]:
     """Get video job status"""
     return await video_job_manager.get_video_job(job_id)
 
+async def process_pending_job(job_id: str) -> None:
+    """Process an already-inserted pending job. Called by the video-worker service."""
+    await video_job_manager.process_video_job(job_id)
+
 # Legacy function for compatibility
 def generate_script(listing_data: Dict[str, Any]) -> Dict[str, Any]:
     """Generate script from listing data (sync version for demo)"""
