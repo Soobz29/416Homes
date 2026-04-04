@@ -301,10 +301,73 @@ class VideoJobManager:
         """Low-level helper to patch arbitrary fields on a video job."""
         self._update_job(job_id, **fields)
 
+    async def _fetch_realtor_ca_photos(self, listing_url: str) -> List[str]:
+        """Extract photos from a realtor.ca listing via their internal API."""
+        import re as _re
+        # Extract MLS number from URL e.g. /real-estate/27484958/slug
+        m = _re.search(r"/real-estate/(\d+)", listing_url)
+        if not m:
+            return []
+        mls = m.group(1)
+        try:
+            async with httpx.AsyncClient(follow_redirects=True, timeout=20) as client:
+                resp = await client.post(
+                    "https://api2.realtor.ca/Listing.svc/PropertySearch_Post",
+                    headers={
+                        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                        "Origin": "https://www.realtor.ca",
+                        "Referer": listing_url,
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    },
+                    data={
+                        "CultureId": "1", "ApplicationId": "1",
+                        "MlsNumber": mls, "Version": "7.0",
+                        "TransactionTypeId": "2",
+                    },
+                    timeout=15,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    results = data.get("Results", []) or []
+                    if results:
+                        photos = results[0].get("Property", {}).get("Photo", []) or []
+                        urls = []
+                        for p in photos:
+                            url = p.get("HighResPath") or p.get("MedResPath") or p.get("LowResPath") or ""
+                            if url.startswith("http"):
+                                urls.append(url)
+                        if urls:
+                            logger.info("realtor.ca API returned %d photos for MLS %s", len(urls), mls)
+                            return urls[:15]
+        except Exception as e:
+            logger.warning("realtor.ca photo API failed for %s: %s", mls, e)
+
+        # Fallback: scrape the listing page HTML for cdn.realtor.ca URLs
+        try:
+            async with httpx.AsyncClient(follow_redirects=True, timeout=20,
+                    headers={"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15"}) as client:
+                resp = await client.get(listing_url)
+                html = resp.text
+            import re as _re2
+            found = _re2.findall(r"https://cdn\.realtor\.ca/[^\s\"\'<>)]+\.(?:jpg|jpeg|webp|png)", html, _re2.IGNORECASE)
+            seen, urls = set(), []
+            for u in found:
+                if u not in seen and "lowres" not in u.lower():
+                    seen.add(u); urls.append(u)
+            if urls:
+                logger.info("realtor.ca HTML scrape found %d photos", len(urls))
+                return urls[:15]
+        except Exception as e:
+            logger.warning("realtor.ca HTML scrape failed: %s", e)
+        return []
+
     async def _fetch_listing_photos(self, listing_url: str) -> List[str]:
-        """Fetch high-resolution photo URLs from Zoocasa listing page using multiple extraction methods."""
+        """Fetch high-resolution photo URLs from a listing page (Zoocasa or realtor.ca)."""
         if not listing_url:
             return []
+
+        if "realtor.ca" in listing_url:
+            return await self._fetch_realtor_ca_photos(listing_url)
 
         try:
             async with httpx.AsyncClient(follow_redirects=True, timeout=20) as client:
