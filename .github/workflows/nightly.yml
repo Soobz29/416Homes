@@ -42,6 +42,7 @@ jobs:
     - run: pip install -r requirements.txt
     - name: Train valuation model
       env:
+        PYTHONPATH: ${{ github.workspace }}
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -63,6 +64,7 @@ jobs:
     - run: pip install -r requirements.txt
     - name: Run agent matching loop
       env:
+        PYTHONPATH: ${{ github.workspace }}
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
