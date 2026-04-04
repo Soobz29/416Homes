@@ -1,0 +1,24 @@
+# Video worker — AI + media processing stack
+# Railway service: video-worker
+# Start Command: python video_pipeline/worker.py
+# Install Command: pip install -r requirements-railway-video.txt
+# nixpacks still provides python312 + ffmpeg via nixpacks.toml
+
+python-dotenv==1.0.1
+
+# Database
+supabase>=2.28,<3
+
+# AI stack
+google-genai>=1.0.0,<2
+google-cloud-aiplatform>=1.45.0
+elevenlabs==1.54.0
+google-cloud-texttospeech>=2.16.0
+gtts>=2.5.0
+
+# HTTP / media helpers
+httpx>=0.28.1,<0.29
+requests==2.31.0
+beautifulsoup4==4.12.3
+aiohttp==3.9.3
+Pillow>=10.0.0
