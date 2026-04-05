@@ -967,16 +967,16 @@ export default function DashboardPage() {
         )}
       </main>
 
-      <footer className="border-t border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.8)] px-16 py-10 max-md:flex-col max-md:gap-3 max-md:px-6">
+      <footer className="flex items-center justify-between border-t border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.8)] px-16 py-10 max-md:flex-col max-md:gap-3 max-md:px-6">
         <div className="footer-logo text-[1.1rem] font-extrabold">
           <span className="text-[#c8a96e]">416</span>
-          Homes Dashboard
+          Homes
         </div>
-        <div className="footer-copy font-['DM Mono',monospace] text-[0.62rem] text-[#6b6b60]">
+        <div className="footer-copy font-['DM_Mono',monospace] text-[0.62rem] text-[#6b6b60]">
           Toronto Real Estate Intelligence Platform
         </div>
-        <div className="footer-copy font-['DM Mono',monospace] text-[0.62rem] text-[#6b6b60]">
-          © 2024 416Homes · Dashboard
+        <div className="footer-copy font-['DM_Mono',monospace] text-[0.62rem] text-[#6b6b60]">
+          © 2026 416Homes · All rights reserved
         </div>
       </footer>
     </div>
