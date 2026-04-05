@@ -83,54 +83,6 @@ jobs:
     needs: [scrape, train-model, agent]
     if: always()
     steps:
-    - name: Send success notification
-      if: ${{ needs.scrape.result == 'success' && needs.agent.result == 'success' && secrets.AGENT_EMAIL != '' }}
-      uses: dawidd6/action-send-mail@v3
-      with:
-        server_address: smtp.gmail.com
-        server_port: 587
-        username: ${{ secrets.EMAIL_USERNAME }}
-        password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: "✅ 416Homes Nightly Scraper Completed"
-        to: ${{ secrets.AGENT_EMAIL }}
-        from: "416Homes Bot <noreply@416homes.ca>"
-        body: |
-          The 416Homes nightly scraper has completed successfully.
-          
-          Time: Workflow run time
-          Workflow: ${{ github.workflow }}
-          Run ID: ${{ github.run_id }}
-          
-          All systems are operating normally.
-          
-          View detailed logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          
-          This is an automated notification from the 416Homes system.
-        
-    - name: Send failure notification
-      if: ${{ (needs.scrape.result == 'failure' || needs.agent.result == 'failure') && secrets.AGENT_EMAIL != '' }}
-      uses: dawidd6/action-send-mail@v3
-      with:
-        server_address: smtp.gmail.com
-        server_port: 587
-        username: ${{ secrets.EMAIL_USERNAME }}
-        password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: "🚨 416Homes Nightly Scraper Failed"
-        to: ${{ secrets.AGENT_EMAIL }}
-        from: "416Homes Bot <noreply@416homes.ca>"
-        body: |
-          The 416Homes nightly scraper has failed.
-          
-          Workflow: ${{ github.workflow }}
-          Run ID: ${{ github.run_id }}
-          Time: Workflow run time
-          Repository: ${{ github.repository }}
-          
-          Please check the GitHub Actions logs for details:
-          ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          
-          This is an automated alert from the 416Homes monitoring system.
-        
     - name: Create issue on critical failure
       if: ${{ needs.scrape.result == 'failure' || needs.agent.result == 'failure' }}
       uses: actions/github-script@v6
