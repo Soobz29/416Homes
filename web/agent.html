@@ -438,7 +438,15 @@
         }
     </style>
 </head>
-
+<script src="/auth.js"></script>
+<script>
+  if (window.Auth) {
+    window.Auth.init();
+    if (!window.Auth.isLoggedIn()) {
+      window.location.href = '/login';
+    }
+  }
+</script>
 <body>
     <header class="header">
         <div>
@@ -486,6 +494,10 @@
             <!-- Controls -->
             <div class="card">
                 <h3>Controls</h3>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>Agent Secret</label>
+                    <input type="password" id="agentSecret" placeholder="AGENT_SECRET value">
+                </div>
                 <button class="btn btn-start" id="btnStart" onclick="startAgent()">▶ Start Monitoring</button>
                 <button class="btn btn-stop" id="btnStop" onclick="stopAgent()" style="display:none">■ Stop
                     Agent</button>
@@ -576,10 +588,11 @@
                 auto_video_min_price: 1000000,
             };
 
+            const secret = document.getElementById('agentSecret').value.trim();
             try {
                 const resp = await fetch(`${API}/agent/start`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', ...(secret ? { 'x-agent-secret': secret } : {}) },
                     body: JSON.stringify(body),
                 });
                 const data = await resp.json();
@@ -594,8 +607,12 @@
 
         // ── Stop Agent ───────────────────────────────
         async function stopAgent() {
+            const secret = document.getElementById('agentSecret').value.trim();
             try {
-                const resp = await fetch(`${API}/agent/stop`, { method: 'POST' });
+                const resp = await fetch(`${API}/agent/stop`, {
+                    method: 'POST',
+                    headers: secret ? { 'x-agent-secret': secret } : {},
+                });
                 const data = await resp.json();
                 console.log('Agent stopped:', data);
                 updateUI(false);
