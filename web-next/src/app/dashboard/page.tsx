@@ -2,12 +2,17 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Listing, Valuation } from "@/types";
+import { Listing } from "@/types";
 import { fetchListings, fetchValuation } from "@/lib/api";
 import { getSession, signInWithEmail, signOut } from "@/lib/supabase";
 import { Alert, fetchAlerts, createAlert, updateAlert, deleteAlert, generateLinkCode, fetchMe } from "@/lib/alerts";
 import { DropdownSelect } from "@/components/DropdownSelect";
 import { ErrorBanner } from "@/components/ui/error-banner";
+import { SmoothToggle } from "@/components/ui/smooth-toggle";
+import { PulseBell } from "@/components/ui/pulse-bell";
+import { BouncingDots } from "@/components/ui/bouncing-dots";
+import { ExpandSearch } from "@/components/ui/expand-search";
+import { HoverCardWrapper } from "@/components/ui/hover-card-wrapper";
 
 const CITIES = [
   { value: "GTA", label: "All GTA" },
@@ -71,6 +76,10 @@ export default function DashboardPage() {
     propertyType: "",
   });
   const [listingsError, setListingsError] = useState<string | null>(null);
+  const [addressSearch, setAddressSearch] = useState("");
+  const [page, setPage] = useState(0);
+  const [totalListings, setTotalListings] = useState(0);
+  const PAGE_SIZE = 20;
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(false);
   const [alertsError, setAlertsError] = useState<string | null>(null);
@@ -88,14 +97,16 @@ export default function DashboardPage() {
   const [linkLoading, setLinkLoading] = useState(false);
   const [telegramLinked, setTelegramLinked] = useState(false);
   const [checkingLinked, setCheckingLinked] = useState(false);
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanMessage, setScanMessage] = useState<string | null>(null);
   const [meError, setMeError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
-
-  // Valuation form state
-  const [valForm, setValForm] = useState({ city: "Toronto", neighbourhood: "", bedrooms: "", bathrooms: "", sqft: "", listPrice: "" });
-  const [valResult, setValResult] = useState<Valuation | null>(null);
-  const [valLoading, setValLoading] = useState(false);
-  const [valError, setValError] = useState<string | null>(null);
+  const [valuationForm, setValuationForm] = useState({
+    neighbourhood: "", city: "Toronto", bedrooms: "", bathrooms: "", sqft: "", list_price: "",
+  });
+  const [valuationResult, setValuationResult] = useState<null | { estimated_value: number; confidence: number; price_per_sqft?: number; market_analysis: string }>(null);
+  const [valuationLoading, setValuationLoading] = useState(false);
+  const [valuationError, setValuationError] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -120,11 +131,33 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (activeTab === "listings") {
-      void loadListings();
+      setPage(0);
+      void loadListings(0);
     }
   }, [activeTab, filters]);
 
-  async function loadListings() {
+  useEffect(() => {
+    if (activeTab === "listings") {
+      void loadListings(page);
+    }
+  }, [page]);
+
+  async function triggerScan() {
+    setScanLoading(true);
+    setScanMessage(null);
+    try {
+      const apiBase = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
+      await fetch(`${apiBase}/api/initiate-scan`, { method: "POST" });
+      setScanMessage("Scan started — listings refresh in ~2 minutes.");
+      setTimeout(() => { setPage(0); void loadListings(0); }, 120_000);
+    } catch {
+      setScanMessage("Could not reach the API to start a scan.");
+    } finally {
+      setScanLoading(false);
+    }
+  }
+
+  async function loadListings(pg = 0) {
     try {
       setLoading(true);
       setListingsError(null);
@@ -133,8 +166,11 @@ export default function DashboardPage() {
         minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
         maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
         propertyTypes: filters.propertyType ? [filters.propertyType] : undefined,
+        limit: PAGE_SIZE,
+        offset: pg * PAGE_SIZE,
       });
       setListings(data.listings || []);
+      setTotalListings(data.total || 0);
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Failed to load listings.";
       setListingsError(msg);
@@ -289,27 +325,6 @@ export default function DashboardPage() {
     }
   }
 
-  async function handleValuate() {
-    setValLoading(true);
-    setValError(null);
-    setValResult(null);
-    try {
-      const result = await fetchValuation({
-        city: valForm.city,
-        neighbourhood: valForm.neighbourhood,
-        property_type: "Condo",
-        bedrooms: Number(valForm.bedrooms) || 0,
-        bathrooms: Number(valForm.bathrooms) || 0,
-        sqft: Number(valForm.sqft) || 0,
-        list_price: Number(valForm.listPrice) || 0,
-      });
-      setValResult(result);
-    } catch (e) {
-      setValError(e instanceof Error ? e.message : "Valuation failed.");
-    } finally {
-      setValLoading(false);
-    }
-  }
 
   return (
     <div className="min-h-screen bg-[#0B0B0B] text-[#f5f4ef]">
@@ -361,7 +376,7 @@ export default function DashboardPage() {
         <div className="mx-auto grid max-w-[1120px] items-center gap-8 md:grid-cols-[2fr,1.2fr]">
           <div>
             <p className="dashboard-hero-eyebrow mb-3 font-['DM Mono',monospace] text-[0.7rem] uppercase tracking-[0.18em] text-[#6b6b60]">
-              Toronto · Mississauga · GTA
+              GTA
             </p>
             <h1 className="dashboard-hero-title mb-3 font-display text-[clamp(2rem,3vw,2.8rem)] font-bold tracking-[-0.01em]">
               Your <span className="text-[#D4AF37]">GTA real estate</span> dashboard.
@@ -458,6 +473,18 @@ export default function DashboardPage() {
               </p>
             </div>
           </div>
+          <div className="mt-4 flex items-center gap-4">
+            <button
+              onClick={() => void triggerScan()}
+              disabled={scanLoading}
+              className="rounded border border-[rgba(200,169,110,0.4)] bg-transparent px-4 py-2 font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-[#c8a96e] transition-colors hover:bg-[rgba(200,169,110,0.1)] disabled:opacity-50"
+            >
+              {scanLoading ? "Scanning…" : "↻ Refresh Listings"}
+            </button>
+            {scanMessage && (
+              <span className="font-['DM_Mono',monospace] text-[0.68rem] text-[#6b6b60]">{scanMessage}</span>
+            )}
+          </div>
         </div>
       </section>
 
@@ -487,8 +514,15 @@ export default function DashboardPage() {
         {activeTab === "listings" && (
           <div className="tab-content">
             {/* Filters */}
-            <div className="card mb-6 border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.025)] p-6 backdrop-blur-md">
-              <h2 className="mb-4 text-[1.1rem] font-bold text-[#f5f4ef]">Search Filters</h2>
+            <div className="card relative z-10 mb-6 border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.025)] p-6 backdrop-blur-md">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-[1.1rem] font-bold text-[#f5f4ef]">Search Filters</h2>
+                <ExpandSearch
+                  value={addressSearch}
+                  onChange={setAddressSearch}
+                  placeholder="Search address…"
+                />
+              </div>
               <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
                 <DropdownSelect
                   options={CITIES}
@@ -529,8 +563,8 @@ export default function DashboardPage() {
                   placeholder="Any type"
                 />
                 <button
-                  onClick={loadListings}
-                  className="btn w-full bg-[#D4AF37] px-4 py-3 font-['Syne',sans-serif] text-[0.88rem] font-bold uppercase tracking-[0.05em] text-black hover:bg-[#F3E5AB]"
+                  onClick={() => loadListings(0)}
+                  className="btn gold-gradient gold-glow w-full px-4 py-3 font-['DM_Mono',monospace] text-[0.82rem] font-bold uppercase tracking-[0.08em] text-black transition-opacity hover:opacity-90"
                 >
                   Search
                 </button>
@@ -654,6 +688,10 @@ export default function DashboardPage() {
                   </button>
 
                   <div className="mt-4 border-t border-[rgba(212,175,55,0.2)] pt-3">
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.1em] text-[#6b6b60]">Active Alerts</span>
+                      <PulseBell count={alerts.filter(a => a.is_active).length} animate={alerts.some(a => a.is_active)} />
+                    </div>
                     {(alertsError || alertActionError) && (
                       <div className="mb-3">
                         <ErrorBanner
@@ -687,17 +725,10 @@ export default function DashboardPage() {
                               </div>
                             </div>
                             <div className="flex flex-shrink-0 flex-nowrap items-center gap-2 border-l border-[rgba(212,175,55,0.2)] pl-3">
-                              <button
-                                type="button"
-                                onClick={() => handleToggleAlert(a)}
-                                className={`rounded px-2 py-1 font-['DM Mono',monospace] text-[0.68rem] uppercase tracking-[0.1em] ${
-                                  a.is_active
-                                    ? "bg-[rgba(46,213,115,0.2)] text-[#2ed573]"
-                                    : "bg-[rgba(255,255,255,0.06)] text-[#6b6b60]"
-                                }`}
-                              >
-                                {a.is_active ? "On" : "Off"}
-                              </button>
+                              <SmoothToggle
+                                checked={a.is_active}
+                                onChange={() => handleToggleAlert(a)}
+                              />
                               <button
                                 type="button"
                                 onClick={() => handleDeleteAlert(a)}
@@ -728,13 +759,18 @@ export default function DashboardPage() {
             )}
             {loading ? (
               <div className="flex h-64 items-center justify-center">
-                <div className="loading-spinner h-10 w-10 animate-spin rounded-full border-[3px] border-[rgba(212,175,55,0.2)] border-t-[#D4AF37]" />
+                <BouncingDots />
               </div>
             ) : (
               <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-                {listings.map((l) => (
+                {listings
+                  .filter((l) =>
+                    !addressSearch ||
+                    (l.address || "").toLowerCase().includes(addressSearch.toLowerCase())
+                  )
+                  .map((l) => (
+                  <HoverCardWrapper key={l.id}>
                   <div
-                    key={l.id}
                     className="group overflow-hidden rounded-xl transition-transform duration-300 hover:scale-[1.02]"
                     style={{boxShadow: "0 0 0 1px rgba(212,175,55,0.2), 0 8px 32px rgba(0,0,0,0.4)"}}
                   >
@@ -786,7 +822,32 @@ export default function DashboardPage() {
                       </div>
                     </div>
                   </div>
+                  </HoverCardWrapper>
                 ))}
+              </div>
+            )}
+
+            {/* Pagination */}
+            {!loading && totalListings > PAGE_SIZE && (
+              <div className="mt-8 flex items-center justify-center gap-4">
+                <button
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  className="rounded border border-[rgba(200,169,110,0.4)] px-4 py-2 font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.08em] text-[#c8a96e] transition-colors hover:bg-[rgba(200,169,110,0.1)] disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  ← Prev
+                </button>
+                <span className="font-['DM_Mono',monospace] text-[0.7rem] text-[#6b6b60]">
+                  {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalListings)}{" "}
+                  <span className="text-[#c8a96e]">of {totalListings.toLocaleString()}</span>
+                </span>
+                <button
+                  disabled={(page + 1) * PAGE_SIZE >= totalListings}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="rounded border border-[rgba(200,169,110,0.4)] px-4 py-2 font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.08em] text-[#c8a96e] transition-colors hover:bg-[rgba(200,169,110,0.1)] disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  Next →
+                </button>
               </div>
             )}
           </div>
@@ -798,24 +859,20 @@ export default function DashboardPage() {
               <h2 className="mb-10 text-center font-display text-[clamp(2rem,3.5vw,3.5rem)] font-bold tracking-[-0.01em]">
                 Property Valuation
               </h2>
-
-              {/* Form inputs — bottom-border only style */}
               <div className="glass-panel p-8">
                 <div className="mb-6 grid gap-6 md:grid-cols-3">
                   {[
                     { label: "City", key: "city", placeholder: "Toronto" },
                     { label: "Neighbourhood", key: "neighbourhood", placeholder: "King West" },
-                    { label: "Bedrooms", key: "bedrooms", placeholder: "3", type: "number" },
-                  ].map(({ label, key, placeholder, type }) => (
+                    { label: "Bedrooms", key: "bedrooms", placeholder: "3" },
+                  ].map(({ label, key, placeholder }) => (
                     <div key={key}>
-                      <label className="mb-2 block font-[‘DM_Mono’,monospace] text-[0.6rem] uppercase tracking-[0.15em] text-[#6b6b60]">
-                        {label}
-                      </label>
+                      <label className="mb-2 block font-[‘DM_Mono’,monospace] text-[0.6rem] uppercase tracking-[0.15em] text-[#6b6b60]">{label}</label>
                       <input
-                        type={type ?? "text"}
+                        type="text"
                         placeholder={placeholder}
-                        value={valForm[key as keyof typeof valForm]}
-                        onChange={(e) => setValForm({ ...valForm, [key]: e.target.value })}
+                        value={valuationForm[key as keyof typeof valuationForm]}
+                        onChange={e => setValuationForm(f => ({ ...f, [key]: e.target.value }))}
                         className="w-full border-0 border-b border-[rgba(212,175,55,0.3)] bg-transparent pb-2 font-[‘DM_Mono’,monospace] text-[0.95rem] text-[#f5f4ef] outline-none transition-colors placeholder:text-[#3a3a32] focus:border-[#D4AF37]"
                       />
                     </div>
@@ -823,66 +880,67 @@ export default function DashboardPage() {
                 </div>
                 <div className="mb-8 grid gap-6 md:grid-cols-3">
                   {[
-                    { label: "Bathrooms", key: "bathrooms", placeholder: "2", type: "number" },
-                    { label: "Sq Ft", key: "sqft", placeholder: "1200", type: "number" },
-                    { label: "List Price", key: "listPrice", placeholder: "750000", type: "number" },
-                  ].map(({ label, key, placeholder, type }) => (
+                    { label: "Bathrooms", key: "bathrooms", placeholder: "2" },
+                    { label: "Sq Ft", key: "sqft", placeholder: "1200" },
+                    { label: "List Price", key: "list_price", placeholder: "750000" },
+                  ].map(({ label, key, placeholder }) => (
                     <div key={key}>
-                      <label className="mb-2 block font-[‘DM_Mono’,monospace] text-[0.6rem] uppercase tracking-[0.15em] text-[#6b6b60]">
-                        {label}
-                      </label>
+                      <label className="mb-2 block font-[‘DM_Mono’,monospace] text-[0.6rem] uppercase tracking-[0.15em] text-[#6b6b60]">{label}</label>
                       <input
-                        type={type}
+                        type="text"
                         placeholder={placeholder}
-                        value={valForm[key as keyof typeof valForm]}
-                        onChange={(e) => setValForm({ ...valForm, [key]: e.target.value })}
+                        value={valuationForm[key as keyof typeof valuationForm]}
+                        onChange={e => setValuationForm(f => ({ ...f, [key]: e.target.value }))}
                         className="w-full border-0 border-b border-[rgba(212,175,55,0.3)] bg-transparent pb-2 font-[‘DM_Mono’,monospace] text-[0.95rem] text-[#f5f4ef] outline-none transition-colors placeholder:text-[#3a3a32] focus:border-[#D4AF37]"
                       />
                     </div>
                   ))}
                 </div>
-
                 <button
-                  onClick={handleValuate}
-                  disabled={valLoading}
+                  disabled={valuationLoading}
                   className="gold-gradient gold-glow w-full py-4 font-[‘DM_Mono’,monospace] text-[0.82rem] font-bold uppercase tracking-[0.15em] text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={async () => {
+                    setValuationLoading(true);
+                    setValuationError(null);
+                    setValuationResult(null);
+                    try {
+                      const result = await fetchValuation({
+                        neighbourhood: valuationForm.neighbourhood,
+                        property_type: "",
+                        city: valuationForm.city,
+                        bedrooms: Number(valuationForm.bedrooms) || 0,
+                        bathrooms: Number(valuationForm.bathrooms) || 0,
+                        sqft: Number(valuationForm.sqft) || 0,
+                        list_price: Number(valuationForm.list_price) || 0,
+                      });
+                      setValuationResult(result);
+                    } catch {
+                      setValuationError("Valuation failed — check API connection.");
+                    } finally {
+                      setValuationLoading(false);
+                    }
+                  }}
                 >
-                  {valLoading ? "Analysing…" : "Get Valuation"}
+                  {valuationLoading ? "Analysing…" : "Get Valuation"}
                 </button>
-
-                {valError && (
-                  <p className="mt-4 text-center font-[‘DM_Mono’,monospace] text-[0.75rem] text-[#e07060]">{valError}</p>
+                {valuationError && (
+                  <p className="mt-4 text-center font-[‘DM_Mono’,monospace] text-[0.75rem] text-[#e07060]">{valuationError}</p>
                 )}
               </div>
-
-              {/* Result */}
-              {valResult && (
+              {valuationResult && (
                 <div className="mt-6 glass-panel p-6" style={{boxShadow: "0 0 0 1px rgba(212,175,55,0.3), 0 0 20px rgba(212,175,55,0.1)"}}>
                   <div className="mb-4 flex items-baseline gap-3">
                     <span className="font-display text-[2.5rem] font-bold text-[#D4AF37]">
-                      ${valResult.estimated_value.toLocaleString()}
+                      ${valuationResult.estimated_value.toLocaleString()}
                     </span>
                     <span className="font-[‘DM_Mono’,monospace] text-[0.7rem] uppercase tracking-[0.1em] text-[#6b6b60]">
-                      Estimated value · {Math.round(valResult.confidence * 100)}% confidence
+                      Estimated value · {Math.round(valuationResult.confidence * 100)}% confidence
                     </span>
                   </div>
-                  {valResult.market_analysis && (
+                  {valuationResult.market_analysis && (
                     <p className="font-[‘DM_Mono’,monospace] text-[0.78rem] leading-relaxed text-[#6b6b60]">
-                      {valResult.market_analysis}
+                      {valuationResult.market_analysis}
                     </p>
-                  )}
-                  {valResult.comparable_sales && valResult.comparable_sales.length > 0 && (
-                    <div className="mt-4 border-t border-[rgba(212,175,55,0.15)] pt-4">
-                      <div className="mb-2 font-[‘DM_Mono’,monospace] text-[0.6rem] uppercase tracking-[0.12em] text-[#D4AF37]">
-                        Comparable Sales
-                      </div>
-                      {valResult.comparable_sales.map((c, i) => (
-                        <div key={i} className="flex justify-between py-1.5 border-b border-[rgba(255,255,255,0.05)] font-[‘DM_Mono’,monospace] text-[0.72rem]">
-                          <span className="text-[#f5f4ef]">{c.address}</span>
-                          <span className="text-[#D4AF37]">${c.price.toLocaleString()}</span>
-                        </div>
-                      ))}
-                    </div>
                   )}
                 </div>
               )}
@@ -912,16 +970,16 @@ export default function DashboardPage() {
         )}
       </main>
 
-      <footer className="border-t border-[rgba(212,175,55,0.2)] bg-[rgba(10,10,8,0.8)] px-16 py-10 max-md:flex-col max-md:gap-3 max-md:px-6">
+      <footer className="flex items-center justify-between border-t border-[rgba(212,175,55,0.2)] bg-[rgba(10,10,8,0.8)] px-16 py-10 max-md:flex-col max-md:gap-3 max-md:px-6">
         <div className="footer-logo text-[1.1rem] font-extrabold">
           <span className="text-[#D4AF37]">416</span>
           Homes Dashboard
         </div>
-        <div className="footer-copy font-['DM Mono',monospace] text-[0.62rem] text-[#6b6b60]">
+        <div className="footer-copy font-['DM_Mono',monospace] text-[0.62rem] text-[#6b6b60]">
           Toronto Real Estate Intelligence Platform
         </div>
-        <div className="footer-copy font-['DM Mono',monospace] text-[0.62rem] text-[#6b6b60]">
-          © 2024 416Homes · Dashboard
+        <div className="footer-copy font-['DM_Mono',monospace] text-[0.62rem] text-[#6b6b60]">
+          © 2026 416Homes · All rights reserved
         </div>
       </footer>
     </div>

@@ -5,18 +5,31 @@ from datetime import datetime
 from supabase import create_client, Client
 from dotenv import load_dotenv
 import os
+
+# google-genai is NOT imported at module level — lazy-loaded on first embedding call
+# to keep API server startup memory low (~100MB instead of ~400MB).
 _genai = None
 _GENAI_SDK = "none"
-try:
-    # New Gemini SDK (package: google-genai)
-    from google import genai as _genai  # type: ignore
-    _GENAI_SDK = "google-genai"
-except Exception:  # pragma: no cover
+_genai_loaded = False
+
+def _load_genai():
+    """Import google-genai once, on first use."""
+    global _genai, _GENAI_SDK, _genai_loaded
+    if _genai_loaded:
+        return
+    _genai_loaded = True
     try:
-        # Legacy Gemini SDK (package: google-generativeai)
-        import google.generativeai as _genai  # type: ignore
+        from google import genai as _g  # type: ignore
+        _genai = _g
+        _GENAI_SDK = "google-genai"
+        return
+    except Exception:
+        pass
+    try:
+        import google.generativeai as _g  # type: ignore
+        _genai = _g
         _GENAI_SDK = "google-generativeai"
-    except Exception:  # pragma: no cover
+    except Exception:
         _genai = None
         _GENAI_SDK = "none"
 
@@ -45,21 +58,30 @@ class MemoryStore:
                 logger.error("Failed to create Supabase client: %s", e)
                 self.supabase = None
         
-        # Initialize Gemini for embeddings. New SDK (google-genai) uses gemini-embedding-001; legacy uses text-embedding-004.
-        self.embedding_model_id = os.getenv("GEMINI_EMBEDDING_MODEL") or (
-            "gemini-embedding-001" if _GENAI_SDK == "google-genai" else "text-embedding-004"
-        )
-        self.client = None
+        # Gemini client — lazy, initialised on first embedding call via _ensure_genai_client()
+        self._gemini_api_key = os.getenv("GEMINI_API_KEY")
+        self.embedding_model_id = os.getenv("GEMINI_EMBEDDING_MODEL") or "gemini-embedding-001"
+        self.client = None  # set on first use
+
+        # In-memory LRU cache for embeddings (text → vector), avoids redundant API calls
+        self._embedding_cache: Dict[str, List[float]] = {}
+
+    def _ensure_genai_client(self):
+        """Lazy-init the Gemini client — imports google-genai only on first call."""
+        if self.client is not None:
+            return
+        _load_genai()
         try:
-            api_key = os.getenv("GEMINI_API_KEY")
             if _GENAI_SDK == "google-genai" and _genai is not None:
-                self.client = _genai.Client(api_key=api_key)
+                self.client = _genai.Client(api_key=self._gemini_api_key)
+                self.embedding_model_id = os.getenv("GEMINI_EMBEDDING_MODEL") or "gemini-embedding-001"
             elif _GENAI_SDK == "google-generativeai" and _genai is not None:
-                # google-generativeai uses global configure()
-                _genai.configure(api_key=api_key)
+                _genai.configure(api_key=self._gemini_api_key)
+                self.client = _genai
+                self.embedding_model_id = os.getenv("GEMINI_EMBEDDING_MODEL") or "text-embedding-004"
         except Exception as e:
             logger.warning("Gemini client init failed (%s): %s", _GENAI_SDK, e)
-    
+
     @staticmethod
     def _safe_scalar(value: Any, default: Any = None, prefer_int: bool = False) -> Any:
         """Coerce value to a scalar for DB (no dicts/lists). For int columns use prefer_int=True."""
@@ -141,7 +163,7 @@ class MemoryStore:
             "price": price,
             "bedrooms": bedrooms if not isinstance(bedrooms, dict) else "",
             "bathrooms": bathrooms if not isinstance(bathrooms, dict) else "",
-            "sqft": sqft,
+            "area": sqft,
             "property_type": str(listing.get("property_type", "Unknown") or "Unknown"),
             "days_on_market": days_on_market,
             "listing_agent_email": listing.get("listing_agent_email"),
@@ -165,7 +187,7 @@ class MemoryStore:
             "list_price": comp.get("list_price"),
             "bedrooms": comp.get("bedrooms", ""),
             "bathrooms": comp.get("bathrooms", ""),
-            "sqft": comp.get("area", comp.get("sqft", "0")),  # Map area → sqft
+            "area": comp.get("area", comp.get("sqft", "0")),
             "property_type": comp.get("property_type", "Unknown"),
             "sold_date": comp.get("sold_date"),
             "days_on_market": comp.get("days_on_market", 0),
@@ -175,10 +197,25 @@ class MemoryStore:
         }
     
     async def embed_text(self, text: str) -> List[float]:
-        """Generate embedding for text using Gemini"""
+        """Generate embedding for text using Gemini (in-memory LRU cache, 1024 entries)."""
+        if not text:
+            return [0.0] * 768
+        if text in self._embedding_cache:
+            return self._embedding_cache[text]
+        embedding = await self._embed_text_uncached(text)
+        if len(self._embedding_cache) >= 1024:
+            # Evict oldest entry
+            self._embedding_cache.pop(next(iter(self._embedding_cache)))
+        self._embedding_cache[text] = embedding
+        return embedding
+
+    async def _embed_text_uncached(self, text: str) -> List[float]:
+        """Internal: call Gemini API without caching. Lazily loads google-genai on first call."""
         try:
             if not text:
                 return [0.0] * 768
+
+            self._ensure_genai_client()
 
             if _GENAI_SDK == "google-genai":
                 if not self.client:
@@ -189,7 +226,6 @@ class MemoryStore:
                 response = self.client.models.embed_content(**kwargs)
                 embedding = list(response.embeddings[0].values) if response.embeddings else []
             elif _GENAI_SDK == "google-generativeai" and _genai is not None:
-                # google-generativeai API
                 resp = _genai.embed_content(
                     model=f"models/{self.embedding_model_id}",
                     content=text,
@@ -223,7 +259,7 @@ class MemoryStore:
             {normalised['address']}
             {normalised['bedrooms']} bedrooms
             {normalised['bathrooms']} bathrooms
-            {normalised['sqft']} sqft
+            {normalised['area']} sqft
             ${normalised['price']:,}
             {normalised['source']}
             """.strip()

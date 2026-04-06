@@ -114,6 +114,51 @@ def _realtor_post_via_curl_cffi(headers: dict, data: dict) -> tuple[int, dict | 
         logger.debug(f"curl_cffi realtor API failed: {e}")
         return 0, None
 
+def _parse_sqft(raw: str) -> str:
+    """Parse SizeInterior string like '1,200 sq ft' or '111.5 m2' into a sqft integer string."""
+    if not raw:
+        return ""
+    # Already a plain number
+    m = re.search(r"([\d,]+(?:\.\d+)?)", str(raw).replace(" ", ""))
+    if not m:
+        return ""
+    try:
+        value = float(m.group(1).replace(",", ""))
+        # If the unit mentions m2/sqm, convert to sqft
+        if re.search(r"m.?2|sqm", str(raw), re.IGNORECASE):
+            value = value * 10.7639
+        return str(int(value)) if value > 0 else ""
+    except Exception:
+        return ""
+
+
+def _parse_listing_item(item: dict, region_name: str) -> dict | None:
+    """Parse a single Realtor.ca API result item into a listing dict."""
+    mls = item.get("MlsNumber", "")
+    price_raw = item.get("Property", {}).get("Price", "0")
+    try:
+        price = int(str(price_raw).replace("$", "").replace(",", "").replace(" ", "").strip())
+    except Exception:
+        price = 0
+    if price < 100000:
+        return None
+    addr_obj = item.get("Property", {}).get("Address", {})
+    address_text = addr_obj.get("AddressText", "Unknown Address")
+    return {
+        "id": f"realtor_ca_{mls}",
+        "source": "realtor_ca",
+        "region": region_name,
+        "url": f"https://www.realtor.ca{item.get('RelativeDetailsURL', '')}",
+        "address": pick_display_address(address_text.replace("Just listed", "").strip() or None),
+        "city": region_name.split(" (")[0] if " (" in region_name else region_name,
+        "price": price,
+        "bedrooms": item.get("Building", {}).get("Bedrooms", ""),
+        "bathrooms": item.get("Building", {}).get("BathroomTotal", ""),
+        "sqft": _parse_sqft(item.get("Building", {}).get("SizeInterior", "")),
+        "scraped_at": datetime.utcnow().isoformat(),
+    }
+
+
 GTA_REGIONS = {
     "Toronto Downtown": {
         "LatitudeMin": "43.63", "LatitudeMax": "43.70",
@@ -250,194 +295,67 @@ async def _post_search(client: httpx.AsyncClient, headers: dict, data: dict) -> 
     )
 
 async def _scrape_region(client, headers: dict, name: str, coords: dict, min_price: int, max_price: int) -> list:
-    """Scrapes a single bounding box region using the shared client."""
+    """Scrapes a single bounding box region. Tries curl_cffi (Chrome impersonation) first
+    to avoid Cloudflare 403s, then falls back to plain httpx."""
     listings = []
+    payload = {
+        "CultureId": "1",
+        "ApplicationId": "1",
+        "RecordsPerPage": "50",
+        "MaximumResults": "50",
+        "LatitudeMin": coords["LatitudeMin"],
+        "LatitudeMax": coords["LatitudeMax"],
+        "LongitudeMin": coords["LongitudeMin"],
+        "LongitudeMax": coords["LongitudeMax"],
+        "PriceMin": str(min_price),
+        "PriceMax": str(max_price),
+        "TransactionTypeId": "2",
+        "PropertySearchTypeId": "1",
+        "PropertyTypeGroupID": "1",
+        "Version": "7.0",
+        "CurrentPage": "1",
+    }
+
+    # ── Primary: curl_cffi Chrome impersonation (bypasses Cloudflare) ──────────
+    if _curl_cffi_available():
+        try:
+            status, data = await asyncio.to_thread(
+                _realtor_post_via_curl_cffi, headers, payload
+            )
+            if status == 200 and isinstance(data, dict):
+                for item in data.get("Results", []) or []:
+                    listing = _parse_listing_item(item, name)
+                    if listing:
+                        listings.append(listing)
+                if listings:
+                    await REQ_STATS.record_success(REALTOR_DOMAIN)
+                    logger.info(f"realtor_ca curl_cffi {name}: {len(listings)} listings")
+                    return listings
+            elif status == 403:
+                logger.warning(f"curl_cffi still 403 for {name} — will try httpx")
+        except Exception as e:
+            logger.debug(f"curl_cffi primary failed for {name}: {e}")
+
+    # ── Fallback: plain httpx ──────────────────────────────────────────────────
     try:
         await RATE_LIMITER.acquire(REALTOR_DOMAIN)
-        resp = await _post_search(
-            client,
-            headers,
-            {
-                "CultureId": "1",
-                "ApplicationId": "1",
-                "RecordsPerPage": "50",
-                "MaximumResults": "50",
-                "LatitudeMin": coords["LatitudeMin"],
-                "LatitudeMax": coords["LatitudeMax"],
-                "LongitudeMin": coords["LongitudeMin"],
-                "LongitudeMax": coords["LongitudeMax"],
-                "PriceMin": str(min_price),
-                "PriceMax": str(max_price),
-                "TransactionTypeId": "2",
-                "PropertySearchTypeId": "1",
-                "PropertyTypeGroupID": "1",
-                "Version": "7.0",
-                "CurrentPage": "1",
-            },
-        )
+        resp = await _post_search(client, headers, payload)
 
         if resp.status_code != 200:
-            logger.error(f"Region {name} failed with status {resp.status_code}")
+            logger.error(f"Region {name} httpx failed with status {resp.status_code}")
             if resp.status_code in (403, 429):
                 await REQ_STATS.record_block(REALTOR_DOMAIN, resp.status_code)
-
-            # Hybrid fallback: try the same API call with curl_cffi impersonation.
-            if resp.status_code == 403 and _curl_cffi_available():
-                status, data = await asyncio.to_thread(
-                    _realtor_post_via_curl_cffi,
-                    headers,
-                    {
-                        "CultureId": "1",
-                        "ApplicationId": "1",
-                        "RecordsPerPage": "50",
-                        "MaximumResults": "50",
-                        "LatitudeMin": coords["LatitudeMin"],
-                        "LatitudeMax": coords["LatitudeMax"],
-                        "LongitudeMin": coords["LongitudeMin"],
-                        "LongitudeMax": coords["LongitudeMax"],
-                        "PriceMin": str(min_price),
-                        "PriceMax": str(max_price),
-                        "TransactionTypeId": "2",
-                        "PropertySearchTypeId": "1",
-                        "PropertyTypeGroupID": "1",
-                        "Version": "7.0",
-                        "CurrentPage": "1",
-                    },
-                )
-                if status == 200 and isinstance(data, dict):
-                    results = data.get("Results", []) or []
-                    for item in results:
-                        mls = item.get("MlsNumber", "")
-                        price_raw = item.get("Property", {}).get("Price", "0")
-                        try:
-                            price = int(
-                                str(price_raw)
-                                .replace("$", "")
-                                .replace(",", "")
-                                .replace(" ", "")
-                                .strip()
-                            )
-                        except Exception:
-                            price = 0
-                        addr_obj = item.get("Property", {}).get("Address", {})
-                        address_text = addr_obj.get("AddressText", "Unknown Address")
-                        if price >= 100000:
-                            listings.append(
-                                {
-                                    "id": f"realtor_ca_{mls}",
-                                    "source": "realtor_ca",
-                                    "region": name,
-                                    "url": f"https://www.realtor.ca{item.get('RelativeDetailsURL', '')}",
-                                    "address": pick_display_address(address_text.replace("Just listed", "").strip() or None),
-                                    "city": name.split(" (")[0] if " (" in name else name,
-                                    "price": price,
-                                    "bedrooms": item.get("Building", {}).get("Bedrooms", ""),
-                                    "bathrooms": item.get("Building", {}).get("BathroomTotal", ""),
-                                    "sqft": "",
-                                    "scraped_at": datetime.utcnow().isoformat(),
-                                }
-                            )
-                    if listings:
-                        await REQ_STATS.record_success(REALTOR_DOMAIN)
-                        return listings
-
-            return []
+            return listings
 
         await REQ_STATS.record_success(REALTOR_DOMAIN)
-
-        data = resp.json()
-        results = data.get("Results", [])
-        for item in results:
-            mls = item.get("MlsNumber", "")
-            price_raw = item.get("Property", {}).get("Price", "0")
-            try:
-                price = int(price_raw.replace("$", "").replace(",", "").replace(" ", "").strip())
-            except:
-                price = 0
-            
-            addr_obj = item.get("Property", {}).get("Address", {})
-            address_text = addr_obj.get("AddressText", "Unknown Address")
-            
-            if price >= 100000:
-                listings.append({
-                    "id": f"realtor_ca_{mls}",
-                    "source": "realtor_ca",
-                    "region": name,
-                    "url": f"https://www.realtor.ca{item.get('RelativeDetailsURL', '')}",
-                    "address": pick_display_address(address_text.replace("Just listed", "").strip() or None),
-                    "city": name.split(' (')[0] if ' (' in name else name,
-                    "price": price,
-                    "bedrooms": item.get("Building", {}).get("Bedrooms", ""),
-                    "bathrooms": item.get("Building", {}).get("BathroomTotal", ""),
-                    "sqft": "",
-                    "scraped_at": datetime.utcnow().isoformat(),
-                })
+        for item in (resp.json().get("Results", []) or []):
+            listing = _parse_listing_item(item, name)
+            if listing:
+                listings.append(listing)
+        logger.info(f"realtor_ca httpx {name}: {len(listings)} listings")
     except Exception as e:
-        logger.error(f"Region {name} scraping failed: {e}")
+        logger.error(f"Region {name} httpx scraping failed: {e}")
 
-        # If async_retry raised on repeated 403, try curl_cffi impersonation once.
-        if "returned 403" in str(e) and _curl_cffi_available():
-            try:
-                status, data = await asyncio.to_thread(
-                    _realtor_post_via_curl_cffi,
-                    headers,
-                    {
-                        "CultureId": "1",
-                        "ApplicationId": "1",
-                        "RecordsPerPage": "50",
-                        "MaximumResults": "50",
-                        "LatitudeMin": coords["LatitudeMin"],
-                        "LatitudeMax": coords["LatitudeMax"],
-                        "LongitudeMin": coords["LongitudeMin"],
-                        "LongitudeMax": coords["LongitudeMax"],
-                        "PriceMin": str(min_price),
-                        "PriceMax": str(max_price),
-                        "TransactionTypeId": "2",
-                        "PropertySearchTypeId": "1",
-                        "PropertyTypeGroupID": "1",
-                        "Version": "7.0",
-                        "CurrentPage": "1",
-                    },
-                )
-                if status == 200 and isinstance(data, dict):
-                    results = data.get("Results", []) or []
-                    for item in results:
-                        mls = item.get("MlsNumber", "")
-                        price_raw = item.get("Property", {}).get("Price", "0")
-                        try:
-                            price = int(
-                                str(price_raw)
-                                .replace("$", "")
-                                .replace(",", "")
-                                .replace(" ", "")
-                                .strip()
-                            )
-                        except Exception:
-                            price = 0
-
-                        addr_obj = item.get("Property", {}).get("Address", {})
-                        address_text = addr_obj.get("AddressText", "Unknown Address")
-                        if price >= 100000:
-                            listings.append(
-                                {
-                                    "id": f"realtor_ca_{mls}",
-                                    "source": "realtor_ca",
-                                    "region": name,
-                                    "url": f"https://www.realtor.ca{item.get('RelativeDetailsURL', '')}",
-                                    "address": pick_display_address(address_text.replace("Just listed", "").strip() or None),
-                                    "city": name.split(" (")[0] if " (" in name else name,
-                                    "price": price,
-                                    "bedrooms": item.get("Building", {}).get("Bedrooms", ""),
-                                    "bathrooms": item.get("Building", {}).get("BathroomTotal", ""),
-                                    "sqft": "",
-                                    "scraped_at": datetime.utcnow().isoformat(),
-                                }
-                            )
-                    if listings:
-                        await REQ_STATS.record_success(REALTOR_DOMAIN)
-            except Exception as e2:
-                logger.debug(f"curl_cffi realtor fallback in except failed: {e2}")
-        
     return listings
 
 async def scrape_listing_details(url: str) -> dict:

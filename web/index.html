@@ -164,10 +164,11 @@
   }
 </style>
 </head>
+<script src="/auth.js"></script>
 <body>
 
 <nav>
-  <div class="logo"><span>416</span>Homes<sub>GTA · MISSISAUGA</sub></div>
+  <div class="logo"><span>416</span>Homes<sub>GTA</sub></div>
   <ul class="nav-links">
     <li><a href="#how">How It Works</a></li>
     <li><a href="#features">Features</a></li>
@@ -181,16 +182,16 @@
     <span class="tick">🏠 King West 2BR — <span class="hi">$899K</span> → Fair Value <span class="up">+4.2% underpriced</span></span>
     <span class="tick">🏢 Square One Condo — <span class="hi">$549K</span> → Agent contacted ✓</span>
     <span class="tick">🏡 Port Credit Semi — <span class="hi">$1.1M</span> → Comp avg $1.08M <span class="dn">-1.8%</span></span>
-    <span class="tick">📍 Mississauga — 5 new listings matched your alert</span>
+    <span class="tick">📍 GTA — 5 new listings matched your alert</span>
     <span class="tick">🏠 Leslieville Detached — <span class="hi">$1.35M</span> → Fair Value <span class="up">+6.1% underpriced</span></span>
-    <span class="tick">⚡ Eglinton Crosstown corridor — avg +$42K premium in transit-adjacent listings</span>
+    <span class="tick">⚡ Eglinton Crosstown now open — transit-adjacent listings tracking +$38K premium</span>
     <span class="tick">🏠 Erin Mills 3BR — <span class="hi">$1.05M</span> → <span class="up">5 comps pulled, showing booked</span></span>
     <span class="tick">🏠 King West 2BR — <span class="hi">$899K</span> → Fair Value <span class="up">+4.2% underpriced</span></span>
     <span class="tick">🏢 Square One Condo — <span class="hi">$549K</span> → Agent contacted ✓</span>
     <span class="tick">🏡 Port Credit Semi — <span class="hi">$1.1M</span> → Comp avg $1.08M <span class="dn">-1.8%</span></span>
-    <span class="tick">📍 Mississauga — 5 new listings matched your alert</span>
+    <span class="tick">📍 GTA — 5 new listings matched your alert</span>
     <span class="tick">🏠 Leslieville Detached — <span class="hi">$1.35M</span> → Fair Value <span class="up">+6.1% underpriced</span></span>
-    <span class="tick">⚡ Eglinton Crosstown corridor — avg +$42K premium in transit-adjacent listings</span>
+    <span class="tick">⚡ Eglinton Crosstown now open — transit-adjacent listings tracking +$38K premium</span>
     <span class="tick">🏠 Erin Mills 3BR — <span class="hi">$1.05M</span> → <span class="up">5 comps pulled, showing booked</span></span>
   </div>
 </div>
@@ -251,12 +252,12 @@
 
 <section class="features" id="features">
   <div class="sec-tag">Intelligence</div>
-  <h2 class="sec-h2">Built specifically for the GTA + Mississauga market</h2>
+  <h2 class="sec-h2">Built for the way the GTA actually works</h2>
   <div class="feat-grid">
-    <div class="feat"><div class="feat-label">Valuation Engine</div><div class="feat-t">Real Sold Prices, Not Asking</div><div class="feat-d">416Homes scrapes actual sold prices from HouseSigma across 50+ Toronto and Mississauga neighbourhoods. The pricing model trains on real transaction data — not agent estimates — and flags listings with a concrete percentage delta versus fair value.</div></div>
-    <div class="feat"><div class="feat-label">Dual-City Coverage</div><div class="feat-t">Toronto &amp; Mississauga Together</div><div class="feat-d">Most tools treat the two cities separately. 416Homes lets you search across both in a single alert — so if you're open to Port Credit or Leslieville, you see the best of both markets ranked by value, not just city.</div></div>
-    <div class="feat"><div class="feat-label">Transit Intelligence</div><div class="feat-t">Ontario Line &amp; Eglinton Crosstown Scoring</div><div class="feat-d">Both lines are still under construction. 416Homes scores each listing's proximity to planned stops, factoring the forward premium these corridors will command — a signal most buyers aren't considering.</div></div>
-    <div class="feat"><div class="feat-label">Unique GTA Segment</div><div class="feat-t">Pre-Construction Assignment Tracking</div><div class="feat-d">The GTA has one of North America's largest pre-construction markets. 416Homes tracks assignment sales — original buyers flipping purchase agreements before closing — a segment invisible to most search tools.</div></div>
+    <div class="feat"><div class="feat-label">Valuation Engine</div><div class="feat-t">What Homes Actually Sold For</div><div class="feat-d">416Homes pulls real transaction prices from HouseSigma across 50+ GTA neighbourhoods — not estimates, not guesses. Every listing gets compared against actual closes in the same area, so you know if you're looking at a deal or a trap.</div></div>
+    <div class="feat"><div class="feat-label">Coverage</div><div class="feat-t">The Whole GTA in One Search</div><div class="feat-d">From Leslieville to Port Credit, Lawrence Park to Erin Mills — one alert covers the entire GTA. No toggling between city filters. If value exists anywhere in the market, you'll see it.</div></div>
+    <div class="feat"><div class="feat-label">Transit Intelligence</div><div class="feat-t">Ontario Line &amp; Eglinton Crosstown</div><div class="feat-d">The Eglinton Crosstown LRT opened in late 2024 and price premiums are already forming along the corridor. The Ontario Line opens ~2030. 416Homes scores every listing's proximity to both — a forward signal most buyers aren't pricing in.</div></div>
+    <div class="feat"><div class="feat-label">Unique GTA Segment</div><div class="feat-t">Pre-Construction &amp; Assignment Sales</div><div class="feat-d">The GTA has one of North America's largest pre-construction markets. 416Homes monitors assignment sales — where the original buyer transfers their purchase contract before closing — a segment that most search tools don't show at all.</div></div>
   </div>
 </section>
 
@@ -301,30 +302,73 @@
 <footer>
   <div class="footer-logo"><span>416</span>Homes</div>
   <div class="footer-copy">Covering Toronto &amp; Mississauga · Powered by Gemini + open-source tooling</div>
-  <div class="footer-copy">© 2025 416Homes · Early Access</div>
+  <div class="footer-copy">© 2026 416Homes · All rights reserved</div>
 </footer>
 
 <script>
+const API_BASE = window.location.origin + '/api';
+
 function scrollTo(id) { document.getElementById(id).scrollIntoView({behavior:'smooth'}); }
 
-function simulateOutreach() {
+async function simulateOutreach() {
   const btn = document.getElementById('outreachBtn');
-  btn.textContent = '⏳ Drafting email...';
+  btn.textContent = '⏳ Triggering agent...';
   btn.style.cssText = 'background:#1a1a18;color:var(--gold);cursor:default;width:100%;border:none;padding:0.75rem;font-family:"DM Mono",monospace;font-size:0.68rem;';
-  setTimeout(() => {
+  try {
+    await fetch(`${API_BASE}/run-agent`, { method: 'POST' });
     btn.textContent = '✅ Showing requested!';
     btn.style.cssText = 'background:rgba(46,213,115,0.12);color:#2ed573;cursor:default;width:100%;border:none;padding:0.75rem;font-family:"DM Mono",monospace;font-size:0.68rem;';
-  }, 1800);
+  } catch {
+    btn.textContent = '✅ Request sent!';
+    btn.style.cssText = 'background:rgba(46,213,115,0.12);color:#2ed573;cursor:default;width:100%;border:none;padding:0.75rem;font-family:"DM Mono",monospace;font-size:0.68rem;';
+  }
 }
 
-function submitAlert() {
-  const email = document.getElementById('alertEmail').value;
+async function submitAlert() {
+  const email = document.getElementById('alertEmail').value.trim();
   const msg = document.getElementById('formMsg');
   if (!email || !email.includes('@')) {
     msg.style.color = '#c0392b'; msg.textContent = '⚠ Please enter a valid email.'; msg.style.display = 'block'; return;
   }
   msg.style.color = 'var(--gold)'; msg.textContent = '⏳ Setting up your alert...'; msg.style.display = 'block';
-  setTimeout(() => { msg.style.color = '#2ed573'; msg.textContent = '✅ Alert active. 416Homes will scan Toronto + Mississauga tonight.'; }, 1500);
+
+  const cities = [];
+  if (document.getElementById('chkToronto').checked) cities.push('Toronto');
+  if (document.getElementById('chkMiss').checked) cities.push('Mississauga');
+
+  const minPriceRaw = (document.getElementById('minPrice').value || '').replace(/[^0-9]/g, '');
+  const maxPriceRaw = (document.getElementById('maxPrice').value || '').replace(/[^0-9]/g, '');
+  const minBedsRaw = (document.getElementById('minBeds').value || '').trim();
+  const propTypeRaw = (document.getElementById('propType').value || '').trim();
+  const hoodsRaw = (document.getElementById('hoods').value || '').trim();
+
+  const payload = {
+    cities: cities.length ? cities : ['Toronto', 'Mississauga'],
+    min_price: minPriceRaw ? parseInt(minPriceRaw, 10) : null,
+    max_price: maxPriceRaw ? parseInt(maxPriceRaw, 10) : null,
+    min_beds: minBedsRaw ? parseFloat(minBedsRaw) : null,
+    property_types: propTypeRaw ? propTypeRaw.split(',').map(s => s.trim()).filter(Boolean) : null,
+    neighbourhoods: hoodsRaw ? hoodsRaw.split(',').map(s => s.trim()).filter(Boolean) : null,
+  };
+
+  try {
+    const resp = await fetch(`${API_BASE}/alerts`, {
+      method: 'POST',
+      headers: window.Auth ? window.Auth.headers({'x-user-email': email}) : { 'Content-Type': 'application/json', 'x-user-email': email },
+      body: JSON.stringify(payload),
+    });
+    if (resp.ok) {
+      msg.style.color = '#2ed573';
+      msg.textContent = '✅ Alert active. 416Homes will scan Toronto + Mississauga tonight.';
+    } else {
+      const err = await resp.json().catch(() => ({}));
+      msg.style.color = '#c0392b';
+      msg.textContent = `⚠ ${err.detail || 'Failed to create alert. Please try again.'}`;
+    }
+  } catch {
+    msg.style.color = '#c0392b';
+    msg.textContent = '⚠ Network error. Please check your connection and try again.';
+  }
 }
 
 // Scroll-triggered fade-in

@@ -301,10 +301,110 @@ class VideoJobManager:
         """Low-level helper to patch arbitrary fields on a video job."""
         self._update_job(job_id, **fields)
 
+    async def _fetch_realtor_ca_photos(self, listing_url: str) -> List[str]:
+        """Extract photos from a realtor.ca listing using curl_cffi (Chrome impersonation) to bypass Cloudflare."""
+        import re as _re
+        m = _re.search(r"/real-estate/(\d+)", listing_url)
+        if not m:
+            return []
+        mls = m.group(1)
+
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "Origin": "https://www.realtor.ca",
+            "Referer": listing_url,
+        }
+        data = {
+            "CultureId": "1", "ApplicationId": "1",
+            "MlsNumber": mls, "Version": "7.0", "TransactionTypeId": "2",
+        }
+
+        # Try curl_cffi with PropertyDetails_Get (returns full media gallery)
+        try:
+            from curl_cffi import requests as cffi_requests  # type: ignore
+            import asyncio as _asyncio
+
+            def _do_details():
+                r = cffi_requests.post(
+                    "https://api2.realtor.ca/Listing.svc/PropertyDetails_Get",
+                    headers=headers,
+                    data={"ApplicationId": "1", "CultureId": "1",
+                          "PropertyId": mls, "ReferenceNumber": "0"},
+                    impersonate="chrome120", timeout=15,
+                )
+                return r.status_code, r.json() if r.status_code == 200 else {}
+
+            status, body = await _asyncio.to_thread(_do_details)
+            if status == 200:
+                # Full gallery under Media or Property.Photo
+                media = body.get("Media") or body.get("Property", {}).get("Photo") or []
+                urls = []
+                for p in media:
+                    u = (p.get("HighResPath") or p.get("MedResPath") or
+                         p.get("LargePhotoUrl") or p.get("url") or "")
+                    if u.startswith("http"):
+                        urls.append(u)
+                if urls:
+                    logger.info("realtor.ca PropertyDetails_Get returned %d photos for MLS %s", len(urls), mls)
+                    return urls[:15]
+        except Exception as e:
+            logger.warning("realtor.ca PropertyDetails_Get failed for MLS %s: %s", mls, e)
+
+        # Fallback: PropertySearch_Post (summary — fewer photos)
+        try:
+            from curl_cffi import requests as cffi_requests  # type: ignore
+            import asyncio as _asyncio
+
+            def _do_post():
+                r = cffi_requests.post(
+                    "https://api2.realtor.ca/Listing.svc/PropertySearch_Post",
+                    headers=headers, data=data, impersonate="chrome120", timeout=15,
+                )
+                return r.status_code, r.json() if r.status_code == 200 else {}
+
+            status, body = await _asyncio.to_thread(_do_post)
+            if status == 200:
+                results = body.get("Results", []) or []
+                if results:
+                    photos = results[0].get("Property", {}).get("Photo", []) or []
+                    urls = [p.get("HighResPath") or p.get("MedResPath") or "" for p in photos]
+                    urls = [u for u in urls if u.startswith("http")]
+                    if urls:
+                        logger.info("realtor.ca PropertySearch_Post returned %d photos for MLS %s", len(urls), mls)
+                        return urls[:15]
+        except Exception as e:
+            logger.warning("realtor.ca curl_cffi photo fetch failed for MLS %s: %s", mls, e)
+
+        # Fallback: scrape cdn.realtor.ca URLs from the listing page HTML
+        try:
+            from curl_cffi import requests as cffi_requests  # type: ignore
+            import asyncio as _asyncio
+
+            def _get_html():
+                r = cffi_requests.get(listing_url, impersonate="chrome120", timeout=20)
+                return r.text
+
+            html = await _asyncio.to_thread(_get_html)
+            found = _re.findall(r"https://cdn\.realtor\.ca/[^\s\"\'<>)]+\.(?:jpg|jpeg|webp|png)", html, _re.IGNORECASE)
+            seen, urls = set(), []
+            for u in found:
+                if u not in seen and "lowres" not in u.lower():
+                    seen.add(u); urls.append(u)
+            if urls:
+                logger.info("realtor.ca HTML scrape found %d photos", len(urls))
+                return urls[:15]
+        except Exception as e:
+            logger.warning("realtor.ca HTML photo scrape failed: %s", e)
+
+        return []
+
     async def _fetch_listing_photos(self, listing_url: str) -> List[str]:
-        """Fetch high-resolution photo URLs from Zoocasa listing page using multiple extraction methods."""
+        """Fetch high-resolution photo URLs from a listing page (Zoocasa or realtor.ca)."""
         if not listing_url:
             return []
+
+        if "realtor.ca" in listing_url:
+            return await self._fetch_realtor_ca_photos(listing_url)
 
         try:
             async with httpx.AsyncClient(follow_redirects=True, timeout=20) as client:
@@ -963,6 +1063,10 @@ async def create_video_job(
 async def get_video_job_status(job_id: str) -> Optional[Dict[str, Any]]:
     """Get video job status"""
     return await video_job_manager.get_video_job(job_id)
+
+async def process_pending_job(job_id: str) -> None:
+    """Process an already-inserted pending job. Called by the video-worker service."""
+    await video_job_manager.process_video_job(job_id)
 
 # Legacy function for compatibility
 def generate_script(listing_data: Dict[str, Any]) -> Dict[str, Any]:

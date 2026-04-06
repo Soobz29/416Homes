@@ -104,15 +104,21 @@ class PropertyAgent:
         if alert.get('min_bedrooms'):
             beds = listing.get('bedrooms', 0)
             if isinstance(beds, str):
-                beds = int(beds)
+                try:
+                    beds = int(beds)
+                except (ValueError, TypeError):
+                    beds = 0
             if beds >= alert['min_bedrooms']:
                 score += 0.25
-        
+
         # Bathrooms match (15% weight)
         if alert.get('min_bathrooms'):
             baths = listing.get('bathrooms', 0)
             if isinstance(baths, str):
-                baths = int(baths)
+                try:
+                    baths = int(baths)
+                except (ValueError, TypeError):
+                    baths = 0
             if baths >= alert['min_bathrooms']:
                 score += 0.15
         
@@ -202,7 +208,7 @@ class PropertyAgent:
         
         try:
             # Extract agent email from listing URL or use default
-            agent_email = "listing@realestate.com"  # Default - in production, scrape from listing
+            agent_email = os.getenv("LISTING_AGENT_EMAIL", "listing@realestate.com")
             
             params = {
                 "from": f"416Homes Agent <{self.agent_email}>",
@@ -214,11 +220,11 @@ class PropertyAgent:
             
             r = resend.Emails.send(params)
             
-            if r.status_code == 200:
+            if getattr(r, 'id', None):
                 logger.info(f"Outreach email sent for {listing.get('address', 'Unknown')}")
                 return True
             else:
-                logger.error(f"Failed to send email: {r.status_code}")
+                logger.error(f"Failed to send email (no id returned)")
                 return False
                 
         except Exception as e:
@@ -263,29 +269,27 @@ class PropertyAgent:
             logger.info("No new listings to process")
             return
         
-        matches_found = 0
-        
-        for listing in listings:
-            # Calculate match score
-            match_score = self.calculate_match_score(listing, alert)
-            
-            # Only process good matches (score >= 0.6)
-            if match_score >= 0.6:
-                matches_found += 1
-                
-                # Generate outreach email
+        good_matches = [
+            (listing, self.calculate_match_score(listing, alert))
+            for listing in listings
+        ]
+        good_matches = [(l, s) for l, s in good_matches if s >= 0.6]
+
+        if not good_matches:
+            logger.info("No matching listings found for this alert")
+            return
+
+        # Process up to 5 matches concurrently; semaphore prevents Resend rate limit
+        semaphore = asyncio.Semaphore(5)
+
+        async def _process_match(listing, match_score):
+            async with semaphore:
                 email_content = await self.generate_outreach_email(listing, alert, match_score)
-                
-                # Send email
                 email_sent = await self.send_outreach_email(listing, alert, email_content)
-                
-                # Record the match
                 await self.record_match(listing, alert, match_score, email_sent)
-                
-                # Add delay between emails to avoid spam filters
-                await asyncio.sleep(2)
-        
-        logger.info(f"Alert processing complete: {matches_found} matches found and processed")
+
+        await asyncio.gather(*[_process_match(l, s) for l, s in good_matches])
+        logger.info(f"Alert processing complete: {len(good_matches)} matches found and processed")
     
     async def run_agent_loop(self):
         """Main agent loop"""

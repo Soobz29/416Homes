@@ -3,6 +3,7 @@ import logging
 import asyncio
 import re
 import json
+import uuid
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -109,6 +110,7 @@ class TelegramBot:
         self.app.add_handler(CommandHandler("status", self.h_status))
         self.app.add_handler(CommandHandler("buyers", self.h_buyers))
         self.app.add_handler(CommandHandler("alerts", self.h_alerts))
+        self.app.add_handler(CommandHandler("newalert", self.h_newalert))
         self.app.add_handler(CommandHandler("link", self.h_link))
         self.app.add_handler(CommandHandler("video", self.h_video))
         self.app.add_handler(CommandHandler("videophotos", self.h_videophotos))
@@ -144,6 +146,7 @@ class TelegramBot:
                     BotCommand("listings", "Browse last scan (Prev/Next)"),
                     BotCommand("regions", "Listing counts by GTA region"),
                     BotCommand("alerts", "Show your saved alerts"),
+                    BotCommand("newalert", "Create a new listing alert (guided)"),
                     BotCommand("link", "Link this chat to your 416Homes account"),
                     BotCommand("video", "Generate video from listing URL"),
                     BotCommand("videophotos", "Upload photos and build a video"),
@@ -936,27 +939,162 @@ class TelegramBot:
             f"✅ Photo {len(photos)}/{MAX_TELEGRAM_PHOTOS} received"
         )
 
+    # ── /newalert conversational flow ────────────────────────────────────────
+
+    async def h_newalert(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Start the guided alert-creation conversation."""
+        context.user_data["alert_step"] = "city"
+        context.user_data["alert_data"] = {}
+        await update.message.reply_text(
+            "🏙 *Create a new listing alert* — Step 1 of 3\n\n"
+            "Which cities should I monitor?\n"
+            "Reply: *toronto*, *mississauga*, or *both*",
+            parse_mode="Markdown",
+        )
+
+    async def _newalert_handle_city(self, update, context, text):
+        text_l = text.lower()
+        if text_l in ("toronto",):
+            cities = ["Toronto"]
+        elif text_l in ("mississauga", "miss"):
+            cities = ["Mississauga"]
+        elif text_l in ("both", "gta", "all"):
+            cities = ["Toronto", "Mississauga"]
+        else:
+            await update.message.reply_text(
+                "Please reply with *toronto*, *mississauga*, or *both*.", parse_mode="Markdown"
+            )
+            return
+        context.user_data["alert_data"]["cities"] = cities
+        context.user_data["alert_step"] = "budget"
+        await update.message.reply_text(
+            "💰 *Step 2 of 3 — Budget range*\n\n"
+            "What's your budget? Examples:\n"
+            "• `500000-1200000` (min–max)\n"
+            "• `any` (no limit)",
+            parse_mode="Markdown",
+        )
+
+    async def _newalert_handle_budget(self, update, context, text):
+        text_l = text.lower().replace(",", "").replace("$", "").strip()
+        min_price = max_price = None
+        if text_l not in ("any", "none", ""):
+            parts = re.split(r"[-–—]", text_l)
+            try:
+                min_price = int(parts[0].strip()) if parts[0].strip() else None
+                max_price = int(parts[1].strip()) if len(parts) > 1 and parts[1].strip() else None
+            except ValueError:
+                await update.message.reply_text(
+                    "⚠ Please use format `500000-1200000` or `any`.", parse_mode="Markdown"
+                )
+                return
+        context.user_data["alert_data"]["min_price"] = min_price
+        context.user_data["alert_data"]["max_price"] = max_price
+        context.user_data["alert_step"] = "bedrooms"
+        await update.message.reply_text(
+            "🛏 *Step 3 of 3 — Bedrooms*\n\n"
+            "Minimum bedrooms? Examples: `1`, `2`, `3` or `any`",
+            parse_mode="Markdown",
+        )
+
+    async def _newalert_handle_bedrooms(self, update, context, text):
+        text_l = text.lower().strip()
+        min_beds = None
+        if text_l not in ("any", "none", ""):
+            try:
+                min_beds = float(text_l)
+            except ValueError:
+                await update.message.reply_text(
+                    "⚠ Please enter a number (e.g. `2`) or `any`.", parse_mode="Markdown"
+                )
+                return
+        context.user_data["alert_data"]["min_beds"] = min_beds
+        context.user_data["alert_step"] = None
+
+        # Persist alert to Supabase
+        chat_id = update.effective_chat.id
+        ad = context.user_data.get("alert_data", {})
+        saved = False
+        if self.supabase:
+            try:
+                # Look up user by telegram_chat_id
+                u_resp = self.supabase.table("users").select("id,email").eq("telegram_chat_id", chat_id).limit(1).execute()
+                users = getattr(u_resp, "data", None) or []
+                user_id = users[0]["id"] if users else None
+                email = users[0].get("email", f"tg_{chat_id}@example.invalid") if users else f"tg_{chat_id}@example.invalid"
+                alert_row = {
+                    "id": str(uuid.uuid4()),
+                    "user_id": user_id,
+                    "email": email,
+                    "cities": ad.get("cities") or ["Toronto", "Mississauga"],
+                    "min_price": ad.get("min_price"),
+                    "max_price": ad.get("max_price"),
+                    "min_beds": ad.get("min_beds"),
+                    "is_active": True,
+                    "created_at": datetime.utcnow().isoformat(),
+                    "updated_at": datetime.utcnow().isoformat(),
+                }
+                self.supabase.table("buyer_alerts").insert(alert_row).execute()
+                saved = True
+            except Exception as e:
+                logger.error(f"Error saving Telegram alert: {e}")
+
+        # Build confirmation message
+        cities_str = " + ".join(ad.get("cities") or ["GTA"])
+        budget_parts = []
+        if ad.get("min_price"):
+            budget_parts.append(f"${int(ad['min_price']):,}")
+        if ad.get("max_price"):
+            budget_parts.append(f"${int(ad['max_price']):,}")
+        budget_str = "–".join(budget_parts) if budget_parts else "Any"
+        beds_str = f"{int(ad['min_beds'])}+" if ad.get("min_beds") else "Any"
+
+        status = "✅ Alert saved!" if saved else "⚠️ Alert created (DB save failed — check logs)."
+        await update.message.reply_text(
+            f"{status}\n\n"
+            f"🏙 *Cities:* {cities_str}\n"
+            f"💰 *Budget:* {budget_str}\n"
+            f"🛏 *Min beds:* {beds_str}\n\n"
+            "I'll notify you when matching listings appear. "
+            "Use /alerts to see all your alerts.",
+            parse_mode="Markdown",
+        )
+
     async def h_text_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
         Handle generic text messages:
+        - Multi-step /newalert conversation (city → budget → bedrooms).
         - Tier selection for /videophotos (basic/cinematic/premium).
-        - Falls through to no-op if not in a photo job.
+        - Falls through to no-op otherwise.
         """
         if not update.message:
             return
 
         chat_id = update.effective_chat.id
-        text = (update.message.text or "").strip().lower()
+        text = (update.message.text or "").strip()
 
-        job = self.pending_photo_jobs.get(chat_id)
-        if not job:
-            # No active photo job; ignore here and let other handlers manage.
+        # ── /newalert conversation ──────────────────────────────────────────
+        alert_step = context.user_data.get("alert_step")
+        if alert_step == "city":
+            await self._newalert_handle_city(update, context, text)
+            return
+        if alert_step == "budget":
+            await self._newalert_handle_budget(update, context, text)
+            return
+        if alert_step == "bedrooms":
+            await self._newalert_handle_bedrooms(update, context, text)
             return
 
-        if text in {"basic", "cinematic", "premium"}:
-            job["tier"] = text
+        # ── /videophotos tier selection ─────────────────────────────────────
+        text_lower = text.lower()
+        job = self.pending_photo_jobs.get(chat_id)
+        if not job:
+            return
+
+        if text_lower in {"basic", "cinematic", "premium"}:
+            job["tier"] = text_lower
             await update.message.reply_text(
-                f"✅ Tier set to *{text.capitalize()}* for this video.\n"
+                f"✅ Tier set to *{text_lower.capitalize()}* for this video.\n"
                 "Now send photos, then /done when finished.",
                 parse_mode="Markdown",
             )

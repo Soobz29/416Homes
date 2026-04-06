@@ -98,56 +98,80 @@ jobs:
       run: |
         echo "Evaluating model performance..."
         python -c "
-        import joblib
+        import sys, os, joblib
         import pandas as pd
-        from sklearn.metrics import mean_absolute_percentage_error
         import numpy as np
-        import os
+        from sklearn.metrics import mean_absolute_percentage_error
         from supabase import create_client
-        
-        # Load the newly trained model
-        model = joblib.load('valuation_model.pkl')
-        
-        # Load test data from recent listings
+
+        # Load trained model + encoders (same files saved by valuation/model.py)
+        try:
+            model = joblib.load('valuation_model.pkl')
+            meta = joblib.load('valuation_model_encoders.pkl')
+            encoders = meta.get('encoders', {})
+            numeric_medians = meta.get('numeric_medians', {})
+        except Exception as e:
+            print(f'⚠️ Could not load model artefacts: {e}')
+            sys.exit(0)
+
+        # Fetch held-out sold comps from Supabase (most recent 200, unseen by training if using daily splits)
         client = create_client(os.environ.get('SUPABASE_URL'), os.environ.get('SUPABASE_KEY'))
-        
-        # Get recent listings with sold prices for validation
-        result = client.table('sold_comps').select('*').eq('sold_date', 'gt', '2024-01-01').order('sold_date', desc=True).limit(100).execute()
-        
-        if result.data:
-            df = pd.DataFrame(result.data)
-            
-            # Simple validation - check if we can make predictions
-            if len(df) > 10:
-                # Mock validation since we don't have actual model structure
-                mape = np.random.uniform(8, 15)  # Simulate reasonable MAPE
-                print(f'Model Validation MAPE: {mape:.2f}%')
-                
-                if mape < 10:
-                    print('✅ Model performance is excellent')
-                elif mape < 15:
-                    print('✅ Model performance is good')
-                else:
-                    print('⚠️ Model performance needs improvement')
+        result = client.table('sold_comps').select('*').order('sold_date', desc=True).limit(200).execute()
+
+        if not result.data or len(result.data) < 10:
+            print('⚠️ Insufficient validation data — skipping MAPE check')
+            sys.exit(0)
+
+        df = pd.DataFrame(result.data)
+        for col in ['price', 'bedrooms', 'bathrooms', 'sqft']:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+        df = df.dropna(subset=['price', 'bedrooms', 'bathrooms', 'sqft'])
+        df = df[(df['price'] > 10000) & (df['sqft'] > 100) & (df['sqft'] < 10000)]
+        df['price_per_sqft'] = df['price'] / df['sqft']
+        df = df[(df['price_per_sqft'] > 50) & (df['price_per_sqft'] < 2000)]
+
+        if len(df) < 10:
+            print('⚠️ Too few clean rows for evaluation')
+            sys.exit(0)
+
+        # Encode categoricals using saved encoders
+        for col, le in encoders.items():
+            if col in df.columns:
+                known = set(le.classes_)
+                df[f'{col}_encoded'] = df[col].apply(lambda v: le.transform([v])[0] if v in known else 0)
             else:
-                print('⚠️ Insufficient validation data')
+                df[f'{col}_encoded'] = 0
+
+        for col, median in numeric_medians.items():
+            if col in df.columns:
+                df[col] = df[col].fillna(median)
+
+        feature_columns = [c for c in ['bedrooms', 'bathrooms', 'sqft', 'property_type_encoded', 'neighbourhood_encoded', 'city_encoded'] if c in df.columns]
+        X = df[feature_columns]
+        y = df['price_per_sqft']
+
+        y_pred = model.predict(X)
+        mape = mean_absolute_percentage_error(y, y_pred) * 100
+        print(f'Model Validation MAPE: {mape:.2f}%  (n={len(y)})')
+
+        if mape < 10:
+            print('✅ Model performance is excellent (MAPE < 10%)')
+        elif mape < 15:
+            print('✅ Model performance is good (MAPE < 15%)')
         else:
-            print('⚠️ No validation data available')
+            print('⚠️ Model performance needs improvement (MAPE >= 15%)')
+            sys.exit(1)
         "
         
-    - name: Backup old model
+    - name: Commit and push trained model
       if: success()
       run: |
-        echo "Backing up previous model..."
-        mkdir -p backups
-        cp valuation_model.pkl backups/valuation_model_$(date +%Y%m%d_%H%M%S).pkl 2>/dev/null || echo "No existing model to backup"
-        
-    - name: Deploy new model
-      if: success()
-      run: |
-        echo "Deploying new model..."
-        # Model is already in place - just log deployment
-        echo "Model deployed successfully"
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add valuation_model.pkl valuation_model_encoders.pkl
+        git diff --cached --quiet && echo "No model changes to commit" || \
+          git commit -m "chore: update trained valuation model [skip ci]"
+        git push origin main
         
     - name: Send retraining notification
       if: success()

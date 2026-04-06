@@ -40,6 +40,7 @@ class ValuationModel:
     def __init__(self):
         self.model = None
         self.encoders = {}
+        self.numeric_medians: Dict[str, float] = {}
         self.feature_columns = [
             'bedrooms', 'bathrooms', 'sqft', 'property_type_encoded',
             'neighbourhood_encoded', 'city_encoded'
@@ -116,11 +117,15 @@ class ValuationModel:
                 df[f'{col}_encoded'] = le.fit_transform(df[col].fillna('Unknown'))
                 self.encoders[col] = le
         
-        # Fill missing values
-        df['bedrooms'] = df['bedrooms'].fillna(df['bedrooms'].median())
-        df['bathrooms'] = df['bathrooms'].fillna(df['bathrooms'].median())
-        df['sqft'] = df['sqft'].fillna(df['sqft'].median())
-        
+        # Fill missing values and save medians for prediction-time use
+        for col in ['bedrooms', 'bathrooms', 'sqft']:
+            median_val = float(df[col].median())
+            self.numeric_medians[col] = median_val
+            df[col] = df[col].fillna(median_val)
+        # Store price_per_sqft median for confidence calculation at inference time
+        if 'price_per_sqft' in df.columns:
+            self.numeric_medians['price_per_sqft'] = float(df['price_per_sqft'].median())
+
         return df
     
     def train_model(self, df: pd.DataFrame) -> Dict[str, Any]:
@@ -190,9 +195,9 @@ class ValuationModel:
             # Save model
             joblib.dump(self.model, filepath)
             
-            # Save encoders
+            # Save encoders and numeric medians
             encoders_path = filepath.replace('.pkl', '_encoders.pkl')
-            joblib.dump(self.encoders, encoders_path)
+            joblib.dump({'encoders': self.encoders, 'numeric_medians': self.numeric_medians}, encoders_path)
             
             logger.info(f"Model saved to {filepath}")
             return True
@@ -208,9 +213,15 @@ class ValuationModel:
             # Load model
             self.model = joblib.load(filepath)
             
-            # Load encoders
+            # Load encoders and numeric medians
             encoders_path = filepath.replace('.pkl', '_encoders.pkl')
-            self.encoders = joblib.load(encoders_path)
+            saved = joblib.load(encoders_path)
+            if isinstance(saved, dict) and 'encoders' in saved:
+                self.encoders = saved['encoders']
+                self.numeric_medians = saved.get('numeric_medians', {})
+            else:
+                # Legacy format: just the encoders dict
+                self.encoders = saved
             
             logger.info(f"Model loaded from {filepath}")
             return True
@@ -238,22 +249,33 @@ class ValuationModel:
                         value = encoder.classes_[0]  # Use first class as default
                     input_df[f'{col}_encoded'] = encoder.transform([value])[0]
             
-            # Fill missing values
+            # Fill missing values using training-time medians
             for col in ['bedrooms', 'bathrooms', 'sqft']:
-                if col in input_df.columns:
-                    input_df[col] = input_df[col].fillna(self.model._n_features.get(col, 0))
-            
+                fallback = self.numeric_medians.get(col, 0)
+                if col not in input_df.columns:
+                    input_df[col] = fallback
+                else:
+                    input_df[col] = pd.to_numeric(input_df[col], errors='coerce').fillna(fallback)
+
+            # Ensure all encoded columns exist (default to 0 for unseen categoricals)
+            for col in ['property_type_encoded', 'neighbourhood_encoded', 'city_encoded']:
+                if col not in input_df.columns:
+                    input_df[col] = 0
+
             # Prepare features
             X = input_df[self.feature_columns]
-            
+
             # Make prediction
             price_per_sqft_pred = self.model.predict(X)
-            
+
             # Calculate estimated price
-            estimated_price = price_per_sqft_pred[0] * property_data.get('sqft', 1000)
-            
-            # Calculate confidence based on prediction consistency
-            confidence = min(0.95, max(0.70, 1.0 - abs(price_per_sqft_pred[0] - 500) / 500))
+            sqft_val = float(input_df['sqft'].iloc[0]) or self.numeric_medians.get('sqft', 1000)
+            estimated_price = price_per_sqft_pred[0] * sqft_val
+
+            # Confidence: distance of prediction from the training median $/sqft
+            median_ppsf = self.numeric_medians.get('price_per_sqft', 900)
+            deviation = abs(price_per_sqft_pred[0] - median_ppsf) / max(median_ppsf, 1)
+            confidence = round(min(0.92, max(0.65, 1.0 - deviation * 0.5)), 2)
             
             return {
                 'estimated_value': int(estimated_price),
@@ -268,17 +290,22 @@ class ValuationModel:
     
     def generate_market_analysis(self, estimated_price: int, property_data: Dict[str, Any]) -> str:
         """Generate market analysis text"""
-        
+
         # Simple heuristics for market analysis
-        sqft = property_data.get('sqft', 1000)
+        sqft = property_data.get('sqft') or 1000
+        try:
+            sqft = float(sqft) or 1000
+        except (TypeError, ValueError):
+            sqft = 1000
         price_per_sqft = estimated_price / sqft
         
-        if price_per_sqft < 400:
-            return "Priced below market value - good opportunity"
-        elif price_per_sqft < 600:
-            return "Priced competitively for market"
-        elif price_per_sqft < 800:
-            return "Priced above market value - negotiate"
+        # Toronto 2026: inner city $950–$1,100/sqft; suburbs/condos $700–$850/sqft
+        if price_per_sqft < 650:
+            return "Priced below market value — strong buying opportunity"
+        elif price_per_sqft < 900:
+            return "Priced competitively for the GTA market"
+        elif price_per_sqft < 1100:
+            return "Priced above market — room to negotiate"
         else:
             return "Priced significantly above market value"
 

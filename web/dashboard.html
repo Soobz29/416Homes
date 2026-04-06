@@ -451,6 +451,13 @@
         }
     </style>
 </head>
+<script src="/auth.js"></script>
+<script>
+    // Auth guard — redirect to login if not authenticated
+    if (window.Auth && !window.Auth.isLoggedIn()) {
+        window.location.href = '/login';
+    }
+</script>
 <body>
     <div id="root"></div>
 
@@ -462,9 +469,14 @@
 
         // Main Dashboard Component
         function Dashboard() {
+            const PAGE_SIZE = 20;
             const [activeTab, setActiveTab] = useState('listings');
             const [listings, setListings] = useState([]);
+            const [offset, setOffset] = useState(0);
+            const [hasMore, setHasMore] = useState(true);
+            const [loadingMore, setLoadingMore] = useState(false);
             const [loading, setLoading] = useState(false);
+            const [error, setError] = useState(null);
             const [searchQuery, setSearchQuery] = useState('');
             const [filters, setFilters] = useState({
                 city: 'GTA',
@@ -473,73 +485,60 @@
                 bedrooms: '',
                 bathrooms: ''
             });
+            const [valuationData, setValuationData] = useState({
+                neighbourhood: '',
+                property_type: 'Condo Apt',
+                city: 'Toronto',
+                bedrooms: '',
+                bathrooms: '',
+                sqft: '',
+                list_price: ''
+            });
 
+            // Reset and reload when tab or filters change
             useEffect(() => {
                 if (activeTab === 'listings') {
-                    fetchListings();
+                    setOffset(0);
+                    setListings([]);
+                    setHasMore(true);
+                    fetchListings(0, true);
                 }
             }, [activeTab, filters]);
 
-            const fetchListings = async () => {
-                setLoading(true);
-                try {
-                    const params = new URLSearchParams({ limit: '20' });
-                    if (filters.city && filters.city !== 'GTA') {
-                        params.append('city', filters.city);
-                    }
-                    
-                    if (filters.minPrice) params.append('min_price', filters.minPrice);
-                    if (filters.maxPrice) params.append('max_price', filters.maxPrice);
-                    if (filters.bedrooms) params.append('bedrooms', filters.bedrooms);
-                    if (filters.bathrooms) params.append('bathrooms', filters.bathrooms);
+            const _buildParams = (off) => {
+                const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(off) });
+                if (filters.city && filters.city !== 'GTA') params.append('city', filters.city);
+                if (filters.minPrice) params.append('min_price', filters.minPrice);
+                if (filters.maxPrice) params.append('max_price', filters.maxPrice);
+                if (filters.bedrooms) params.append('bedrooms', filters.bedrooms);
+                if (filters.bathrooms) params.append('bathrooms', filters.bathrooms);
+                return params;
+            };
 
-                    const response = await fetch(`${API_BASE}/listings?${params}`);
+            const fetchListings = async (off = 0, replace = false) => {
+                if (replace) setLoading(true); else setLoadingMore(true);
+                if (replace) setError(null);
+                try {
+                    const params = _buildParams(off);
+                    const response = await fetch(`${API_BASE}/listings?${params}`, {
+                        headers: (window.Auth ? window.Auth.headers({'Content-Type': undefined}) : {})
+                    });
+                    if (!response.ok) throw new Error(`API error ${response.status}`);
                     const data = await response.json();
-                    setListings(data);
+                    const items = Array.isArray(data) ? data : (Array.isArray(data?.listings) ? data.listings : []);
+                    if (!items.length && !Array.isArray(data) && !data?.listings) throw new Error('Unexpected API response');
+                    setListings(prev => replace ? items : [...prev, ...items]);
+                    setOffset(off + items.length);
+                    setHasMore(items.length === PAGE_SIZE);
                 } catch (error) {
                     console.error('Error fetching listings:', error);
-                    // Mock data for demo
-                    setListings(getMockListings());
+                    if (replace) { setError('Could not load listings. Please try again later.'); setListings([]); }
                 } finally {
-                    setLoading(false);
+                    if (replace) setLoading(false); else setLoadingMore(false);
                 }
             };
 
-            const getMockListings = () => [
-                {
-                    id: '1',
-                    address: '123 King St W, Toronto',
-                    price: 899000,
-                    bedrooms: '2',
-                    bathrooms: '2',
-                    area: '950',
-                    source: 'realtor_ca',
-                    url: 'https://www.realtor.ca/test1',
-                    scraped_at: new Date().toISOString()
-                },
-                {
-                    id: '2',
-                    address: '456 Queen St E, Toronto',
-                    price: 1250000,
-                    bedrooms: '3',
-                    bathrooms: '2',
-                    area: '1500',
-                    source: 'kijiji',
-                    url: 'https://www.kijiji.ca/test2',
-                    scraped_at: new Date().toISOString()
-                },
-                {
-                    id: '3',
-                    address: '789 Yonge St, Toronto',
-                    price: 650000,
-                    bedrooms: '1',
-                    bathrooms: '1',
-                    area: '650',
-                    source: 'zoocasa',
-                    url: 'https://www.zoocasa.ca/test3',
-                    scraped_at: new Date().toISOString()
-                }
-            ];
+            const loadMore = () => fetchListings(offset, false);
 
             const formatSqft = (value) => {
                 if (value == null) return '—';
@@ -613,7 +612,7 @@
 
                         <div className="flex justify-between items-center">
                             <a
-                                href={listing.url}
+                                href={(/^https?:\/\//i.test(listing.url || '')) ? listing.url : '#'}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 style={{
@@ -628,7 +627,18 @@
                                 View Listing →
                             </a>
                             <button
-                                onClick={() => setActiveTab('valuation')}
+                                onClick={() => {
+                                    setValuationData({
+                                        neighbourhood: listing.city || '',
+                                        property_type: 'Condo Apt',
+                                        city: listing.city || 'Toronto',
+                                        bedrooms: listing.bedrooms || '',
+                                        bathrooms: listing.bathrooms || '',
+                                        sqft: listing.area || '',
+                                        list_price: String(listing.price || ''),
+                                    });
+                                    setActiveTab('valuation');
+                                }}
                                 className="btn"
                                 style={{
                                     padding: '0.65rem 1.4rem',
@@ -727,6 +737,11 @@
                     </div>
 
                     {/* Listings Grid */}
+                    {error && (
+                        <div style={{background:'rgba(192,57,43,0.12)',border:'1px solid rgba(192,57,43,0.4)',borderRadius:'8px',padding:'1rem',marginBottom:'1rem',color:'#e74c3c',fontFamily:"'DM Mono',monospace",fontSize:'0.78rem'}}>
+                            ⚠ {error}
+                        </div>
+                    )}
                     {loading ? (
                         <div className="flex justify-center items-center h-64">
                             <div className="loading-spinner"></div>
@@ -736,21 +751,30 @@
                             {listings.map(listing => (
                                 <ListingCard key={listing.id} listing={listing} />
                             ))}
+                            {!loading && !error && listings.length === 0 && (
+                                <div style={{gridColumn:'1/-1',textAlign:'center',color:'var(--text-muted)',padding:'3rem',fontFamily:"'DM Mono',monospace",fontSize:'0.78rem'}}>
+                                    No listings found. Try adjusting your filters or run a scan.
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    {/* Load More */}
+                    {!loading && !error && hasMore && listings.length > 0 && (
+                        <div style={{textAlign:'center',marginTop:'2rem'}}>
+                            <button
+                                onClick={loadMore}
+                                disabled={loadingMore}
+                                className="btn"
+                                style={{padding:'0.75rem 2.5rem',fontSize:'0.82rem',letterSpacing:'0.08em',textTransform:'uppercase',opacity: loadingMore ? 0.6 : 1}}
+                            >
+                                {loadingMore ? 'Loading...' : 'Load More'}
+                            </button>
                         </div>
                     )}
                 </div>
             );
 
-            const ValuationTab = () => {
-                const [valuationData, setValuationData] = useState({
-                    neighbourhood: '',
-                    property_type: 'Condo Apt',
-                    city: 'Toronto',
-                    bedrooms: '',
-                    bathrooms: '',
-                    sqft: '',
-                    list_price: ''
-                });
+            const ValuationTab = ({ valuationData, setValuationData }) => {
                 const [valuationResult, setValuationResult] = useState(null);
                 const [loading, setLoading] = useState(false);
 
@@ -774,12 +798,7 @@
                         setValuationResult(result);
                     } catch (error) {
                         console.error('Valuation error:', error);
-                        // Mock result for demo
-                        setValuationResult({
-                            estimated_value: 925000,
-                            confidence: 0.87,
-                            market_analysis: 'Priced slightly below market value'
-                        });
+                        setValuationResult({ error: 'Could not reach valuation service. Please try again.' });
                     } finally {
                         setLoading(false);
                     }
@@ -1019,16 +1038,16 @@
                     <main style={{padding: '4rem'}}>
                         <div className="tab-content">
                             {activeTab === 'listings' && <ListingsTab filters={filters} />}
-                            {activeTab === 'valuation' && <ValuationTab />}
+                            {activeTab === 'valuation' && <ValuationTab valuationData={valuationData} setValuationData={setValuationData} />}
                             {activeTab === 'videos' && <VideosTab />}
                         </div>
                     </main>
 
                     {/* Footer */}
                     <footer>
-                        <div className="footer-logo"><span>416</span>Homes Dashboard</div>
+                        <div className="footer-logo"><span>416</span>Homes</div>
                         <div className="footer-copy">Toronto Real Estate Intelligence Platform</div>
-                        <div className="footer-copy">© 2024 416Homes · Dashboard</div>
+                        <div className="footer-copy">© 2026 416Homes · All rights reserved</div>
                     </footer>
                 </div>
             );
