@@ -34,9 +34,12 @@ from supabase import create_client
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-
 def market_analysis_from_ppsf(price_per_sqft: float) -> str:
-    """Shared market analysis text from price-per-sqft. Toronto 2026 thresholds."""
+    """Return a human-readable market analysis string based on $/sqft.
+
+    Thresholds reflect Toronto GTA 2026 market medians:
+      inner city $950–$1,100/sqft; suburbs/condos $700–$850/sqft.
+    """
     if price_per_sqft < 650:
         return "Priced below market value — strong buying opportunity"
     elif price_per_sqft < 900:
@@ -304,12 +307,14 @@ class ValuationModel:
     
     def generate_market_analysis(self, estimated_price: int, property_data: Dict[str, Any]) -> str:
         """Generate market analysis text"""
+
         sqft = property_data.get('sqft') or 1000
         try:
             sqft = float(sqft) or 1000
         except (TypeError, ValueError):
             sqft = 1000
-        return market_analysis_from_ppsf(estimated_price / sqft)
+        price_per_sqft = estimated_price / sqft
+        return market_analysis_from_ppsf(price_per_sqft)
 
 def main():
     """Main training pipeline"""

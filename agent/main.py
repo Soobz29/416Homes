@@ -56,7 +56,7 @@ class PropertyAgent:
         self.agent_email = os.getenv("AGENT_EMAIL")
     
     async def get_active_alerts(self) -> List[Dict[str, Any]]:
-        """Get all active buyer alerts"""
+        """Get all active buyer alerts from the `alerts` table (written by the API)."""
         try:
             result = self.supabase.table("alerts")\
                 .select("*")\
@@ -111,9 +111,7 @@ class PropertyAgent:
             if beds >= alert['min_beds']:
                 score += 0.25
 
-        # Bathrooms match (15% weight) — alerts table has no min_baths column; skip
-
-        
+        # Bathrooms match — alerts table has no min_bathrooms column; weight stays with bedrooms/price.
         # Property type match (10% weight)
         if alert.get('property_types'):
             property_type = listing.get('source', '').lower()
@@ -162,8 +160,8 @@ class PropertyAgent:
             Min Price: ${alert.get('min_price', 0):,}
             Max Price: ${alert.get('max_price', 0):,}
             Min Bedrooms: {alert.get('min_beds', 'N/A')}
-            Property Types: {', '.join(alert.get('property_types', []))}
-            Neighbourhoods: {', '.join(alert.get('neighbourhoods', []))}
+            Property Types: {', '.join(alert.get('property_types') or [])}
+            Neighbourhoods: {', '.join(alert.get('neighbourhoods') or [])}
             
             VALUATION CONTEXT:
             Estimated Value: ${estimated_value:,}

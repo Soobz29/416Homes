@@ -90,6 +90,7 @@ async def _video_worker_loop() -> None:
                 logger.info("Video worker: processing job %s", jid)
                 supabase_client.table("video_jobs").update({"status": "generating_script"}).eq("id", jid).execute()
                 from video_pipeline.pipeline import process_pending_job  # lazy — loads AI stack on demand
+
                 async def _run_job(job_id: str) -> None:
                     try:
                         await process_pending_job(job_id)
@@ -102,6 +103,7 @@ async def _video_worker_loop() -> None:
                             }).eq("id", job_id).execute()
                         except Exception:
                             pass
+
                 asyncio.create_task(_run_job(jid))
         except Exception as exc:
             logger.error("Video worker poll error: %s", exc)
@@ -381,15 +383,27 @@ def _get_or_create_user_by_email(email: str) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail="Email is required")
     client = _ensure_supabase()
     try:
+        # Upsert is atomic (avoids SELECT-then-INSERT race condition).
+        # Note: Supabase returns data on INSERT but an empty list on no-op UPDATE,
+        # so we fall back to a SELECT when the row already existed.
+        insert_resp = (
+            client.table("users")
+            .upsert({"email": email}, on_conflict="email")
+            .execute()
+        )
+        data = getattr(insert_resp, "data", None) or []
+        if data:
+            return data[0]
+        # Row already existed — upsert returned no data, fetch it explicitly.
         resp = (
             client.table("users")
             .upsert({"email": email}, on_conflict="email")
             .execute()
         )
-        data = getattr(resp, "data", None) or []
-        if not data:
-            raise RuntimeError("Upsert returned no rows")
-        return data[0]
+        rows = getattr(resp, "data", None) or []
+        if rows:
+            return rows[0]
+        raise RuntimeError("Failed to upsert user")
     except Exception as e:
         logger.error(f"Supabase user lookup failed for {email}: {e}")
         raise HTTPException(status_code=500, detail="Failed to resolve user")
@@ -769,6 +783,8 @@ async def valuate_property(data: dict):
     except Exception as e:
         logger.warning(f"Valuation model unavailable, using fallback: {e}")
 
+    from valuation.model import market_analysis_from_ppsf
+
     # Fallback: simple $/sqft estimate (Toronto 2026 median ~$900/sqft)
     sqft = 1500
     try:
@@ -784,7 +800,6 @@ async def valuate_property(data: dict):
 
     estimated_value = sqft * 900
 
-    # Compute market analysis from actual list price vs $900/sqft baseline
     if list_price > 0 and sqft > 0:
         market_analysis = market_analysis_from_ppsf(list_price / sqft)
     else:
