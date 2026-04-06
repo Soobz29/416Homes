@@ -13,6 +13,7 @@ import logging
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 import random
+import secrets
 import string
 
 from memory.store import memory_store, search_listings, replace_listings, embed_and_store_listings
@@ -88,7 +89,21 @@ async def _video_worker_loop() -> None:
                 logger.info("Video worker: processing job %s", jid)
                 supabase_client.table("video_jobs").update({"status": "generating_script"}).eq("id", jid).execute()
                 from video_pipeline.pipeline import process_pending_job  # lazy — loads AI stack on demand
-                asyncio.create_task(process_pending_job(jid))
+
+                async def _run_job(job_id: str) -> None:
+                    try:
+                        await process_pending_job(job_id)
+                    except Exception as job_exc:
+                        logger.error("Video job %s failed: %s", job_id, job_exc)
+                        try:
+                            supabase_client.table("video_jobs").update({
+                                "status": "failed",
+                                "error_message": str(job_exc),
+                            }).eq("id", job_id).execute()
+                        except Exception:
+                            pass
+
+                asyncio.create_task(_run_job(jid))
         except Exception as exc:
             logger.error("Video worker poll error: %s", exc)
 
@@ -367,6 +382,18 @@ def _get_or_create_user_by_email(email: str) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail="Email is required")
     client = _ensure_supabase()
     try:
+        # Upsert is atomic (avoids SELECT-then-INSERT race condition).
+        # Note: Supabase returns data on INSERT but an empty list on no-op UPDATE,
+        # so we fall back to a SELECT when the row already existed.
+        insert_resp = (
+            client.table("users")
+            .upsert({"email": email}, on_conflict="email")
+            .execute()
+        )
+        data = getattr(insert_resp, "data", None) or []
+        if data:
+            return data[0]
+        # Row already existed — upsert returned no data, fetch it explicitly.
         resp = (
             client.table("users")
             .select("*")
@@ -377,16 +404,7 @@ def _get_or_create_user_by_email(email: str) -> Dict[str, Any]:
         rows = getattr(resp, "data", None) or []
         if rows:
             return rows[0]
-
-        insert_resp = (
-            client.table("users")
-            .insert({"email": email})
-            .execute()
-        )
-        data = getattr(insert_resp, "data", None) or []
-        if not data:
-            raise RuntimeError("Failed to insert user")
-        return data[0]
+        raise RuntimeError("Failed to upsert user")
     except Exception as e:
         logger.error(f"Supabase user lookup failed for {email}: {e}")
         raise HTTPException(status_code=500, detail="Failed to resolve user")
@@ -414,7 +432,7 @@ def _get_user_id_from_header(x_user_email: str | None) -> str:
 def _generate_link_code(length: int = 6) -> str:
     """Generate a short human-typed code like TG-A1B2C3 (6 chars, 30 min expiry)."""
     chars = string.ascii_uppercase + string.digits
-    suffix = "".join(random.choice(chars) for _ in range(length))
+    suffix = "".join(secrets.choice(chars) for _ in range(length))
     return f"TG-{suffix}"
 
 # Listings endpoints
@@ -639,7 +657,7 @@ async def create_alert(
     """
     user_id = _get_user_id_from_header(x_user_email)
     client = _ensure_supabase()
-    data = payload.dict(exclude_unset=True)
+    data = payload.model_dump(exclude_unset=True)
     data["user_id"] = user_id
     try:
         resp = client.table("alerts").insert(data).execute()
@@ -677,7 +695,7 @@ async def update_alert(
     """
     user_id = _get_user_id_from_header(x_user_email)
     client = _ensure_supabase()
-    data = payload.dict(exclude_unset=True)
+    data = payload.model_dump(exclude_unset=True)
     if not data:
         raise HTTPException(status_code=400, detail="No fields to update")
     try:
@@ -766,6 +784,8 @@ async def valuate_property(data: dict):
     except Exception as e:
         logger.warning(f"Valuation model unavailable, using fallback: {e}")
 
+    from valuation.model import market_analysis_from_ppsf
+
     # Fallback: simple $/sqft estimate (Toronto 2026 median ~$900/sqft)
     sqft = 1500
     try:
@@ -781,17 +801,8 @@ async def valuate_property(data: dict):
 
     estimated_value = sqft * 900
 
-    # Compute market analysis from actual list price vs $900/sqft baseline
     if list_price > 0 and sqft > 0:
-        ppsf = list_price / sqft
-        if ppsf < 650:
-            market_analysis = "Priced below market value — strong buying opportunity."
-        elif ppsf < 900:
-            market_analysis = "Priced competitively for the GTA market."
-        elif ppsf < 1100:
-            market_analysis = "Priced above market — room to negotiate."
-        else:
-            market_analysis = "Priced significantly above market value."
+        market_analysis = market_analysis_from_ppsf(list_price / sqft)
     else:
         market_analysis = "Estimated at $900/sqft — Toronto 2026 market median (train LightGBM model for neighbourhood-level precision)."
 
@@ -924,8 +935,8 @@ async def _handle_stripe_webhook(body: bytes, sig_header: str) -> None:
                     "listing_data": {"voice": voice, "tier": tier, "price_cad": price_cad},
                     "status": "pending",
                     "progress": 0,
-                    "created_at": datetime.utcnow().isoformat(),
-                    "updated_at": datetime.utcnow().isoformat(),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
                 }).execute()
                 logger.info("Video job %s queued after Stripe payment for %s", jid, email)
             except Exception as e:
@@ -963,8 +974,8 @@ async def create_video_job_endpoint(request: VideoJobRequest):
             "listing_data": listing_meta or {},
             "status": "pending",
             "progress": 0,
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }).execute()
         return VideoJobResponse(
             id=jid,
@@ -1032,8 +1043,8 @@ async def create_custom_video_job(
             "listing_data": listing_data,
             "status": "pending",
             "progress": 0,
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }).execute()
         return VideoJobResponse(
             id=job_id,
@@ -1096,7 +1107,7 @@ async def request_video_revision(job_id: str, payload: RevisionRequest):
             "status": "revision_requested",
             "revision_notes": notes,
             "revision_count": revision_count + 1,
-            "updated_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }).eq("id", job_id).execute()
         logger.info("Revision requested for job %s: %s", job_id, notes)
         return {"status": "revision_requested", "job_id": job_id, "notes": notes}
@@ -1265,10 +1276,10 @@ async def agent_start(background_tasks: BackgroundTasks):
             logger.error(f"Agent loop error: {e}")
         finally:
             _agent_status["running"] = False
-            _agent_status["last_run"] = datetime.utcnow().isoformat()
+            _agent_status["last_run"] = datetime.now(timezone.utc).isoformat()
 
     _agent_status["running"] = True
-    _agent_status["started_at"] = datetime.utcnow().isoformat()
+    _agent_status["started_at"] = datetime.now(timezone.utc).isoformat()
     background_tasks.add_task(_run)
     return {"status": "started", "started_at": _agent_status["started_at"]}
 
@@ -1292,7 +1303,7 @@ async def agent_alerts(limit: int = Query(default=50, ge=1, le=200)):
     try:
         if not supabase_client:
             return []
-        result = supabase_client.table("buyer_alerts").select("*").eq("is_active", True).limit(limit).execute()
+        result = supabase_client.table("alerts").select("*").eq("is_active", True).limit(limit).execute()
         return result.data or []
     except Exception as e:
         logger.error(f"agent_alerts error: {e}")
@@ -1304,7 +1315,7 @@ async def mark_alert_seen(alert_id: str):
     try:
         if not supabase_client:
             raise HTTPException(status_code=503, detail="Database not configured")
-        supabase_client.table("buyer_alerts").update({"last_notified_at": datetime.utcnow().isoformat()}).eq("id", alert_id).execute()
+        supabase_client.table("alerts").update({"last_notified_at": datetime.now(timezone.utc).isoformat()}).eq("id", alert_id).execute()
         return {"status": "ok"}
     except HTTPException:
         raise
