@@ -17,6 +17,7 @@ import secrets
 import string
 
 from memory.store import memory_store, search_listings, replace_listings, embed_and_store_listings
+from valuation.model import market_analysis_from_ppsf
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -396,9 +397,7 @@ def _get_or_create_user_by_email(email: str) -> Dict[str, Any]:
         # Row already existed — upsert returned no data, fetch it explicitly.
         resp = (
             client.table("users")
-            .select("*")
-            .eq("email", email)
-            .limit(1)
+            .upsert({"email": email}, on_conflict="email")
             .execute()
         )
         rows = getattr(resp, "data", None) or []
@@ -1235,6 +1234,11 @@ def _normalise_listing(row: dict) -> dict:
         "url":         row.get("url", ""),
         "scraped_at":  str(row.get("scraped_at") or ""),
         "strategy":    row.get("strategy", "unknown"),
+        "photos":      (
+            row.get("photos")
+            or ([row["photo"]] if row.get("photo") else [])
+            or ([p] if (p := (row.get("raw_data") or {}).get("photo")) else [])
+        ),
     }
 
 def _get_comps(neighbourhood: str, limit: int = 5) -> list:

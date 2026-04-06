@@ -8,7 +8,7 @@ import hashlib
 import re
 import time
 from typing import List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +122,7 @@ def _scrape_housesigma_sync(area: str, days_back: int = 30) -> List[Dict[str, An
                         "neighbourhood": "",
                         "lat": None,
                         "lng": None,
-                        "scraped_at": datetime.utcnow().isoformat(),
+                        "scraped_at": datetime.now(timezone.utc).isoformat(),
                     })
             except Exception:
                 continue

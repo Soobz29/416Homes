@@ -166,6 +166,7 @@ class MemoryStore:
             "area": sqft,
             "property_type": str(listing.get("property_type", "Unknown") or "Unknown"),
             "days_on_market": days_on_market,
+            "photo": str(listing.get("photo") or "") or None,
             "listing_agent_email": listing.get("listing_agent_email"),
             "listing_agent_name": listing.get("listing_agent_name"),
             "lat": listing.get("lat"),

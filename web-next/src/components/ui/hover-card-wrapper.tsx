@@ -18,7 +18,7 @@ export function HoverCardWrapper({ children, className = "" }: HoverCardWrapperP
         }
         .hover-card-lift:hover {
           transform: translateY(-6px) scale(1.012);
-          box-shadow: 0 16px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(200,169,110,0.35);
+          box-shadow: 0 16px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(212,175,55,0.35);
         }
       `}</style>
       <div className={`hover-card-lift ${className}`}>{children}</div>

@@ -50,7 +50,7 @@ def market_analysis_from_ppsf(price_per_sqft: float) -> str:
         return "Priced significantly above market value"
 
 
-
+class ValuationModel:
     """LightGBM-based property valuation model"""
     
     def __init__(self):
