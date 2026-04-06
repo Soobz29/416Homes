@@ -36,7 +36,10 @@ def _patch_vertex_generate_videos_response_parser() -> None:
         logger.warning("Veo SDK patch skipped (import): %s", e)
         return
 
-    orig = genai_models._GenerateVideosResponse_from_vertex
+    orig = getattr(genai_models, "_GenerateVideosResponse_from_vertex", None)
+    if orig is None:
+        logger.warning("Veo SDK patch skipped: _GenerateVideosResponse_from_vertex not found in installed google-genai")
+        return
 
     def _extended(
         from_object: Any,

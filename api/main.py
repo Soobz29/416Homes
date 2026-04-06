@@ -302,15 +302,32 @@ class AlertUpdate(BaseModel):
     keywords: Optional[str] = None
     is_active: Optional[bool] = None
 
-from listing_agent import get_last_scan_listings
-from scraper.listing_utils import is_badge_or_headline_only
-from scraper.crawler import (
-    CrawlRequest,
-    CrawlResult,
-    CrawlBackend,
-    crawl_site,
-    get_default_backend,
-)
+try:
+    from listing_agent import get_last_scan_listings
+except ImportError:
+    def get_last_scan_listings(limit=1000, offset=0, city=None, region=None):  # type: ignore[misc]
+        return None, 0, []
+
+try:
+    from scraper.listing_utils import is_badge_or_headline_only
+except ImportError:
+    def is_badge_or_headline_only(listing: dict) -> bool:  # type: ignore[misc]
+        return False
+
+try:
+    from scraper.crawler import (
+        CrawlRequest,
+        CrawlResult,
+        CrawlBackend,
+        crawl_site,
+        get_default_backend,
+    )
+except ImportError:
+    CrawlRequest = None  # type: ignore[assignment,misc]
+    CrawlResult = None  # type: ignore[assignment,misc]
+    CrawlBackend = None  # type: ignore[assignment,misc]
+    crawl_site = None  # type: ignore[assignment]
+    get_default_backend = None  # type: ignore[assignment]
 
 
 # ── Auth endpoints ────────────────────────────────────────────────────────
