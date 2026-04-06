@@ -38,7 +38,7 @@ def _scrape_housesigma_sync(area: str, days_back: int = 30) -> List[Dict[str, An
     page = None
 
     try:
-        page = create_browser(headless=False)
+        page = create_browser(headless=True)
         logger.info(f"HouseSigma: navigating to {url}")
         page.get(url, retry=1, interval=1, timeout=25)
         time.sleep(12)  # HouseSigma has heavy JS + map loading

@@ -34,7 +34,23 @@ from supabase import create_client
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-class ValuationModel:
+def market_analysis_from_ppsf(price_per_sqft: float) -> str:
+    """Return a human-readable market analysis string based on $/sqft.
+
+    Thresholds reflect Toronto GTA 2026 market medians:
+      inner city $950–$1,100/sqft; suburbs/condos $700–$850/sqft.
+    """
+    if price_per_sqft < 650:
+        return "Priced below market value — strong buying opportunity"
+    elif price_per_sqft < 900:
+        return "Priced competitively for the GTA market"
+    elif price_per_sqft < 1100:
+        return "Priced above market — room to negotiate"
+    else:
+        return "Priced significantly above market value"
+
+
+
     """LightGBM-based property valuation model"""
     
     def __init__(self):
@@ -149,6 +165,7 @@ class ValuationModel:
         
         # Train LightGBM model
         with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
             model = lgb.LGBMRegressor(
                 objective='regression',
                 n_estimators=100,
@@ -291,23 +308,13 @@ class ValuationModel:
     def generate_market_analysis(self, estimated_price: int, property_data: Dict[str, Any]) -> str:
         """Generate market analysis text"""
 
-        # Simple heuristics for market analysis
         sqft = property_data.get('sqft') or 1000
         try:
             sqft = float(sqft) or 1000
         except (TypeError, ValueError):
             sqft = 1000
         price_per_sqft = estimated_price / sqft
-        
-        # Toronto 2026: inner city $950–$1,100/sqft; suburbs/condos $700–$850/sqft
-        if price_per_sqft < 650:
-            return "Priced below market value — strong buying opportunity"
-        elif price_per_sqft < 900:
-            return "Priced competitively for the GTA market"
-        elif price_per_sqft < 1100:
-            return "Priced above market — room to negotiate"
-        else:
-            return "Priced significantly above market value"
+        return market_analysis_from_ppsf(price_per_sqft)
 
 def main():
     """Main training pipeline"""
