@@ -13,6 +13,7 @@ try:
     from sklearn.model_selection import train_test_split  # type: ignore
     from sklearn.metrics import mean_absolute_percentage_error  # type: ignore
     from sklearn.preprocessing import LabelEncoder  # type: ignore
+    import joblib
     _DS_ENABLED = True
 except Exception:  # pragma: no cover
     pd = None  # type: ignore
@@ -21,9 +22,9 @@ except Exception:  # pragma: no cover
     train_test_split = None  # type: ignore
     mean_absolute_percentage_error = None  # type: ignore
     LabelEncoder = None  # type: ignore
+    joblib = None  # type: ignore
     _DS_ENABLED = False
 from typing import List, Dict, Any
-import joblib
 import os
 from dotenv import load_dotenv
 import logging
@@ -203,11 +204,14 @@ class ValuationModel:
     
     def save_model(self, filepath: str = 'valuation_model.pkl'):
         """Save the trained model and encoders"""
-        
+
         if self.model is None:
             logger.error("No model to save")
             return False
-        
+        if joblib is None:
+            logger.error("joblib not available; cannot save model")
+            return False
+
         try:
             # Save model
             joblib.dump(self.model, filepath)
@@ -225,7 +229,11 @@ class ValuationModel:
     
     def load_model(self, filepath: str = 'valuation_model.pkl'):
         """Load the trained model and encoders"""
-        
+
+        if joblib is None:
+            logger.warning("joblib not available; model loading skipped")
+            return False
+
         try:
             # Load model
             self.model = joblib.load(filepath)
