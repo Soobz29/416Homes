@@ -1,197 +1,215 @@
 # 416Homes — Session Handoff
-
-**Last updated:** 2026-04-01  
-**Branch:** `claude/add-claude-documentation-9bkXo`  
-**HEAD:** `e4f0280`  
-**Repo:** `github.com/Soobz29/416Homes`
+_Last updated: 2026-04-06_
 
 ---
 
-## What Was Done This Session
+## Current State
 
-Two large commits + one fix were pushed:
+The project is **fully deployed** and functional on Vercel (frontend) + Railway (backend).
+All critical bugs from the previous two sessions have been fixed and merged to `main`.
 
-| Commit | What |
-|---|---|
-| `7ae2732` | P1–P5: CORS, embedding cache, concurrent emails, valuation confidence, scraper fixes, workflow parallelization |
-| `5f57908` | P6: auth system, dashboard pagination, video revision endpoint + UI, Telegram `/newalert` flow |
-| `e4f0280` | Fix: `neighborhoods` → `neighbourhoods` in `buyer_alerts` schema (init_db.py) |
-
----
-
-## Current State of Every File Changed
-
-### `api/main.py`
-- CORS reads from `APP_URL` env var (comma-separated list) instead of `"*"`
-- All list endpoints have bounded pagination: `limit: int = Query(default=20, ge=1, le=200)`, `offset: int = Query(default=0, ge=0)`
-- New endpoints added:
-  - `POST /api/auth/magic-link` — sends Supabase OTP to email
-  - `POST /api/auth/session` — validates token, returns user email
-  - `POST /api/video-jobs/{job_id}/revision` — max 1 revision per job, stores notes, sets status `revision_requested`
-  - `GET /agent/status`, `POST /agent/start`, `POST /agent/stop` — agent control
-  - `GET /agent/alerts`, `PATCH /agent/alerts/{id}/seen` — alert management
-  - `POST /api/run-agent` — protected by `AGENT_SECRET` header
-  - `GET /auth.js` — serves `web/auth.js`
-
-### `api/init_db.py`
-- `video_jobs` table: added `revision_count INTEGER DEFAULT 0`, `revision_notes TEXT`
-- `video_jobs` status CHECK includes `'complete'`, `'revision_requested'`
-- `buyer_alerts` table: `neighbourhoods TEXT[] DEFAULT '{}'` (British spelling, was `neighborhoods`)
-- Index: `idx_sold_comps_neighbourhood` (was `idx_sold_comps_neighborhood`)
-
-### `memory/store.py`
-- `MemoryStore.__init__` initialises `self._embedding_cache: Dict[str, List[float]] = {}`
-- `embed_text()` returns cached value if present; on cache miss calls Gemini then stores result; evicts oldest entry when cache exceeds 1024
-
-### `valuation/model.py`
-- During training, stores `self.numeric_medians['price_per_sqft'] = float(df['price_per_sqft'].median())`
-- `predict()` uses `median_ppsf = self.numeric_medians.get('price_per_sqft', 700)` for confidence calculation (was incorrectly keyed on `'sqft'`)
-
-### `agent/main.py`
-- Email sending is now concurrent: `asyncio.gather(*[_process_match(l, s) for l, s in good_matches])` with `Semaphore(5)`
-- Agent email reads from env: `agent_email = os.getenv("LISTING_AGENT_EMAIL", "listing@realestate.com")`
-
-### `scraper/housesigma.py`
-- `AREA_URLS["mississauga"]` uses municipality `10420` (was `10343`, same as toronto)
-
-### `scraper/kijiji.py` + `scraper/redfin.py`
-- Removed ~90 lines each of dead `extract_*_listing` / `extract_*_listing_playwright` functions
-- City mapping: `"Toronto" if area.lower() in ("gta", "toronto") else area.title()`
-
-### `scraper/orchestrator.py`
-- Comment clarified: realtor.ca excluded due to Cloudflare 403s; instructions left for re-enabling
-
-### `telegram_bot.py`
-- Added `import uuid`
-- Added `async def h_newalert(self, update, context)` — 3-step guided alert creation (city → budget → bedrooms), saves to Supabase `buyer_alerts`
-- `h_text_message` checks `context.user_data.get("alert_step")` first before photo-job handling
-- Registered `CommandHandler("newalert", self.h_newalert)`
-- Bot command list includes `BotCommand("newalert", "Create a new listing alert (guided)")`
-
-### `web/auth.js` (NEW FILE)
-- Handles Supabase magic-link `#access_token=...` URL callback on page load
-- Persists session (email + access_token) to `localStorage` under key `416homes_session`
-- Exposes `window.Auth`:
-  - `Auth.getEmail()` — returns email or null
-  - `Auth.headers(extra)` — returns fetch headers with `x-user-email` + `Authorization`
-  - `Auth.saveSession(email, token)` — manual session store
-  - `Auth.logout()` — clears storage, redirects to `/login`
-  - `Auth.isLoggedIn()` — bool
-  - `Auth.init()` — call on page load to process callback
-
-### `web/dashboard.html`
-- Includes `<script src="/auth.js"></script>`; all fetches use `Auth.headers()`
-- Pagination state: `PAGE_SIZE=20`, `offset`, `hasMore`, `loadingMore`
-- `fetchListings(off, replace)` — `replace=true` resets list on filter change, `false` appends for "Load More"
-- "Load More" button visible when `!loading && !error && hasMore && listings.length > 0`
-- `getMockListings()` function removed entirely
-- Error banner shown on API failure
-- XSS fix: listing URLs validated with `/^https?:\/\//i` before use in `href`
-
-### `web/video.html`
-- `simulateDemo()` function removed entirely
-- Revision block `<div id="revisionBlock">` shown after video completes
-- `submitRevision()` POSTs to `POST /api/video-jobs/{id}/revision` with notes from textarea
-- Errors shown inline; revision button disabled after submission
-
-### `web/login.html`
-- `submitMagicLink()` does real `fetch('/api/auth/magic-link', { method: 'POST', body: JSON.stringify({ email }) })`
-- Removed `setTimeout` simulation
-
-### `web/index.html`
-- `submitAlert()` POSTs to `/api/alerts` with `neighborhoods, min_price, max_price, min_bedrooms, property_types`
-- `simulateOutreach()` calls `POST /api/run-agent` with `AGENT_SECRET` header from input field
-
-### `web/agent.html`
-- `const API = window.location.origin;` (was hardcoded `'http://localhost:8000'`)
-
-### `.github/workflows/nightly.yml`
-- Three jobs: `scrape` (sources in parallel steps) + `train-model` (parallel with scrape) → `agent` (needs: scrape) → `notify` (needs: all three)
-
-### `.github/workflows/retrain.yml`
-- Real MAPE: trains on 80% of `sold_comps`, evaluates on 20% holdout using `mean_absolute_percentage_error`
-- Exits code 1 if MAPE ≥ 15% (previously always passed with `np.random.uniform(8,15)`)
+### Live URLs
+- **Frontend (Vercel):** check Vercel dashboard — Next.js `web-next/`
+- **Backend (Railway):** `api-server` service — FastAPI on port 8000
+- **Health check:** `GET /health` → `{"status":"ok"}`
 
 ---
 
-## Known Remaining Tasks / Next Steps
+## What Was Completed (This Session)
 
-### High priority
-- [ ] **Run DB migration**: The schema changes in `init_db.py` (revision columns, neighbourhoods spelling) need to be applied in Supabase SQL editor. Run `python api/init_db.py` to get the SQL, then paste into Supabase.
-- [ ] **Train valuation model**: Run `python valuation/model.py` once sold_comps are in Supabase to produce `valuation_model.pkl`. Without this, API falls back to `$600/sqft` estimate.
-- [ ] **Set env vars on Railway**: `APP_URL` (your Vercel domain), `AGENT_SECRET`, `LISTING_AGENT_EMAIL`
-- [ ] **Set env vars on Vercel**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (for magic-link auth flow)
+### Design Overhaul (PR #5 — merged)
+- "Neon-Noir Obsidian Luxury" redesign applied across `web-next/`
+- Cormorant Garamond serif headlines, Brushed Gold `#D4AF37`, Obsidian `#0B0B0B`
+- Glassmorphism utilities: `.glass-panel`, `.gold-gradient`, `.gold-glow`
+- Framer Motion staggered entrance animations replacing manual `IntersectionObserver`
+- Files: `layout.tsx`, `globals.css`, `page.tsx`, `listing-card.tsx`, `video/page.tsx`
 
-### Medium priority
-- [ ] **Telegram bot polling vs webhook**: Currently uses long-polling. For production, set a webhook URL pointing to Railway.
-- [ ] **Video revision worker**: `revision_requested` status is stored but no background job picks it up yet. Need to wire `video_pipeline/pipeline.py` to re-run when status = `revision_requested`.
-- [ ] **Auth on more pages**: `web/video.html` and `web/agent.html` include `auth.js` but don't gate access. Add a redirect to `/login` if `!Auth.isLoggedIn()`.
-- [ ] **Rate limiting**: No per-IP rate limiting on API endpoints yet. Consider adding `slowapi` middleware.
+### Backend Hardening + Photos (PR #7 — merged)
+- `secrets.choice` replaces `random.choice` in link-code generation
+- Atomic upsert for user creation (no race condition)
+- Video worker wraps job in try/except, marks `failed` on crash
+- Pydantic v2: `model_dump()` replaces `dict()`
+- `datetime.now(timezone.utc)` replaces deprecated `datetime.utcnow()`
+- `buyer_alerts` table renamed to `alerts` (aligned with API write path)
+- `market_analysis_from_ppsf()` extracted to `valuation/model.py`, shared with `api/main.py`
+- Photos wired end-to-end: scraper `photo` field → `listings.photo` DB column → API → dashboard cards
+- Old gold tokens `#c8a96e` purged from all UI components → `#D4AF37`
+- HouseSigma scraper: `headless=True`
 
-### Low priority
-- [ ] `web/agent.html` agent control routes (`/agent/start`, `/agent/stop`) need the `AGENT_SECRET` header wired up the same way `index.html` does it.
-- [ ] Zoocasa scraper returns null sqft for most listings — upstream API limitation, nothing actionable until Zoocasa exposes it.
+### Bug Fixes (PR #8 — merged)
+- **Embedding error fixed:** Removed unsupported `output_dimensionality=768` kwarg from `memory/store.py` `embed_content()` — was causing `TypeError` on every embedding call, so no listing ever got a vector
+- **Bedroom parse error fixed:** Added `_parse_room_count()` in `memory/store.py` — converts realtor.ca's `"1 + 1"` (bedroom + den) strings to `"2"` before DB insert, fixing `22P02 invalid input syntax for type numeric`
+- **Railway startup crash fixed:** `import joblib` moved inside `try/except` in `valuation/model.py` — joblib is absent from `requirements-railway.txt`, was crashing the API on startup; `save_model`/`load_model` now guard against `joblib is None`
 
 ---
 
-## Architecture Quick Reference
+## File Map
 
 ```
-scraper/          → concurrent multi-source runner (Kijiji, HouseSigma, Redfin, Zoocasa)
-memory/store.py   → Supabase pgvector embed + search (LRU cache)
-valuation/model.py→ LightGBM train + inference (price_per_sqft target)
-agent/main.py     → nightly match → valuate → email loop (concurrent)
-video_pipeline/   → URL → Gemini script → ElevenLabs TTS → Suno music → MP4
-api/main.py       → FastAPI: listings, alerts, valuation, video, Stripe, auth
-telegram_bot.py   → Telegram bot with /newalert guided flow
-web/              → Static HTML/JS frontend (Vercel)
+scraper/
+  orchestrator.py       concurrent multi-source runner + dedup
+  realtor_ca.py         stealth + API + Playwright fallback; photo field included
+  housesigma.py         sold comps, headless=True
+  kijiji.py / redfin.py / zoocasa.py
+  run_all.py            CLI: python -m scraper.run_all --source X --area Y
+
+memory/store.py
+  _parse_room_count()   converts "1 + 1" → "2" before DB insert
+  embed_text()          no output_dimensionality kwarg (fixed)
+
+valuation/model.py
+  market_analysis_from_ppsf()  top-level helper shared with api/main.py
+  ValuationModel               joblib inside try/except (Railway-safe)
+  _DS_ENABLED                  False on Railway (LightGBM not installed there)
+
+agent/main.py           nightly match → valuate → email loop
+  table: "alerts"       (not "buyer_alerts")
+  alert fields: min_beds, property_types, neighbourhoods
+
+api/main.py             FastAPI
+  /health               → {"status":"ok"}
+  /api/listings         paginated, filterable
+  /api/valuate          LightGBM → fallback $900/sqft
+  /api/alerts           CRUD (table: alerts)
+  /api/video/*          job create/status/revision
+  /api/stripe/webhook   payment handler
+
+api/init_db.py          prints Supabase schema SQL
+
+web-next/
+  src/app/layout.tsx          Cormorant Garamond + Inter fonts
+  src/app/globals.css         CSS tokens + glass/gold utilities
+  src/app/page.tsx            landing page (Framer Motion)
+  src/app/dashboard/page.tsx  dashboard + listing cards + valuation
+  src/app/video/page.tsx      video order flow
+  src/components/listing-card.tsx   glassmorphic card
+  src/lib/api.ts              reads photos from l.photos or l.photo
+  src/lib/supabase.ts         placeholder fallback for missing env vars
 ```
 
-## Tech Stack
+---
 
-| Layer | Tool |
-|---|---|
-| Scraping | scrapling + DrissionPage / Playwright fallback |
-| LLM | Gemini 2.5 Flash |
-| Embeddings | Gemini text-embedding-004 (768-dim) |
-| Database | Supabase Postgres + pgvector |
-| ML | LightGBM |
-| API | FastAPI + uvicorn (Railway) |
-| Auth | Supabase magic-link OTP |
-| Email | Resend |
-| Payments | Stripe |
-| Video | ElevenLabs TTS, Suno music |
-| CI/CD | GitHub Actions |
-| Frontend | Static HTML + React (CDN Babel) on Vercel |
-| Bot | python-telegram-bot |
+## Database Schema Notes
 
-## Env Vars Required
+Key tables in Supabase:
+- `listings` — active listings with `photo TEXT`, `embedding vector(768)`
+- `sold_comps` — sold comps from HouseSigma
+- `video_jobs` — video pipeline state machine
+- `alerts` — buyer alerts (**NOT** `buyer_alerts`)
+- `agent_matches` — listing × alert match log
+- `users` — email-based user records
+
+To re-init schema: `python api/init_db.py` → copy SQL → paste in Supabase SQL Editor.
+The `photo TEXT` column is included in the schema. If your DB pre-dates it, run:
+```sql
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS photo TEXT;
+```
+
+---
+
+## Environment Variables Required
 
 ```
-# Supabase
 SUPABASE_URL=
-SUPABASE_SERVICE_KEY=
+SUPABASE_KEY=                    # anon key
+SUPABASE_SERVICE_ROLE_KEY=       # service role key (preferred server-side)
 
-# LLMs
 GEMINI_API_KEY=
+GEMINI_EMBEDDING_MODEL=gemini-embedding-001   # optional, this is the default
 
-# Email
 RESEND_API_KEY=
-FROM_EMAIL=
+AGENT_EMAIL=                     # from address for outreach emails
+LISTING_AGENT_EMAIL=             # default outreach recipient
 
-# Payments
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
 
-# Video
 ELEVENLABS_API_KEY=
-SUNO_API_KEY=
+VEO_PROJECT_ID=                  # Google Vertex AI project for Veo
+GOOGLE_APPLICATION_CREDENTIALS= # path to service account JSON
 
-# App
-APP_URL=https://your-vercel-domain.vercel.app
-AGENT_SECRET=                # any secret string for /api/run-agent
-LISTING_AGENT_EMAIL=         # default email when agent email unknown
-
-# Telegram
-TELEGRAM_BOT_TOKEN=
+AGENT_SECRET=                    # header secret for /agent/* endpoints
 ```
+
+---
+
+## Pending / Next Steps
+
+### Must Do Before Photos Show Up
+1. **Run Supabase photo migration** (if DB was created before `photo` column):
+   ```sql
+   ALTER TABLE listings ADD COLUMN IF NOT EXISTS photo TEXT;
+   ```
+2. **Run one full scraper pass** to populate `photo` with real URLs:
+   ```bash
+   python -m scraper.run_all --source all --area gta
+   ```
+
+### Must Do Before Valuation Works Accurately
+3. **Train the LightGBM model** (needs sold comps in DB first):
+   ```bash
+   python valuation/model.py
+   ```
+   Or: GitHub Actions → "416Homes Model Retraining" → Run workflow.
+   Target MAPE < 10%. Workflow commits `valuation_model.pkl` back to repo so Railway picks it up.
+
+### Nice to Have
+- Improve sold comps neighbourhood coverage (HouseSigma `neighbourhood` field often blank)
+- Listing photo carousel in dashboard card (currently single photo)
+- "Save listing" / "mark seen" per-user persistence
+- Telegram alert integration (scaffolded, needs `TELEGRAM_BOT_TOKEN` env var)
+
+---
+
+## Test Commands
+
+```bash
+# Scraper — should show ≥10 listings, no 22P02 numeric errors, no embedding TypeErrors
+python -m scraper.run_all --source realtor_ca --area toronto
+python -m scraper.run_all --source all --area gta
+
+# API
+uvicorn api.main:app --reload --port 8000
+curl http://localhost:8000/health
+curl "http://localhost:8000/api/listings?limit=5"
+
+# Valuation model
+python valuation/model.py    # target MAPE <10%
+
+# Agent loop
+python agent/main.py
+
+# Video pipeline
+python video_pipeline/pipeline.py https://www.realtor.ca/real-estate/LISTING_URL
+```
+
+---
+
+## PR / Branch History
+
+| PR | Status | Summary |
+|----|--------|---------|
+| #5 | Merged | Luxury redesign |
+| #6 | Merged | Copilot codebase analysis |
+| #7 | Merged | Photos end-to-end + backend hardening |
+| #8 | Merged | 3 bug fixes (embedding / bedroom parse / Railway startup) |
+
+All work is on `main`. No open PRs. No open conflicts.
+
+---
+
+## Tech Stack Quick Reference
+
+| Layer | Tool |
+|---|---|
+| Frontend | Next.js 16 + React 19 + TypeScript + Tailwind 4 + Framer Motion |
+| Backend | FastAPI + uvicorn (Railway) |
+| Scraping | scrapling + AsyncDynamicSession / Playwright fallback |
+| LLM | Gemini 2.5 Flash (`google-genai` SDK) |
+| Embeddings | `gemini-embedding-001` via `client.models.embed_content()` |
+| Database | Supabase Postgres + pgvector (768-dim) |
+| ML | LightGBM (disabled on Railway; fallback $900/sqft used) |
+| Email | Resend |
+| Payments | Stripe |
+| Video | ElevenLabs TTS + Veo (Vertex AI) |
+| CI/CD | GitHub Actions (nightly scrape + model retrain workflows) |
