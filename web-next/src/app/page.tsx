@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { createAlert } from "@/lib/alerts";
 import { fetchListings } from "@/lib/api";
@@ -39,30 +40,6 @@ export default function LandingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [formSuccess, setFormSuccess] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-
-  // Scroll-reveal
-  useEffect(() => {
-    const steps = document.querySelectorAll<HTMLElement>(".step,.feat,.ss-item");
-    const obs = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((e) => {
-          if (e.isIntersecting) {
-            const el = e.target as HTMLElement;
-            el.style.opacity = "1";
-            el.style.transform = "translateY(0)";
-          }
-        });
-      },
-      { threshold: 0.1 },
-    );
-    steps.forEach((el) => {
-      el.style.opacity = "0";
-      el.style.transform = "translateY(18px)";
-      el.style.transition = "opacity 0.5s ease,transform 0.5s ease";
-      obs.observe(el);
-    });
-    return () => obs.disconnect();
-  }, []);
 
   // Live ticker from API
   useEffect(() => {
@@ -127,11 +104,11 @@ export default function LandingPage() {
   const displayTicker = [...tickerItems, ...tickerItems];
 
   return (
-    <div className="min-h-screen bg-[#0a0a08] text-[#f5f4ef] font-['Syne',system-ui,sans-serif]">
+    <div className="min-h-screen bg-[#0B0B0B] text-[#f5f4ef] font-['Syne',system-ui,sans-serif]">
       {/* Top nav */}
-      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between border-b border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.75)] px-16 py-6 backdrop-blur-xl max-md:px-6">
+      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between border-b border-[rgba(212,175,55,0.2)] bg-[rgba(10,10,8,0.75)] px-16 py-6 backdrop-blur-xl max-md:px-6">
         <div className="logo text-[1.3rem] font-extrabold tracking-[0.05em]">
-          <span className="text-[#c8a96e]">416</span>
+          <span className="text-[#D4AF37]">416</span>
           Homes
           <sub className="ml-1 align-middle font-['DM_Mono',monospace] text-[0.6rem] font-normal tracking-[0.1em] text-[#6b6b60]">
             GTA · MISSISSAUGA
@@ -141,7 +118,7 @@ export default function LandingPage() {
           <li>
             <button
               onClick={() => scrollToId("how")}
-              className="bg-transparent text-inherit transition-colors hover:text-[#c8a96e]"
+              className="bg-transparent text-inherit transition-colors hover:text-[#D4AF37]"
             >
               How It Works
             </button>
@@ -149,7 +126,7 @@ export default function LandingPage() {
           <li>
             <button
               onClick={() => scrollToId("features")}
-              className="bg-transparent text-inherit transition-colors hover:text-[#c8a96e]"
+              className="bg-transparent text-inherit transition-colors hover:text-[#D4AF37]"
             >
               Features
             </button>
@@ -157,7 +134,7 @@ export default function LandingPage() {
           <li>
             <button
               onClick={() => scrollToId("alert")}
-              className="bg-transparent text-inherit transition-colors hover:text-[#c8a96e]"
+              className="bg-transparent text-inherit transition-colors hover:text-[#D4AF37]"
             >
               Get Started
             </button>
@@ -165,7 +142,7 @@ export default function LandingPage() {
         </ul>
         <div className="flex items-center gap-3">
           <button
-            className="nav-cta bg-[#c8a96e] px-6 py-2 font-['DM_Mono',monospace] text-[0.72rem] font-medium uppercase tracking-[0.08em] text-black transition-colors hover:bg-[#e4c98a]"
+            className="nav-cta gold-gradient gold-glow px-6 py-2 font-['DM_Mono',monospace] text-[0.72rem] font-medium uppercase tracking-[0.08em] text-black transition-opacity hover:opacity-90"
             onClick={() => scrollToId("alert")}
           >
             Set My Alert
@@ -177,27 +154,27 @@ export default function LandingPage() {
             aria-label={menuOpen ? "Close menu" : "Open menu"}
             aria-expanded={menuOpen}
           >
-            <span className={`block h-px w-5 bg-[#c8a96e] transition-all ${menuOpen ? "translate-y-[6px] rotate-45" : ""}`} />
-            <span className={`block h-px w-5 bg-[#c8a96e] transition-all ${menuOpen ? "opacity-0" : ""}`} />
-            <span className={`block h-px w-5 bg-[#c8a96e] transition-all ${menuOpen ? "-translate-y-[6px] -rotate-45" : ""}`} />
+            <span className={`block h-px w-5 bg-[#D4AF37] transition-all ${menuOpen ? "translate-y-[6px] rotate-45" : ""}`} />
+            <span className={`block h-px w-5 bg-[#D4AF37] transition-all ${menuOpen ? "opacity-0" : ""}`} />
+            <span className={`block h-px w-5 bg-[#D4AF37] transition-all ${menuOpen ? "-translate-y-[6px] -rotate-45" : ""}`} />
           </button>
         </div>
       </nav>
 
       {/* Mobile menu */}
       {menuOpen && (
-        <div className="fixed inset-x-0 top-[4.3rem] z-40 border-b border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.97)] px-6 py-6 md:hidden">
+        <div className="fixed inset-x-0 top-[4.3rem] z-40 border-b border-[rgba(212,175,55,0.2)] bg-[rgba(10,10,8,0.97)] px-6 py-6 md:hidden">
           <ul className="flex flex-col gap-6 font-['DM_Mono',monospace] text-[0.8rem] uppercase tracking-[0.1em] text-[#6b6b60]">
-            <li><button onClick={() => scrollToId("how")} className="hover:text-[#c8a96e]">How It Works</button></li>
-            <li><button onClick={() => scrollToId("features")} className="hover:text-[#c8a96e]">Features</button></li>
-            <li><button onClick={() => scrollToId("alert")} className="hover:text-[#c8a96e]">Get Started</button></li>
-            <li><Link href="/dashboard" className="text-[#c8a96e] hover:text-[#e4c98a]" onClick={() => setMenuOpen(false)}>Dashboard →</Link></li>
+            <li><button onClick={() => scrollToId("how")} className="hover:text-[#D4AF37]">How It Works</button></li>
+            <li><button onClick={() => scrollToId("features")} className="hover:text-[#D4AF37]">Features</button></li>
+            <li><button onClick={() => scrollToId("alert")} className="hover:text-[#D4AF37]">Get Started</button></li>
+            <li><Link href="/dashboard" className="text-[#D4AF37] hover:text-[#F3E5AB]" onClick={() => setMenuOpen(false)}>Dashboard →</Link></li>
           </ul>
         </div>
       )}
 
       {/* Ticker */}
-      <div className="fixed left-0 right-0 top-[4.5rem] z-40 border-b border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.9)] py-2 max-md:hidden">
+      <div className="fixed left-0 right-0 top-[4.5rem] z-40 border-b border-[rgba(212,175,55,0.2)] bg-[rgba(10,10,8,0.9)] py-2 max-md:hidden">
         <div className="flex animate-[ticker_35s_linear_infinite] gap-20 whitespace-nowrap text-[0.68rem] font-['DM_Mono',monospace] text-[#6b6b60]">
           {displayTicker.map((text, idx) => (
             <span key={idx}>{text}</span>
@@ -208,25 +185,25 @@ export default function LandingPage() {
       {/* Hero */}
       <section className="grid min-h-screen grid-cols-1 pt-[7.5rem] md:grid-cols-2">
         <div className="flex flex-col justify-center px-16 pb-16 pt-24 max-md:px-6">
-          <div className="mb-8 flex items-center gap-3 font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.18em] text-[#c8a96e]">
-            <span className="h-px w-8 bg-[#c8a96e]" />
+          <div className="mb-8 flex items-center gap-3 font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.18em] text-[#D4AF37]">
+            <span className="h-px w-8 bg-[#D4AF37]" />
             Toronto &amp; Mississauga property search, done for you
           </div>
-          <h1 className="mb-8 text-[clamp(2.8rem,4.5vw,5rem)] font-extrabold leading-[0.95] tracking-[-0.03em]">
+          <h1 className="mb-8 font-display text-[clamp(2.8rem,4.5vw,5rem)] font-bold leading-[0.95] tracking-[-0.02em]">
             Stop chasing.
             <br />
             Let listings
             <br />
-            <span className="text-[#c8a96e]">chase you.</span>
+            <span className="text-[#D4AF37]">chase you.</span>
           </h1>
           <div className="mb-10 flex gap-2">
-            <span className="border border-[rgba(200,169,110,0.2)] bg-[rgba(200,169,110,0.12)] px-3 py-1 font-['DM_Mono',monospace] text-[0.65rem] uppercase tracking-[0.1em] text-[#c8a96e]">
+            <span className="border border-[rgba(212,175,55,0.2)] bg-[rgba(212,175,55,0.12)] px-3 py-1 font-['DM_Mono',monospace] text-[0.65rem] uppercase tracking-[0.1em] text-[#D4AF37]">
               Toronto
             </span>
-            <span className="border border-[rgba(200,169,110,0.2)] bg-[rgba(200,169,110,0.12)] px-3 py-1 font-['DM_Mono',monospace] text-[0.65rem] uppercase tracking-[0.1em] text-[#c8a96e]">
+            <span className="border border-[rgba(212,175,55,0.2)] bg-[rgba(212,175,55,0.12)] px-3 py-1 font-['DM_Mono',monospace] text-[0.65rem] uppercase tracking-[0.1em] text-[#D4AF37]">
               Mississauga
             </span>
-            <span className="border border-[rgba(200,169,110,0.2)] px-3 py-1 font-['DM_Mono',monospace] text-[0.65rem] uppercase tracking-[0.1em] text-[#c8a96e]">
+            <span className="border border-[rgba(212,175,55,0.2)] px-3 py-1 font-['DM_Mono',monospace] text-[0.65rem] uppercase tracking-[0.1em] text-[#D4AF37]">
               50+ Neighbourhoods
             </span>
           </div>
@@ -236,13 +213,14 @@ export default function LandingPage() {
           </p>
           <div className="flex items-center gap-4">
             <Button
-              className="bg-[#c8a96e] px-8 py-3 text-[0.88rem] font-bold uppercase tracking-[0.05em] text-black hover:bg-[#e4c98a]"
+              variant="gold"
+              className="gold-glow px-8 py-3 text-[0.88rem] font-bold uppercase tracking-[0.05em]"
               onClick={() => scrollToId("alert")}
             >
               Set My Alert Free
             </Button>
             <button
-              className="border border-[rgba(200,169,110,0.2)] px-7 py-3 font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.08em] text-[#f5f4ef] transition-colors hover:border-[#c8a96e] hover:text-[#c8a96e]"
+              className="border border-[rgba(212,175,55,0.2)] px-7 py-3 font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.08em] text-[#f5f4ef] transition-colors hover:border-[#D4AF37] hover:text-[#D4AF37]"
               onClick={() => scrollToId("how")}
             >
               See How →
@@ -252,13 +230,13 @@ export default function LandingPage() {
 
         {/* Hero card — illustrative example */}
         <div className="relative hidden items-center justify-center p-16 md:flex">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(200,169,110,0.07)_0%,transparent_70%)]" />
-          <div className="w-[340px] animate-[float_6s_ease-in-out_infinite] border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.03)] p-8 backdrop-blur-md">
-            <div className="mb-6 flex items-center gap-2 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.15em] text-[#c8a96e]">
-              <span className="h-[6px] w-[6px] animate-[pulse_2s_ease-in-out_infinite] rounded-full bg-[#c8a96e]" aria-hidden="true" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(212,175,55,0.07)_0%,transparent_70%)]" />
+          <div className="w-[340px] animate-[float_6s_ease-in-out_infinite] glass-panel p-8">
+            <div className="mb-6 flex items-center gap-2 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.15em] text-[#D4AF37]">
+              <span className="h-[6px] w-[6px] animate-[pulse_2s_ease-in-out_infinite] rounded-full bg-[#D4AF37]" aria-hidden="true" />
               Live Update
             </div>
-            <div className="mb-2 inline-block bg-[rgba(200,169,110,0.1)] px-2 py-1 font-['DM_Mono',monospace] text-[0.6rem] uppercase tracking-[0.15em] text-[#c8a96e]">
+            <div className="mb-2 inline-block bg-[rgba(212,175,55,0.1)] px-2 py-1 font-['DM_Mono',monospace] text-[0.6rem] uppercase tracking-[0.15em] text-[#D4AF37]">
               Mississauga
             </div>
             <div className="mb-1 text-[1rem] font-bold">1480 Erin Mills Pkwy, Unit 12</div>
@@ -272,7 +250,7 @@ export default function LandingPage() {
               </span>
               <span className="font-['DM_Mono',monospace] text-[0.62rem] text-[#6b6b60]">vs. 9 comps</span>
             </div>
-            <div className="mb-5 grid grid-cols-3 gap-2 border-y border-[rgba(200,169,110,0.2)] py-5">
+            <div className="mb-5 grid grid-cols-3 gap-2 border-y border-[rgba(212,175,55,0.2)] py-5">
               {[["3", "Beds"], ["2", "Baths"], ["11", "DOM"]].map(([v, l]) => (
                 <div key={l} className="text-center">
                   <div className="text-[1.05rem] font-bold">{v}</div>
@@ -282,7 +260,7 @@ export default function LandingPage() {
             </div>
             <Link
               href="/dashboard"
-              className="block w-full bg-[#c8a96e] px-4 py-3 text-center font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-black transition-colors hover:bg-[#e4c98a]"
+              className="block w-full bg-[#D4AF37] px-4 py-3 text-center font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-black transition-colors hover:bg-[#F3E5AB]"
             >
               View Live Listings →
             </Link>
@@ -291,28 +269,35 @@ export default function LandingPage() {
       </section>
 
       {/* Stats strip */}
-      <div className="grid border-y border-[rgba(200,169,110,0.2)] md:grid-cols-4">
+      <div className="grid border-y border-[rgba(212,175,55,0.2)] md:grid-cols-4">
         {[
           ["24/7", "Continuous monitoring"],
           ["50+", "GTA neighbourhoods"],
           ["2", "Cities: Toronto & Mississauga"],
           ["$0", "To get started"],
-        ].map(([num, label]) => (
-          <div key={label} className="ss-item border-r border-[rgba(200,169,110,0.2)] p-10 last:border-r-0">
-            <div className="mb-1 text-[2.8rem] font-extrabold text-[#c8a96e]">{num}</div>
+        ].map(([num, label], i) => (
+          <motion.div
+            key={label}
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: i * 0.1 }}
+            className="border-r border-[rgba(212,175,55,0.2)] p-10 last:border-r-0"
+          >
+            <div className="mb-1 text-[2.8rem] font-extrabold text-[#D4AF37]">{num}</div>
             <div className="font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-[#6b6b60]">
               {label}
             </div>
-          </div>
+          </motion.div>
         ))}
       </div>
 
       {/* Process */}
       <section id="how" className="px-16 py-28 max-md:px-6 max-md:py-16">
-        <div className="mb-3 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.2em] text-[#c8a96e]">
+        <div className="mb-3 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.2em] text-[#D4AF37]">
           Process
         </div>
-        <h2 className="mb-16 max-w-[22ch] text-[clamp(1.8rem,3vw,3.2rem)] font-extrabold leading-[1.05] tracking-[-0.02em]">
+        <h2 className="mb-16 max-w-[22ch] font-display text-[clamp(1.8rem,3vw,3.2rem)] font-bold leading-[1.05] tracking-[-0.01em]">
           Four steps, then you&apos;re done
         </h2>
         <div className="grid gap-[2px] md:grid-cols-4">
@@ -341,28 +326,32 @@ export default function LandingPage() {
               t: "We reach out to the agent",
               d: "When something matches your criteria, a professional note goes to the listing agent requesting a showing — so the email is already sent by the time you wake up.",
             },
-          ].map((s) => (
-            <div
+          ].map((s, i) => (
+            <motion.div
               key={s.n}
-              className="step border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.02)] p-10 transition-colors hover:bg-[rgba(200,169,110,0.04)]"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: i * 0.1 }}
+              className="border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.02)] p-10 transition-colors hover:bg-[rgba(212,175,55,0.04)]"
             >
-              <div className="mb-5 font-['DM_Mono',monospace] text-[0.62rem] tracking-[0.18em] text-[#c8a96e]">
+              <div className="mb-5 font-['DM_Mono',monospace] text-[0.62rem] tracking-[0.18em] text-[#D4AF37]">
                 {s.n}
               </div>
               <div className="mb-3 text-[1.4rem]">{s.icon}</div>
               <div className="mb-2 text-[1.05rem] font-bold">{s.t}</div>
               <div className="font-['DM_Mono',monospace] text-[0.74rem] leading-[1.7] text-[#6b6b60]">{s.d}</div>
-            </div>
+            </motion.div>
           ))}
         </div>
       </section>
 
       {/* Intelligence */}
-      <section id="features" className="border-y border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.01)] px-16 py-28 max-md:px-6 max-md:py-16">
-        <div className="mb-3 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.2em] text-[#c8a96e]">
+      <section id="features" className="border-y border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.01)] px-16 py-28 max-md:px-6 max-md:py-16">
+        <div className="mb-3 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.2em] text-[#D4AF37]">
           Why it&apos;s different
         </div>
-        <h2 className="mb-16 max-w-[22ch] text-[clamp(1.8rem,3vw,3.2rem)] font-extrabold leading-[1.05] tracking-[-0.02em]">
+        <h2 className="mb-16 max-w-[22ch] font-display text-[clamp(1.8rem,3vw,3.2rem)] font-bold leading-[1.05] tracking-[-0.01em]">
           Built for the way the GTA actually works
         </h2>
         <div className="grid gap-[2px] md:grid-cols-2">
@@ -387,19 +376,23 @@ export default function LandingPage() {
               title: "Assignment sales, tracked",
               desc: "The GTA has one of North America's largest pre-construction markets. 416Homes watches assignment sales — where the original buyer transfers their purchase contract before closing — a segment that most search tools don't show at all.",
             },
-          ].map((f) => (
-            <div
+          ].map((f, i) => (
+            <motion.div
               key={f.title}
-              className="feat relative overflow-hidden border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.02)] p-12"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: i * 0.1 }}
+              className="relative overflow-hidden border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.02)] p-12"
             >
-              <div className="mb-3 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.18em] text-[#c8a96e]">
+              <div className="mb-3 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.18em] text-[#D4AF37]">
                 {f.label}
               </div>
               <div className="mb-3 text-[1.25rem] font-bold leading-tight">{f.title}</div>
               <div className="font-['DM_Mono',monospace] text-[0.76rem] leading-[1.75] text-[#6b6b60]">
                 {f.desc}
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       </section>
@@ -407,10 +400,10 @@ export default function LandingPage() {
       {/* Alert section */}
       <section id="alert" className="grid gap-20 px-16 py-28 md:grid-cols-2 max-md:px-6 max-md:py-16">
         <div>
-          <div className="mb-3 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.2em] text-[#c8a96e]">
+          <div className="mb-3 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.2em] text-[#D4AF37]">
             Free to start
           </div>
-          <h2 className="mb-5 text-[clamp(1.8rem,3vw,3.2rem)] font-extrabold leading-[1.05] tracking-[-0.02em]">
+          <h2 className="mb-5 font-display text-[clamp(1.8rem,3vw,3.2rem)] font-bold leading-[1.05] tracking-[-0.01em]">
             Set it once.
             <br />
             We handle the rest.
@@ -429,13 +422,13 @@ export default function LandingPage() {
             ].map(([name, role, badge]) => (
               <div
                 key={name}
-                className="flex items-center justify-between border-b border-[rgba(200,169,110,0.2)] py-4 last:border-b-0"
+                className="flex items-center justify-between border-b border-[rgba(212,175,55,0.2)] py-4 last:border-b-0"
               >
                 <div>
                   <div className="text-[0.95rem] font-semibold">{name}</div>
                   <div className="mt-1 font-['DM_Mono',monospace] text-[0.68rem] text-[#6b6b60]">{role}</div>
                 </div>
-                <span className="border border-[rgba(200,169,110,0.3)] px-2 py-0.5 font-['DM_Mono',monospace] text-[0.58rem] uppercase tracking-[0.1em] text-[#c8a96e]">
+                <span className="border border-[rgba(212,175,55,0.3)] px-2 py-0.5 font-['DM_Mono',monospace] text-[0.58rem] uppercase tracking-[0.1em] text-[#D4AF37]">
                   {badge}
                 </span>
               </div>
@@ -444,12 +437,12 @@ export default function LandingPage() {
         </div>
 
         {/* Form — wired to /api/alerts */}
-        <div className="border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.02)] p-10">
+        <div className="border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.02)] p-10">
           <div className="mb-4 flex items-center justify-between gap-4">
             <div className="text-[1.1rem] font-bold">Create Your Alert</div>
             <Link
               href="/dashboard"
-              className="shrink-0 font-['DM_Mono',monospace] text-[0.7rem] uppercase tracking-[0.1em] text-[#c8a96e] no-underline hover:text-[#e4c98a]"
+              className="shrink-0 font-['DM_Mono',monospace] text-[0.7rem] uppercase tracking-[0.1em] text-[#D4AF37] no-underline hover:text-[#F3E5AB]"
             >
               Sign in or manage alerts →
             </Link>
@@ -465,7 +458,7 @@ export default function LandingPage() {
             >
               ✅ You&apos;re set. Check your inbox — we&apos;ll send your first matches tomorrow morning.
               <br />
-              <Link href="/dashboard" className="mt-3 block text-[#c8a96e] hover:text-[#e4c98a]">
+              <Link href="/dashboard" className="mt-3 block text-[#D4AF37] hover:text-[#F3E5AB]">
                 Manage your alerts in the dashboard →
               </Link>
             </div>
@@ -481,7 +474,7 @@ export default function LandingPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.05)] px-3 py-2 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none transition-colors focus:border-[#c8a96e] placeholder:text-[#6b6b60]"
+                  className="w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.05)] px-3 py-2 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none transition-colors focus:border-[#D4AF37] placeholder:text-[#6b6b60]"
                   placeholder="you@example.com"
                 />
               </div>
@@ -495,7 +488,7 @@ export default function LandingPage() {
                       type="checkbox"
                       checked={toronto}
                       onChange={(e) => setToronto(e.target.checked)}
-                      className="accent-[#c8a96e]"
+                      className="accent-[#D4AF37]"
                     />
                     Toronto
                   </label>
@@ -504,7 +497,7 @@ export default function LandingPage() {
                       type="checkbox"
                       checked={mississauga}
                       onChange={(e) => setMississauga(e.target.checked)}
-                      className="accent-[#c8a96e]"
+                      className="accent-[#D4AF37]"
                     />
                     Mississauga
                   </label>
@@ -519,7 +512,7 @@ export default function LandingPage() {
                     id="alert-min-price"
                     value={minPrice}
                     onChange={(e) => setMinPrice(e.target.value)}
-                    className="w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.05)] px-3 py-2 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none transition-colors focus:border-[#c8a96e] placeholder:text-[#6b6b60]"
+                    className="w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.05)] px-3 py-2 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none transition-colors focus:border-[#D4AF37] placeholder:text-[#6b6b60]"
                     placeholder="500000"
                   />
                 </div>
@@ -531,7 +524,7 @@ export default function LandingPage() {
                     id="alert-max-price"
                     value={maxPrice}
                     onChange={(e) => setMaxPrice(e.target.value)}
-                    className="w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.05)] px-3 py-2 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none transition-colors focus:border-[#c8a96e] placeholder:text-[#6b6b60]"
+                    className="w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.05)] px-3 py-2 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none transition-colors focus:border-[#D4AF37] placeholder:text-[#6b6b60]"
                     placeholder="1200000"
                   />
                 </div>
@@ -547,7 +540,7 @@ export default function LandingPage() {
                     min="0"
                     value={minBeds}
                     onChange={(e) => setMinBeds(e.target.value)}
-                    className="w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.05)] px-3 py-2 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none transition-colors focus:border-[#c8a96e] placeholder:text-[#6b6b60]"
+                    className="w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.05)] px-3 py-2 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none transition-colors focus:border-[#D4AF37] placeholder:text-[#6b6b60]"
                     placeholder="2"
                   />
                 </div>
@@ -559,7 +552,7 @@ export default function LandingPage() {
                     id="alert-property-type"
                     value={propertyType}
                     onChange={(e) => setPropertyType(e.target.value)}
-                    className="w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.05)] px-3 py-2 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none transition-colors focus:border-[#c8a96e] placeholder:text-[#6b6b60]"
+                    className="w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.05)] px-3 py-2 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none transition-colors focus:border-[#D4AF37] placeholder:text-[#6b6b60]"
                     placeholder="Condo, Detached..."
                   />
                 </div>
@@ -572,7 +565,7 @@ export default function LandingPage() {
                   id="alert-neighbourhoods"
                   value={neighbourhoods}
                   onChange={(e) => setNeighbourhoods(e.target.value)}
-                  className="w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.05)] px-3 py-2 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none transition-colors focus:border-[#c8a96e] placeholder:text-[#6b6b60]"
+                  className="w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.05)] px-3 py-2 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none transition-colors focus:border-[#D4AF37] placeholder:text-[#6b6b60]"
                   placeholder="Port Credit, King West, Erin Mills..."
                 />
               </div>
@@ -586,7 +579,7 @@ export default function LandingPage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="mt-1 w-full bg-[#c8a96e] px-4 py-3 font-['Syne',sans-serif] text-[0.88rem] font-bold uppercase tracking-[0.05em] text-black transition-colors hover:bg-[#e4c98a] disabled:cursor-not-allowed disabled:opacity-60"
+                className="gold-gradient gold-glow mt-1 w-full px-4 py-3 font-['Syne',sans-serif] text-[0.88rem] font-bold uppercase tracking-[0.05em] text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {submitting ? "Saving..." : "Activate My Alert →"}
               </button>
@@ -596,9 +589,9 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="flex items-center justify-between border-t border-[rgba(200,169,110,0.2)] px-16 py-10 max-md:flex-col max-md:gap-3 max-md:px-6">
+      <footer className="flex items-center justify-between border-t border-[rgba(212,175,55,0.2)] px-16 py-10 max-md:flex-col max-md:gap-3 max-md:px-6">
         <div className="text-[1.1rem] font-extrabold">
-          <span className="text-[#c8a96e]">416</span>Homes
+          <span className="text-[#D4AF37]">416</span>Homes
         </div>
         <div className="font-['DM_Mono',monospace] text-[0.62rem] text-[#6b6b60]">
           Covering Toronto &amp; Mississauga · Built on real sold data

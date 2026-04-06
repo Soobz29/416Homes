@@ -75,7 +75,7 @@ function VideoOrderForm({
   setFormCustomMusic: (f: File | null) => void;
 }) {
   return (
-    <div className="order-form border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] p-10">
+    <div className="order-form border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.025)] p-10">
       <div className="form-title mb-1 text-[1.1rem] font-bold">Submit Your Listing</div>
       <p className="form-sub mb-6 font-['DM Mono',monospace] text-[0.7rem] leading-[1.6] text-[#6b6b60]">
         Provide a listing URL or upload custom photos. Your selected tier will be attached to this order.
@@ -86,8 +86,8 @@ function VideoOrderForm({
           onClick={() => setUploadMethod("url")}
           className={`submit-btn border px-4 py-2 text-[0.8rem] transition-colors ${
             uploadMethod === "url"
-              ? "border-[#c8a96e] bg-[#c8a96e] text-[#0a0a08]"
-              : "border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] text-[#f5f4ef]"
+              ? "border-[#D4AF37] bg-[#D4AF37] text-[#0B0B0B]"
+              : "border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.025)] text-[#f5f4ef]"
           }`}
         >
           Fetch by URL
@@ -97,8 +97,8 @@ function VideoOrderForm({
           onClick={() => setUploadMethod("custom")}
           className={`submit-btn border px-4 py-2 text-[0.8rem] transition-colors ${
             uploadMethod === "custom"
-              ? "border-[#c8a96e] bg-[#c8a96e] text-[#0a0a08]"
-              : "border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] text-[#f5f4ef]"
+              ? "border-[#D4AF37] bg-[#D4AF37] text-[#0B0B0B]"
+              : "border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.025)] text-[#f5f4ef]"
           }`}
         >
           Custom Upload
@@ -113,7 +113,7 @@ function VideoOrderForm({
             type="text"
             value={formListingUrl}
             onChange={(e) => setFormListingUrl(e.target.value)}
-            className="fi w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
+            className="fi w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
             placeholder="zoocasa.com/oakville-on-real-estate/136-n-park-blvd"
           />
         </div>
@@ -128,7 +128,7 @@ function VideoOrderForm({
               type="text"
               value={formCustomAddress}
               onChange={(e) => setFormCustomAddress(e.target.value)}
-              className="fi w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
+              className="fi w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
               placeholder="123 Main St, Toronto"
             />
           </div>
@@ -141,7 +141,7 @@ function VideoOrderForm({
                 type="text"
                 value={formCustomPrice}
                 onChange={(e) => setFormCustomPrice(e.target.value)}
-                className="fi w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
+                className="fi w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
                 placeholder="$1,149,000"
               />
             </div>
@@ -153,7 +153,7 @@ function VideoOrderForm({
                 type="text"
                 value={formCustomBeds}
                 onChange={(e) => setFormCustomBeds(e.target.value)}
-                className="fi w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
+                className="fi w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
                 placeholder="3 Beds, 2 Baths"
               />
             </div>
@@ -166,7 +166,7 @@ function VideoOrderForm({
               type="file"
               accept="image/jpeg,image/png,image/webp"
               multiple
-              className="fi w-full border border-[rgba(200,169,110,0.2)] bg-transparent px-4 py-2 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
+              className="fi w-full border border-[rgba(212,175,55,0.2)] bg-transparent px-4 py-2 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
               onChange={(e) => setFormCustomPhotos(e.target.files)}
             />
           </div>
@@ -177,7 +177,7 @@ function VideoOrderForm({
             <input
               type="file"
               accept="audio/mpeg,audio/mp3"
-              className="fi w-full border border-[rgba(200,169,110,0.2)] bg-transparent px-4 py-2 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
+              className="fi w-full border border-[rgba(212,175,55,0.2)] bg-transparent px-4 py-2 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
               onChange={(e) => setFormCustomMusic(e.target.files?.[0] ?? null)}
             />
             <p className="mt-1 font-['DM Mono',monospace] text-[0.6rem] text-[#6b6b60]">
@@ -194,7 +194,7 @@ function VideoOrderForm({
           type="email"
           value={formEmail}
           onChange={(e) => setFormEmail(e.target.value)}
-          className="fi w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
+          className="fi w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
           placeholder="agent@yourbrokerage.com"
         />
       </div>
@@ -206,7 +206,7 @@ function VideoOrderForm({
           type="text"
           value={formName}
           onChange={(e) => setFormName(e.target.value)}
-          className="fi w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
+          className="fi w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
           placeholder="Jane Smith"
         />
       </div>
@@ -222,8 +222,8 @@ function VideoOrderForm({
               onClick={() => setSelectedVoice(v.id)}
               className={`voice-opt cursor-pointer border p-3 text-center transition-colors ${
                 selectedVoice === v.id
-                  ? "border-[#c8a96e] bg-[rgba(200,169,110,0.08)]"
-                  : "border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.02)] hover:border-[rgba(200,169,110,0.5)]"
+                  ? "border-[#D4AF37] bg-[rgba(212,175,55,0.08)]"
+                  : "border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.02)] hover:border-[rgba(212,175,55,0.5)]"
               }`}
             >
               <div className="voice-name text-[0.82rem] font-semibold">{v.name}</div>
@@ -236,7 +236,7 @@ function VideoOrderForm({
         type="button"
         disabled={submitLoading}
         onClick={onSubmit}
-        className="submit-btn mt-2 w-full bg-[#c8a96e] px-4 py-4 font-['Syne',sans-serif] text-[0.95rem] font-extrabold uppercase tracking-[0.05em] text-black transition-all hover:-translate-y-[1px] hover:bg-[#e4c98a] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+        className="submit-btn mt-2 w-full bg-[#D4AF37] px-4 py-4 font-['Syne',sans-serif] text-[0.95rem] font-extrabold uppercase tracking-[0.05em] text-black transition-all hover:-translate-y-[1px] hover:bg-[#F3E5AB] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
       >
         {submitLoading ? "Processing..." : `Order ${tier.charAt(0).toUpperCase() + tier.slice(1)} — $${price} CAD →`}
       </button>
@@ -279,19 +279,19 @@ function ProgressPanel({
   ];
   const apiBase = (process.env.NEXT_PUBLIC_API_URL || (typeof window !== "undefined" ? window.location.origin : "http://localhost:8000")).replace(/\/$/, "");
   return (
-    <div className="progress-panel border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] p-10">
+    <div className="progress-panel border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.025)] p-10">
       <div className="prog-title mb-1 text-[1rem] font-bold">Generating your video...</div>
-      <div className="prog-addr mb-8 font-['DM Mono',monospace] text-[0.72rem] text-[#c8a96e]">{progressAddr}</div>
+      <div className="prog-addr mb-8 font-['DM Mono',monospace] text-[0.72rem] text-[#D4AF37]">{progressAddr}</div>
       <div className="prog-steps flex flex-col gap-0">
         {steps.map((s) => (
-          <div key={s.key} className="prog-step flex items-center gap-4 border-b border-[rgba(200,169,110,0.08)] py-4 last:border-b-0">
+          <div key={s.key} className="prog-step flex items-center gap-4 border-b border-[rgba(212,175,55,0.08)] py-4 last:border-b-0">
             <div
               className={`prog-icon flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border text-[0.75rem] ${
                 stepStates[s.key] === "done"
                   ? "border-[#2ed573] bg-[rgba(46,213,115,0.15)]"
                   : stepStates[s.key] === "active"
-                    ? "animate-pulse border-[#c8a96e] bg-[rgba(200,169,110,0.1)]"
-                    : "border-[rgba(200,169,110,0.2)] opacity-30"
+                    ? "animate-pulse border-[#D4AF37] bg-[rgba(212,175,55,0.1)]"
+                    : "border-[rgba(212,175,55,0.2)] opacity-30"
               }`}
             >
               {stepStates[s.key] === "done" ? "✓" : s.icon}
@@ -327,7 +327,7 @@ function ProgressPanel({
           <a
             href={videoUrl || (jobId ? `${apiBase}/video/download/${jobId}` : "#") || "#"}
             download
-            className="dl-btn inline-block bg-[#2ed573] px-6 py-3 font-['Syne',sans-serif] text-[0.85rem] font-bold text-[#0a0a08] no-underline"
+            className="dl-btn inline-block bg-[#2ed573] px-6 py-3 font-['Syne',sans-serif] text-[0.85rem] font-bold text-[#0B0B0B] no-underline"
           >
             ⬇ Download Video
           </a>
@@ -569,34 +569,34 @@ export default function VideoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a08] text-[#f5f4ef]">
+    <div className="min-h-screen bg-[#0B0B0B] text-[#f5f4ef]">
       {/* Nav */}
-      <nav className="flex items-center justify-between border-b border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.8)] px-16 py-6 backdrop-blur-xl max-md:px-6">
+      <nav className="flex items-center justify-between border-b border-[rgba(212,175,55,0.2)] bg-[rgba(10,10,8,0.8)] px-16 py-6 backdrop-blur-xl max-md:px-6">
         <div className="logo text-[1.2rem] font-extrabold">
-          <span className="text-[#c8a96e]">416</span>
+          <span className="text-[#D4AF37]">416</span>
           Homes <span className="align-middle font-['DM Mono',monospace] text-[0.75rem] font-normal tracking-[0.1em] text-[#6b6b60]">
             VIDEO
           </span>
         </div>
         <Link
           href="/"
-          className="nav-back flex items-center gap-2 font-['DM Mono',monospace] text-[0.7rem] uppercase tracking-[0.1em] text-[#6b6b60] no-underline hover:text-[#c8a96e]"
+          className="nav-back flex items-center gap-2 font-['DM Mono',monospace] text-[0.7rem] uppercase tracking-[0.1em] text-[#6b6b60] no-underline hover:text-[#D4AF37]"
         >
           ← Back to 416Homes
         </Link>
       </nav>
 
       {/* Hero */}
-      <section className="hero grid gap-12 border-b border-[rgba(200,169,110,0.2)] px-16 pb-16 pt-24 md:grid-cols-2 max-md:px-6">
+      <section className="hero grid gap-12 border-b border-[rgba(212,175,55,0.2)] px-16 pb-16 pt-24 md:grid-cols-2 max-md:px-6">
         <div>
-          <div className="hero-tag mb-6 flex items-center gap-3 font-['DM Mono',monospace] text-[0.65rem] uppercase tracking-[0.2em] text-[#c8a96e]">
-            <span className="h-px w-6 bg-[#c8a96e]" />
+          <div className="hero-tag mb-6 flex items-center gap-3 font-['DM Mono',monospace] text-[0.65rem] uppercase tracking-[0.2em] text-[#D4AF37]">
+            <span className="h-px w-6 bg-[#D4AF37]" />
             Cinematic Listing Videos for GTA Agents
           </div>
-          <h1 className="mb-6 text-[clamp(2.5rem,4vw,4.5rem)] font-extrabold leading-[0.95] tracking-[-0.03em]">
+          <h1 className="mb-6 font-display text-[clamp(2.5rem,4vw,4.5rem)] font-bold leading-[0.95] tracking-[-0.02em]">
             Professional listing
             <br />
-            videos from <span className="text-[#c8a96e]">$
+            videos from <span className="text-[#D4AF37]">$
               {tier === "basic" ? "99" : tier === "cinematic" ? "249" : "299"}.</span>
             <br />
             Not $5,000.
@@ -606,7 +606,7 @@ export default function VideoPage() {
             record the voiceover, and deliver a polished 30-second video — in under 15 minutes.
           </p>
           <div className="price-block mb-10 flex items-baseline gap-6">
-            <div className="price-main text-[3rem] font-extrabold text-[#c8a96e]">
+            <div className="price-main text-[3rem] font-extrabold text-[#D4AF37]">
               {tier === "basic" ? "$99" : tier === "cinematic" ? "$249" : "$299"}
             </div>
             <div className="price-compare font-['DM Mono',monospace] text-[0.75rem] leading-[1.5] text-[#6b6b60]">
@@ -616,7 +616,7 @@ export default function VideoPage() {
             </div>
           </div>
           <button
-            className="submit-btn inline-block bg-[#c8a96e] px-10 py-4 font-['Syne',sans-serif] text-[0.95rem] font-extrabold uppercase tracking-[0.05em] text-black transition-all hover:-translate-y-[1px] hover:bg-[#e4c98a]"
+            className="submit-btn inline-block bg-[#D4AF37] px-10 py-4 font-['Syne',sans-serif] text-[0.95rem] font-extrabold uppercase tracking-[0.05em] text-black transition-all hover:-translate-y-[1px] hover:bg-[#F3E5AB]"
             onClick={() => {
               const el = document.getElementById("order");
               if (el) el.scrollIntoView({ behavior: "smooth" });
@@ -627,7 +627,7 @@ export default function VideoPage() {
         </div>
 
         {/* Video preview — HTML5 sample (use NEXT_PUBLIC_HERO_VIDEO_URL for your own sample) */}
-        <div className="video-preview relative aspect-[16/9] overflow-hidden border border-[rgba(200,169,110,0.2)] bg-black">
+        <div className="video-preview relative aspect-[16/9] overflow-hidden border border-[rgba(212,175,55,0.2)] bg-black">
           <div className="video-preview-inner relative h-full w-full overflow-hidden bg-black">
             <video
               className="absolute left-0 top-0 h-full w-full object-cover"
@@ -646,10 +646,10 @@ export default function VideoPage() {
               </div>
               <div className="vp-address font-['DM Mono',monospace] text-[0.65rem] text-[#6b6b60]">
                 218 Broadview Ave, Leslieville ·{" "}
-                <span className="vp-price-tag font-bold text-[#c8a96e]">$1,149,000</span>
+                <span className="vp-price-tag font-bold text-[#D4AF37]">$1,149,000</span>
               </div>
             </div>
-            <div className="vp-badge absolute right-[5%] top-[10%] border border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.7)] px-2 py-1 font-['DM Mono',monospace] text-[0.6rem] uppercase tracking-[0.1em] text-[#c8a96e]">
+            <div className="vp-badge absolute right-[5%] top-[10%] border border-[rgba(212,175,55,0.2)] bg-[rgba(10,10,8,0.7)] px-2 py-1 font-['DM Mono',monospace] text-[0.6rem] uppercase tracking-[0.1em] text-[#D4AF37]">
               Sample Video
             </div>
           </div>
@@ -657,11 +657,11 @@ export default function VideoPage() {
       </section>
 
       {/* Process */}
-      <section className="process border-b border-[rgba(200,169,110,0.2)] px-16 py-20 max-md:px-6">
-        <div className="sec-tag mb-3 font-['DM Mono',monospace] text-[0.62rem] uppercase tracking-[0.2em] text-[#c8a96e]">
+      <section className="process border-b border-[rgba(212,175,55,0.2)] px-16 py-20 max-md:px-6">
+        <div className="sec-tag mb-3 font-['DM Mono',monospace] text-[0.62rem] uppercase tracking-[0.2em] text-[#D4AF37]">
           How It Works
         </div>
-        <h2 className="sec-h mb-12 text-[clamp(1.6rem,2.5vw,2.8rem)] font-extrabold tracking-[-0.02em]">
+        <h2 className="sec-h mb-12 font-display text-[clamp(1.6rem,2.5vw,2.8rem)] font-bold tracking-[-0.01em]">
           Five steps, one URL, one video.
         </h2>
         <div className="steps grid gap-0 md:grid-cols-5">
@@ -704,9 +704,9 @@ export default function VideoPage() {
           ].map((s) => (
             <div
               key={s.n}
-              className="step relative border-r border-[rgba(200,169,110,0.2)] p-8 last:border-r-0"
+              className="step relative border-r border-[rgba(212,175,55,0.2)] p-8 last:border-r-0"
             >
-              <div className="step-n mb-4 font-['DM Mono',monospace] text-[0.6rem] text-[#c8a96e] tracking-[0.15em]">
+              <div className="step-n mb-4 font-['DM Mono',monospace] text-[0.6rem] text-[#D4AF37] tracking-[0.15em]">
                 {s.n}
               </div>
               <div className="step-ico mb-3 text-[1.3rem]">{s.icon}</div>
@@ -715,7 +715,7 @@ export default function VideoPage() {
                 {s.d}
               </div>
               {s.tool && (
-                <div className="step-tool mt-2 inline-block border border-[rgba(200,169,110,0.2)] px-1.5 py-0.5 font-['DM Mono',monospace] text-[0.58rem] text-[#c8a96e]">
+                <div className="step-tool mt-2 inline-block border border-[rgba(212,175,55,0.2)] px-1.5 py-0.5 font-['DM Mono',monospace] text-[0.58rem] text-[#D4AF37]">
                   {s.tool}
                 </div>
               )}
@@ -725,7 +725,7 @@ export default function VideoPage() {
       </section>
 
       {/* Order section — matches API server video page */}
-      <section id="order" className="order-section grid gap-16 border-b border-[rgba(200,169,110,0.2)] px-16 py-20 md:grid-cols-2 max-md:px-6">
+      <section id="order" className="order-section grid gap-16 border-b border-[rgba(212,175,55,0.2)] px-16 py-20 md:grid-cols-2 max-md:px-6">
         <div className="order-info">
           <h2 className="mb-4 text-[2rem] font-extrabold tracking-[-0.02em]">
             Order your listing video
@@ -734,7 +734,7 @@ export default function VideoPage() {
             Paste your listing URL below. We&apos;ll scrape the photos, write the script, record the voiceover,
             animate the images, and assemble your video — all automatically. Download ready in ~12 minutes.
           </p>
-          <div className="cost-breakdown border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] p-6">
+          <div className="cost-breakdown border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.025)] p-6">
             {[
               ["Basic", "$99 CAD"],
               ["Cinematic (Most Popular)", "$249 CAD"],
@@ -747,12 +747,12 @@ export default function VideoPage() {
             ].map(([label, value], i) => (
               <div
                 key={label}
-                className={`cost-row flex items-center justify-between border-b border-[rgba(200,169,110,0.1)] py-2 text-[0.72rem] font-['DM Mono',monospace] ${
+                className={`cost-row flex items-center justify-between border-b border-[rgba(212,175,55,0.1)] py-2 text-[0.72rem] font-['DM Mono',monospace] ${
                   i === 7 ? "border-b-0 text-[0.85rem] font-bold" : ""
                 }`}
               >
                 <span className="cost-label text-[#6b6b60]">{label}</span>
-                <span className={`cost-value ${i === 7 ? "text-[1.1rem] text-[#c8a96e]" : "text-[#f5f4ef]"}`}>
+                <span className={`cost-value ${i === 7 ? "text-[1.1rem] text-[#D4AF37]" : "text-[#f5f4ef]"}`}>
                   {value}
                 </span>
               </div>
@@ -767,17 +767,17 @@ export default function VideoPage() {
                 onClick={() => selectTier(t.id, t.price)}
                 className={`relative cursor-pointer border p-6 text-left transition-colors ${
                   tier === t.id
-                    ? "border-[#c8a96e] bg-[rgba(200,169,110,0.08)]"
-                    : "border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] hover:border-[rgba(200,169,110,0.5)]"
+                    ? "border-[#D4AF37] bg-[rgba(212,175,55,0.08)]"
+                    : "border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.025)] hover:border-[rgba(212,175,55,0.5)]"
                 }`}
               >
                 {t.badge && (
-                  <span className="absolute right-4 top-4 bg-[#c8a96e] px-2 py-0.5 font-['DM Mono',monospace] text-[0.6rem] uppercase tracking-[0.1em] text-[#0a0a08]">
+                  <span className="absolute right-4 top-4 bg-[#D4AF37] px-2 py-0.5 font-['DM Mono',monospace] text-[0.6rem] uppercase tracking-[0.1em] text-[#0B0B0B]">
                     {t.badge}
                   </span>
                 )}
                 <h3 className="mb-1 text-[1.1rem] font-bold">{t.title}</h3>
-                <p className="mb-3 text-[1.4rem] font-extrabold text-[#c8a96e]">${t.price}</p>
+                <p className="mb-3 text-[1.4rem] font-extrabold text-[#D4AF37]">${t.price}</p>
                 <ul className="list-none pl-0 font-['DM Mono',monospace] text-[0.7rem] leading-[1.7] text-[#6b6b60]">
                   {t.features.map((f) => (
                     <li key={f}>{f}</li>
@@ -832,9 +832,9 @@ export default function VideoPage() {
 
       {/* Social proof + FAQ text left as-is in HTML; we can port those 1:1 next if you want the full page parity. */}
 
-      <footer className="flex items-center justify-between border-t border-[rgba(200,169,110,0.2)] px-16 py-8 max-md:flex-col max-md:gap-3 max-md:px-6">
+      <footer className="flex items-center justify-between border-t border-[rgba(212,175,55,0.2)] px-16 py-8 max-md:flex-col max-md:gap-3 max-md:px-6">
         <div className="footer-logo text-[1rem] font-extrabold">
-          <span className="text-[#c8a96e]">416</span>
+          <span className="text-[#D4AF37]">416</span>
           Homes Video
         </div>
         <div className="footer-copy font-['DM Mono',monospace] text-[0.6rem] text-[#6b6b60]">
