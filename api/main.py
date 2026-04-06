@@ -1224,6 +1224,7 @@ def _normalise_listing(row: dict) -> dict:
         "url":         row.get("url", ""),
         "scraped_at":  str(row.get("scraped_at") or ""),
         "strategy":    row.get("strategy", "unknown"),
+        "photos":      row.get("photos") or ([row["photo"]] if row.get("photo") else []),
     }
 
 def _get_comps(neighbourhood: str, limit: int = 5) -> list:

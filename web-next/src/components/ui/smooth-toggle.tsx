@@ -25,7 +25,7 @@ export function SmoothToggle({ checked, onChange, disabled }: SmoothToggleProps)
           transition: background 0.3s cubic-bezier(0.34,1.56,0.64,1);
           flex-shrink: 0;
         }
-        .smooth-toggle-track.on  { background: rgba(200,169,110,0.35); border: 1px solid #c8a96e; }
+        .smooth-toggle-track.on  { background: rgba(212,175,55,0.35); border: 1px solid #D4AF37; }
         .smooth-toggle-track.off { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); }
         .smooth-toggle-track.disabled { opacity: 0.4; cursor: not-allowed; }
         .smooth-toggle-knob {
@@ -37,7 +37,7 @@ export function SmoothToggle({ checked, onChange, disabled }: SmoothToggleProps)
           transition: left 0.32s cubic-bezier(0.34,1.56,0.64,1),
                       background 0.3s ease;
         }
-        .smooth-toggle-track.on  .smooth-toggle-knob { left: 21px; background: #c8a96e; }
+        .smooth-toggle-track.on  .smooth-toggle-knob { left: 21px; background: #D4AF37; }
         .smooth-toggle-track.off .smooth-toggle-knob { left: 3px;  background: rgba(255,255,255,0.35); }
       `}</style>
       <button

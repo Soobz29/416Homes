@@ -477,7 +477,7 @@ export default function DashboardPage() {
             <button
               onClick={() => void triggerScan()}
               disabled={scanLoading}
-              className="rounded border border-[rgba(200,169,110,0.4)] bg-transparent px-4 py-2 font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-[#c8a96e] transition-colors hover:bg-[rgba(200,169,110,0.1)] disabled:opacity-50"
+              className="rounded border border-[rgba(212,175,55,0.4)] bg-transparent px-4 py-2 font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-[#D4AF37] transition-colors hover:bg-[rgba(212,175,55,0.1)] disabled:opacity-50"
             >
               {scanLoading ? "Scanning…" : "↻ Refresh Listings"}
             </button>
@@ -833,18 +833,18 @@ export default function DashboardPage() {
                 <button
                   disabled={page === 0}
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  className="rounded border border-[rgba(200,169,110,0.4)] px-4 py-2 font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.08em] text-[#c8a96e] transition-colors hover:bg-[rgba(200,169,110,0.1)] disabled:cursor-not-allowed disabled:opacity-30"
+                  className="rounded border border-[rgba(212,175,55,0.4)] px-4 py-2 font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.08em] text-[#D4AF37] transition-colors hover:bg-[rgba(212,175,55,0.1)] disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   ← Prev
                 </button>
                 <span className="font-['DM_Mono',monospace] text-[0.7rem] text-[#6b6b60]">
                   {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalListings)}{" "}
-                  <span className="text-[#c8a96e]">of {totalListings.toLocaleString()}</span>
+                  <span className="text-[#D4AF37]">of {totalListings.toLocaleString()}</span>
                 </span>
                 <button
                   disabled={(page + 1) * PAGE_SIZE >= totalListings}
                   onClick={() => setPage((p) => p + 1)}
-                  className="rounded border border-[rgba(200,169,110,0.4)] px-4 py-2 font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.08em] text-[#c8a96e] transition-colors hover:bg-[rgba(200,169,110,0.1)] disabled:cursor-not-allowed disabled:opacity-30"
+                  className="rounded border border-[rgba(212,175,55,0.4)] px-4 py-2 font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.08em] text-[#D4AF37] transition-colors hover:bg-[rgba(212,175,55,0.1)] disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   Next →
                 </button>

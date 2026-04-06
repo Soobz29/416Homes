@@ -5,7 +5,7 @@ interface BouncingDotsProps {
   color?: string;
 }
 
-export function BouncingDots({ size = "md", color = "#c8a96e" }: BouncingDotsProps) {
+export function BouncingDots({ size = "md", color = "#D4AF37" }: BouncingDotsProps) {
   const dim = size === "sm" ? 6 : 9;
   const gap = size === "sm" ? "gap-1" : "gap-[6px]";
 

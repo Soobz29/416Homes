@@ -40,7 +40,7 @@ export async function fetchListings(params?: {
       property_type: l.strategy ?? "Unknown",
       source: l.source,
       url: l.url,
-      photos: [],
+      photos: Array.isArray(l.photos) ? l.photos : (l.photo ? [l.photo] : []),
       created_at: l.scraped_at,
     })),
     total: typeof data?.total === "number" ? data.total : rawListings.length,

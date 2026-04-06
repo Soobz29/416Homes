@@ -42,7 +42,7 @@ export function DropdownSelect({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.8)] px-3 py-2 text-left font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] flex items-center justify-between gap-2"
+        className="w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(10,10,8,0.8)] px-3 py-2 text-left font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] flex items-center justify-between gap-2"
       >
         <span>{label}</span>
         <span className="text-[0.6rem] opacity-70">{open ? "▲" : "▼"}</span>
@@ -51,7 +51,7 @@ export function DropdownSelect({
       {open && (
         <div
           role="listbox"
-          className="absolute left-0 top-full z-50 mt-1 max-h-60 w-full overflow-y-auto rounded border border-[rgba(200,169,110,0.35)] bg-[#141410] shadow-2xl"
+          className="absolute left-0 top-full z-50 mt-1 max-h-60 w-full overflow-y-auto rounded border border-[rgba(212,175,55,0.35)] bg-[#141410] shadow-2xl"
         >
           {options.map((opt) => (
             <button
@@ -64,8 +64,8 @@ export function DropdownSelect({
                 onChange(opt.value);
                 setOpen(false);
               }}
-              className={`block w-full px-3 py-2 text-left font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] hover:bg-[rgba(200,169,110,0.12)] focus:outline-none ${
-                opt.value === value ? "bg-[rgba(200,169,110,0.18)] text-[#c8a96e]" : ""
+              className={`block w-full px-3 py-2 text-left font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] hover:bg-[rgba(212,175,55,0.12)] focus:outline-none ${
+                opt.value === value ? "bg-[rgba(212,175,55,0.18)] text-[#D4AF37]" : ""
               }`}
             >
               {opt.label}
