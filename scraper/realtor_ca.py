@@ -5,7 +5,7 @@ import os
 import random
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 import httpx
@@ -155,7 +155,8 @@ def _parse_listing_item(item: dict, region_name: str) -> dict | None:
         "bedrooms": item.get("Building", {}).get("Bedrooms", ""),
         "bathrooms": item.get("Building", {}).get("BathroomTotal", ""),
         "sqft": _parse_sqft(item.get("Building", {}).get("SizeInterior", "")),
-        "scraped_at": datetime.utcnow().isoformat(),
+        "photo": (item.get("Property", {}).get("Photo") or [{}])[0].get("HighResPath", ""),
+        "scraped_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -512,7 +513,7 @@ def _scrape_realtor_browser_sync(area: str) -> List[Dict[str, Any]]:
                         "sqft": "",
                         "lat": None,
                         "lng": None,
-                        "scraped_at": datetime.utcnow().isoformat(),
+                        "scraped_at": datetime.now(timezone.utc).isoformat(),
                     }
                 )
             except Exception:
@@ -597,7 +598,7 @@ async def _scrape_realtor_scrapling(area: str) -> List[Dict[str, Any]]:
                     "sqft": "",
                     "lat": None,
                     "lng": None,
-                    "scraped_at": datetime.utcnow().isoformat(),
+                    "scraped_at": datetime.now(timezone.utc).isoformat(),
                 })
             except Exception:
                 continue
@@ -716,5 +717,5 @@ def _parse_realtor_crawled_page(page: "CrawlPage") -> Optional[Dict[str, Any]]:
         "sqft": "",
         "lat": None,
         "lng": None,
-        "scraped_at": datetime.utcnow().isoformat(),
+        "scraped_at": datetime.now(timezone.utc).isoformat(),
     }

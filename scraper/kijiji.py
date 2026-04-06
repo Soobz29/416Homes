@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from typing import List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import hashlib
 import re
 from urllib.parse import urljoin
@@ -71,7 +71,8 @@ async def scrape_with_scrapling(area: str) -> List[Dict[str, Any]]:
                     "lng": None,
                     "source": "kijiji",
                     "url": full_url,
-                    "scraped_at": datetime.utcnow().isoformat(),
+                    "photo": "",
+                    "scraped_at": datetime.now(timezone.utc).isoformat(),
                     "strategy": "scrapling",
                 })
             except Exception:

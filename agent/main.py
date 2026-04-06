@@ -7,7 +7,7 @@ Matches new listings to buyer alerts and sends outreach emails.
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any
 import os
 from dotenv import load_dotenv
@@ -58,7 +58,7 @@ class PropertyAgent:
     async def get_active_alerts(self) -> List[Dict[str, Any]]:
         """Get all active buyer alerts"""
         try:
-            result = self.supabase.table("buyer_alerts")\
+            result = self.supabase.table("alerts")\
                 .select("*")\
                 .eq("is_active", True)\
                 .execute()
@@ -72,7 +72,7 @@ class PropertyAgent:
     async def get_new_listings(self, hours_back: int = 24) -> List[Dict[str, Any]]:
         """Get new listings from the last N hours"""
         try:
-            cutoff_time = (datetime.utcnow() - timedelta(hours=hours_back)).isoformat()
+            cutoff_time = (datetime.now(timezone.utc) - timedelta(hours=hours_back)).isoformat()
             
             result = self.supabase.table("listings")\
                 .select("*")\
@@ -101,26 +101,18 @@ class PropertyAgent:
                 score += 0.1  # Above maximum but close
         
         # Bedrooms match (25% weight)
-        if alert.get('min_bedrooms'):
+        if alert.get('min_beds'):
             beds = listing.get('bedrooms', 0)
             if isinstance(beds, str):
                 try:
                     beds = int(beds)
                 except (ValueError, TypeError):
                     beds = 0
-            if beds >= alert['min_bedrooms']:
+            if beds >= alert['min_beds']:
                 score += 0.25
 
-        # Bathrooms match (15% weight)
-        if alert.get('min_bathrooms'):
-            baths = listing.get('bathrooms', 0)
-            if isinstance(baths, str):
-                try:
-                    baths = int(baths)
-                except (ValueError, TypeError):
-                    baths = 0
-            if baths >= alert['min_bathrooms']:
-                score += 0.15
+        # Bathrooms match (15% weight) — alerts table has no min_baths column; skip
+
         
         # Property type match (10% weight)
         if alert.get('property_types'):
@@ -169,8 +161,7 @@ class PropertyAgent:
             Email: {alert.get('email', 'Unknown')}
             Min Price: ${alert.get('min_price', 0):,}
             Max Price: ${alert.get('max_price', 0):,}
-            Min Bedrooms: {alert.get('min_bedrooms', 'N/A')}
-            Min Bathrooms: {alert.get('min_bathrooms', 'N/A')}
+            Min Bedrooms: {alert.get('min_beds', 'N/A')}
             Property Types: {', '.join(alert.get('property_types', []))}
             Neighbourhoods: {', '.join(alert.get('neighbourhoods', []))}
             
@@ -241,7 +232,7 @@ class PropertyAgent:
                 "match_score": match_score,
                 "match_reason": f"Score {match_score:.2f}/1.0",
                 "email_sent": email_sent,
-                "created_at": datetime.utcnow().isoformat()
+                "created_at": datetime.now(timezone.utc).isoformat()
             }
             
             result = self.supabase.table("agent_matches").insert(match_data).execute()
