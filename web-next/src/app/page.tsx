@@ -604,7 +604,7 @@ export default function LandingPage() {
           Covering Toronto &amp; Mississauga · Built on real sold data
         </div>
         <div className="font-['DM_Mono',monospace] text-[0.62rem] text-[#6b6b60]">
-          © 2025 416Homes · Early Access
+          © 2026 416Homes · All rights reserved
         </div>
       </footer>
     </div>
