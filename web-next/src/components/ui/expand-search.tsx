@@ -20,7 +20,7 @@ export function ExpandSearch({ value, onChange, onSearch, placeholder = "Search 
         .expand-search-wrap {
           display: flex;
           align-items: center;
-          border: 1px solid rgba(200,169,110,0.25);
+          border: 1px solid rgba(212,175,55,0.25);
           border-radius: 6px;
           background: rgba(255,255,255,0.03);
           overflow: hidden;
@@ -32,14 +32,14 @@ export function ExpandSearch({ value, onChange, onSearch, placeholder = "Search 
         }
         .expand-search-wrap.open {
           width: 200px;
-          border-color: rgba(200,169,110,0.6);
-          background: rgba(200,169,110,0.06);
+          border-color: rgba(212,175,55,0.6);
+          background: rgba(212,175,55,0.06);
           cursor: text;
         }
         .expand-search-icon {
           flex-shrink: 0;
           padding: 0 10px;
-          color: #c8a96e;
+          color: #D4AF37;
           display: flex;
           align-items: center;
         }

@@ -125,6 +125,17 @@ class MemoryStore:
         
         return "Unknown"
     
+    @staticmethod
+    def _parse_room_count(val: Any) -> str:
+        """Parse room count strings like '1 + 1' (bedroom + den) into their integer sum ('2').
+        Returns the value unchanged if it doesn't match that pattern."""
+        if isinstance(val, str) and '+' in val:
+            try:
+                return str(sum(int(x.strip()) for x in val.split('+')))
+            except (ValueError, TypeError):
+                pass
+        return str(val) if val not in (None, "") else ""
+
     def _normalise_for_listings(self, listing: Dict[str, Any]) -> Dict[str, Any]:
         """Translate scraper dict to exact Supabase listings column names. Coerce scalars so no dicts hit DB."""
         price = self._safe_scalar(listing.get("price"), 0, prefer_int=True)
@@ -134,8 +145,8 @@ class MemoryStore:
             price = int(price)
         except (TypeError, ValueError):
             price = 0
-        bedrooms = self._safe_scalar(listing.get("bedrooms"), "")
-        bathrooms = self._safe_scalar(listing.get("bathrooms"), "")
+        bedrooms = self._parse_room_count(self._safe_scalar(listing.get("bedrooms"), ""))
+        bathrooms = self._parse_room_count(self._safe_scalar(listing.get("bathrooms"), ""))
         sqft_raw = listing.get("area") or listing.get("sqft")
         sqft = self._safe_scalar(sqft_raw, 0, prefer_int=True)
         if isinstance(sqft, dict):
@@ -166,6 +177,7 @@ class MemoryStore:
             "area": sqft,
             "property_type": str(listing.get("property_type", "Unknown") or "Unknown"),
             "days_on_market": days_on_market,
+            "photo": str(listing.get("photo") or "") or None,
             "listing_agent_email": listing.get("listing_agent_email"),
             "listing_agent_name": listing.get("listing_agent_name"),
             "lat": listing.get("lat"),
@@ -221,8 +233,6 @@ class MemoryStore:
                 if not self.client:
                     raise RuntimeError("Gemini client not initialized")
                 kwargs = {"model": self.embedding_model_id, "contents": text}
-                if self.embedding_model_id == "gemini-embedding-001":
-                    kwargs["output_dimensionality"] = 768
                 response = self.client.models.embed_content(**kwargs)
                 embedding = list(response.embeddings[0].values) if response.embeddings else []
             elif _GENAI_SDK == "google-generativeai" and _genai is not None:

@@ -325,12 +325,13 @@ export default function DashboardPage() {
     }
   }
 
+
   return (
-    <div className="min-h-screen bg-[#0a0a08] text-[#f5f4ef]">
+    <div className="min-h-screen bg-[#0B0B0B] text-[#f5f4ef]">
       {/* Nav */}
-      <nav className="fixed left-0 right-0 top-0 z-50 flex items-center justify-between border-b border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.75)] px-16 py-6 backdrop-blur-xl max-md:px-6">
+      <nav className="fixed left-0 right-0 top-0 z-50 flex items-center justify-between border-b border-[rgba(212,175,55,0.2)] bg-[rgba(10,10,8,0.75)] px-16 py-6 backdrop-blur-xl max-md:px-6">
         <div className="logo text-[1.3rem] font-extrabold tracking-[0.05em]">
-          <span className="text-[#c8a96e]">416</span>
+          <span className="text-[#D4AF37]">416</span>
           Homes
           <sub className="ml-1 align-middle font-['DM Mono',monospace] text-[0.6rem] font-normal tracking-[0.1em] text-[#6b6b60]">
             DASHBOARD
@@ -362,7 +363,7 @@ export default function DashboardPage() {
             </button>
           </li>
         </ul>
-        <button className="nav-cta flex items-center gap-2 bg-[#c8a96e] px-6 py-2 font-['DM Mono',monospace] text-[0.72rem] font-medium uppercase tracking-[0.08em] text-black transition-colors hover:bg-[#e4c98a]">
+        <button className="nav-cta flex items-center gap-2 bg-[#D4AF37] px-6 py-2 font-['DM Mono',monospace] text-[0.72rem] font-medium uppercase tracking-[0.08em] text-black transition-colors hover:bg-[#F3E5AB]">
           <span className="hidden md:inline">Back to 416Homes</span>
           <Link href="/" className="md:hidden">
             Home
@@ -371,14 +372,14 @@ export default function DashboardPage() {
       </nav>
 
       {/* Hero */}
-      <section className="dashboard-hero border-b border-[rgba(200,169,110,0.2)] bg-[radial-gradient(circle_at_top,rgba(200,169,110,0.14),transparent_55%)] px-16 pb-8 pt-24 max-md:px-6">
+      <section className="dashboard-hero border-b border-[rgba(212,175,55,0.2)] bg-[radial-gradient(circle_at_top,rgba(212,175,55,0.14),transparent_55%)] px-16 pb-8 pt-24 max-md:px-6">
         <div className="mx-auto grid max-w-[1120px] items-center gap-8 md:grid-cols-[2fr,1.2fr]">
           <div>
             <p className="dashboard-hero-eyebrow mb-3 font-['DM Mono',monospace] text-[0.7rem] uppercase tracking-[0.18em] text-[#6b6b60]">
               GTA
             </p>
-            <h1 className="dashboard-hero-title mb-3 text-[clamp(2rem,3vw,2.8rem)] font-extrabold tracking-[-0.02em]">
-              Your <span className="text-[#c8a96e]">GTA real estate</span> dashboard.
+            <h1 className="dashboard-hero-title mb-3 font-display text-[clamp(2rem,3vw,2.8rem)] font-bold tracking-[-0.01em]">
+              Your <span className="text-[#D4AF37]">GTA real estate</span> dashboard.
             </h1>
             <p className="dashboard-hero-sub max-w-xl font-['DM Mono',monospace] text-[0.8rem] leading-relaxed text-[#6b6b60]">
               Browse fresh listings across Toronto and Mississauga, run quick valuations on any address, and order
@@ -386,7 +387,7 @@ export default function DashboardPage() {
             </p>
             <div className="mt-6" suppressHydrationWarning>
               {!mounted ? (
-                <div className="flex flex-col gap-2 rounded-xl border border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.7)] p-4 max-w-md">
+                <div className="flex flex-col gap-2 rounded-xl border border-[rgba(212,175,55,0.2)] bg-[rgba(10,10,8,0.7)] p-4 max-w-md">
                   <span className="text-[0.7rem] font-['DM Mono',monospace] uppercase tracking-[0.12em] text-[#6b6b60]">
                     Early access login
                   </span>
@@ -395,19 +396,19 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ) : sessionEmail ? (
-                <div className="inline-flex items-center gap-3 rounded-full border border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.7)] px-4 py-2">
+                <div className="inline-flex items-center gap-3 rounded-full border border-[rgba(212,175,55,0.2)] bg-[rgba(10,10,8,0.7)] px-4 py-2">
                   <span className="font-['DM Mono',monospace] text-[0.7rem] text-[#6b6b60]">
                     Signed in as <span className="text-[#f5f4ef]">{sessionEmail}</span>
                   </span>
                   <button
                     onClick={handleSignOut}
-                    className="text-[0.7rem] font-['DM Mono',monospace] uppercase tracking-[0.1em] text-[#c8a96e]"
+                    className="text-[0.7rem] font-['DM Mono',monospace] uppercase tracking-[0.1em] text-[#D4AF37]"
                   >
                     Sign out
                   </button>
                 </div>
               ) : (
-                <div className="flex flex-col gap-2 rounded-xl border border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.7)] p-4 max-w-md">
+                <div className="flex flex-col gap-2 rounded-xl border border-[rgba(212,175,55,0.2)] bg-[rgba(10,10,8,0.7)] p-4 max-w-md">
                   <span className="text-[0.7rem] font-['DM Mono',monospace] uppercase tracking-[0.12em] text-[#6b6b60]">
                     Early access login
                   </span>
@@ -417,12 +418,12 @@ export default function DashboardPage() {
                       value={emailInput}
                       onChange={(e) => setEmailInput(e.target.value)}
                       placeholder="you@example.com"
-                      className="flex-1 min-w-[10rem] border border-[rgba(200,169,110,0.2)] bg-transparent px-3 py-2 font-['DM Mono',monospace] text-[0.8rem] text-[#f5f4ef] outline-none placeholder:text-[#6b6b60]"
+                      className="flex-1 min-w-[10rem] border border-[rgba(212,175,55,0.2)] bg-transparent px-3 py-2 font-['DM Mono',monospace] text-[0.8rem] text-[#f5f4ef] outline-none placeholder:text-[#6b6b60]"
                     />
                     <button
                       type="button"
                       onClick={handleAuthSubmit}
-                      className="rounded-full bg-[#c8a96e] px-4 py-2 font-['DM Mono',monospace] text-[0.72rem] uppercase tracking-[0.12em] text-black hover:bg-[#e4c98a]"
+                      className="rounded-full bg-[#D4AF37] px-4 py-2 font-['DM Mono',monospace] text-[0.72rem] uppercase tracking-[0.12em] text-black hover:bg-[#F3E5AB]"
                     >
                       Send link
                     </button>
@@ -448,27 +449,27 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
-          <div className="dashboard-hero-metrics grid grid-cols-2 gap-3">
-            <div className="dashboard-hero-metric rounded-[14px] border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.02)] p-4">
-              <div className="dashboard-hero-metric-label font-['DM Mono',monospace] text-[0.62rem] uppercase tracking-[0.11em] text-[#6b6b60]">
-                Active listings
+          <div className="dashboard-hero-metrics grid grid-cols-2 gap-4">
+            <div className="dashboard-hero-metric glass-panel rounded-2xl p-6" style={{boxShadow: "0 0 0 1px rgba(212,175,55,0.35), 0 0 24px rgba(212,175,55,0.12), inset 0 1px 0 rgba(255,255,255,0.06)"}}>
+              <div className="mb-2 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.15em] text-[#D4AF37]">
+                Active Listings
               </div>
-              <div className="dashboard-hero-metric-value text-[1.35rem] font-bold text-[#c8a96e]">
+              <div className="font-display text-[2.2rem] font-bold leading-none text-[#f5f4ef]">
                 GTA‑wide
               </div>
-              <p className="mt-1 text-[0.72rem] text-[#6b6b60]">
-                Pulled from Realtor.ca, Zoocasa, Kijiji and more.
+              <p className="mt-3 font-['DM_Mono',monospace] text-[0.68rem] leading-relaxed text-[#6b6b60]">
+                Active Listings
               </p>
             </div>
-            <div className="dashboard-hero-metric rounded-[14px] border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.02)] p-4">
-              <div className="dashboard-hero-metric-label font-['DM Mono',monospace] text-[0.62rem] uppercase tracking-[0.11em] text-[#6b6b60]">
-                Scan cadence
+            <div className="dashboard-hero-metric glass-panel rounded-2xl p-6" style={{boxShadow: "0 0 0 1px rgba(212,175,55,0.35), 0 0 24px rgba(212,175,55,0.12), inset 0 1px 0 rgba(255,255,255,0.06)"}}>
+              <div className="mb-2 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.15em] text-[#D4AF37]">
+                Scan Cadence
               </div>
-              <div className="dashboard-hero-metric-value text-[1.35rem] font-bold text-[#c8a96e]">
+              <div className="font-display text-[2.2rem] font-bold leading-none text-[#f5f4ef]">
                 Every 30 min
               </div>
-              <p className="mt-1 text-[0.72rem] text-[#6b6b60]">
-                Nightly full scans plus on‑demand refreshes for hot listings.
+              <p className="mt-3 font-['DM_Mono',monospace] text-[0.68rem] leading-relaxed text-[#6b6b60]">
+                Every 30 minutes
               </p>
             </div>
           </div>
@@ -476,7 +477,7 @@ export default function DashboardPage() {
             <button
               onClick={() => void triggerScan()}
               disabled={scanLoading}
-              className="rounded border border-[rgba(200,169,110,0.4)] bg-transparent px-4 py-2 font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-[#c8a96e] transition-colors hover:bg-[rgba(200,169,110,0.1)] disabled:opacity-50"
+              className="rounded border border-[rgba(212,175,55,0.4)] bg-transparent px-4 py-2 font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-[#D4AF37] transition-colors hover:bg-[rgba(212,175,55,0.1)] disabled:opacity-50"
             >
               {scanLoading ? "Scanning…" : "↻ Refresh Listings"}
             </button>
@@ -488,7 +489,7 @@ export default function DashboardPage() {
       </section>
 
       {/* Tab nav */}
-      <div className="tab-nav sticky top-0 z-40 border-b border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.8)] backdrop-blur-xl">
+      <div className="tab-nav sticky top-0 z-40 border-b border-[rgba(212,175,55,0.2)] bg-[rgba(10,10,8,0.8)] backdrop-blur-xl">
         <div className="tab-nav-inner flex justify-center px-16 max-md:px-6">
           {[
             ["listings", "Listings"],
@@ -499,7 +500,7 @@ export default function DashboardPage() {
               key={id}
               onClick={() => setActiveTab(id as any)}
               className={`tab-btn border-b-2 px-6 py-5 font-['DM Mono',monospace] text-[0.68rem] uppercase tracking-[0.1em] transition-colors ${
-                activeTab === id ? "border-[#c8a96e] text-[#c8a96e]" : "border-transparent text-[#6b6b60]"
+                activeTab === id ? "border-[#D4AF37] text-[#D4AF37]" : "border-transparent text-[#6b6b60]"
               }`}
             >
               {label}
@@ -513,7 +514,7 @@ export default function DashboardPage() {
         {activeTab === "listings" && (
           <div className="tab-content">
             {/* Filters */}
-            <div className="card relative z-10 mb-6 border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] p-6 backdrop-blur-md">
+            <div className="card relative z-10 mb-6 border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.025)] p-6 backdrop-blur-md">
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-[1.1rem] font-bold text-[#f5f4ef]">Search Filters</h2>
                 <ExpandSearch
@@ -534,14 +535,14 @@ export default function DashboardPage() {
                   placeholder="Min Price"
                   value={filters.minPrice}
                   onChange={(e) => setFilters({ ...filters, minPrice: e.target.value })}
-                  className="fi w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.8)] px-3 py-2 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
+                  className="fi w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(10,10,8,0.8)] px-3 py-2 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
                 />
                 <input
                   type="number"
                   placeholder="Max Price"
                   value={filters.maxPrice}
                   onChange={(e) => setFilters({ ...filters, maxPrice: e.target.value })}
-                  className="fi w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.8)] px-3 py-2 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
+                  className="fi w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(10,10,8,0.8)] px-3 py-2 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
                 />
                 <DropdownSelect
                   options={BED_OPTIONS}
@@ -563,7 +564,7 @@ export default function DashboardPage() {
                 />
                 <button
                   onClick={() => loadListings(0)}
-                  className="btn w-full bg-[#c8a96e] px-4 py-3 font-['Syne',sans-serif] text-[0.88rem] font-bold uppercase tracking-[0.05em] text-black hover:bg-[#e4c98a]"
+                  className="btn gold-gradient gold-glow w-full px-4 py-3 font-['DM_Mono',monospace] text-[0.82rem] font-bold uppercase tracking-[0.08em] text-black transition-opacity hover:opacity-90"
                 >
                   Search
                 </button>
@@ -571,7 +572,7 @@ export default function DashboardPage() {
             </div>
 
             {/* My alerts */}
-            <div className="card mb-6 border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.02)] p-6 backdrop-blur-md">
+            <div className="card mb-6 border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.02)] p-6 backdrop-blur-md">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <h2 className="text-[1rem] font-bold text-[#f5f4ef]">My alerts</h2>
@@ -582,20 +583,20 @@ export default function DashboardPage() {
                 {sessionEmail && (
                   <div className="text-right">
                     {telegramLinked ? (
-                      <div className="inline-block rounded-lg border border-[rgba(200,169,110,0.3)] bg-[rgba(200,169,110,0.06)] px-4 py-2 text-center">
+                      <div className="inline-block rounded-lg border border-[rgba(212,175,55,0.3)] bg-[rgba(212,175,55,0.06)] px-4 py-2 text-center">
                         <div className="text-[1.1rem]">✅</div>
                         <p className="font-['DM Mono',monospace] text-[0.75rem] font-semibold text-[#f5f4ef]">Connected</p>
                         <p className="font-['DM Mono',monospace] text-[0.65rem] text-[#6b6b60]">You&apos;ll receive alerts in Telegram</p>
                       </div>
                     ) : linkCode ? (
                       <div className="space-y-2 text-right">
-                        <div className="rounded-lg border border-[rgba(200,169,110,0.3)] bg-[rgba(0,0,0,0.2)] p-3 font-['DM Mono',monospace]">
+                        <div className="rounded-lg border border-[rgba(212,175,55,0.3)] bg-[rgba(0,0,0,0.2)] p-3 font-['DM Mono',monospace]">
                           <p className="text-[0.65rem] text-[#6b6b60] mb-1">Your link code (valid 30 min):</p>
                           <p className="text-[1rem] font-semibold text-[#f5f4ef] tracking-wider">{linkCode}</p>
                           {linkMessage && <p className="mt-1 text-[0.65rem] text-[#6b6b60]">{linkMessage}</p>}
                         </div>
                         <div className="text-[0.68rem] text-[#6b6b60] space-y-0.5">
-                          <p>1. Open Telegram and find <strong className="text-[#c8a96e]">@Homes_Alertsbot</strong> (or your 416Homes Alerts bot)</p>
+                          <p>1. Open Telegram and find <strong className="text-[#D4AF37]">@Homes_Alertsbot</strong> (or your 416Homes Alerts bot)</p>
                           <p>2. Send: <code className="bg-[rgba(255,255,255,0.06)] px-1 rounded">/link {linkCode}</code></p>
                           <p>3. Wait for confirmation, then click below.</p>
                         </div>
@@ -603,7 +604,7 @@ export default function DashboardPage() {
                           type="button"
                           onClick={handleCheckLinked}
                           disabled={checkingLinked}
-                          className="mt-1 rounded-full border border-[rgba(200,169,110,0.4)] px-3 py-1.5 font-['DM Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-[#c8a96e] hover:border-[#e4c98a] disabled:opacity-50"
+                          className="mt-1 rounded-full border border-[rgba(212,175,55,0.4)] px-3 py-1.5 font-['DM Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-[#D4AF37] hover:border-[#F3E5AB] disabled:opacity-50"
                         >
                           {checkingLinked ? "Checking…" : "I've linked it, check status"}
                         </button>
@@ -613,7 +614,7 @@ export default function DashboardPage() {
                         <button
                           onClick={handleGenerateLinkCode}
                           disabled={linkLoading}
-                          className="rounded-full border border-[rgba(200,169,110,0.4)] px-3 py-1.5 font-['DM Mono',monospace] text-[0.7rem] uppercase tracking-[0.11em] text-[#c8a96e] hover:border-[#e4c98a]"
+                          className="rounded-full border border-[rgba(212,175,55,0.4)] px-3 py-1.5 font-['DM Mono',monospace] text-[0.7rem] uppercase tracking-[0.11em] text-[#D4AF37] hover:border-[#F3E5AB]"
                         >
                           {linkLoading ? "Generating…" : "Connect Telegram"}
                         </button>
@@ -643,21 +644,21 @@ export default function DashboardPage() {
                       placeholder="Min beds"
                       value={alertForm.minBeds}
                       onChange={(e) => setAlertForm({ ...alertForm, minBeds: e.target.value })}
-                      className="border border-[rgba(200,169,110,0.2)] bg-transparent px-2 py-1.5 text-[0.78rem] font-['DM Mono',monospace] text-[#f5f4ef] placeholder:text-[#6b6b60]"
+                      className="border border-[rgba(212,175,55,0.2)] bg-transparent px-2 py-1.5 text-[0.78rem] font-['DM Mono',monospace] text-[#f5f4ef] placeholder:text-[#6b6b60]"
                     />
                     <input
                       type="number"
                       placeholder="Min price"
                       value={alertForm.minPrice}
                       onChange={(e) => setAlertForm({ ...alertForm, minPrice: e.target.value })}
-                      className="border border-[rgba(200,169,110,0.2)] bg-transparent px-2 py-1.5 text-[0.78rem] font-['DM Mono',monospace] text-[#f5f4ef] placeholder:text-[#6b6b60]"
+                      className="border border-[rgba(212,175,55,0.2)] bg-transparent px-2 py-1.5 text-[0.78rem] font-['DM Mono',monospace] text-[#f5f4ef] placeholder:text-[#6b6b60]"
                     />
                     <input
                       type="number"
                       placeholder="Max price"
                       value={alertForm.maxPrice}
                       onChange={(e) => setAlertForm({ ...alertForm, maxPrice: e.target.value })}
-                      className="border border-[rgba(200,169,110,0.2)] bg-transparent px-2 py-1.5 text-[0.78rem] font-['DM Mono',monospace] text-[#f5f4ef] placeholder:text-[#6b6b60]"
+                      className="border border-[rgba(212,175,55,0.2)] bg-transparent px-2 py-1.5 text-[0.78rem] font-['DM Mono',monospace] text-[#f5f4ef] placeholder:text-[#6b6b60]"
                     />
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-[0.7rem] text-[#6b6b60]">Property types:</span>
@@ -672,7 +673,7 @@ export default function DashboardPage() {
                                 : alertForm.propertyTypes.filter((x) => x !== p.value);
                               setAlertForm({ ...alertForm, propertyTypes: next });
                             }}
-                            className="rounded border-[rgba(200,169,110,0.4)]"
+                            className="rounded border-[rgba(212,175,55,0.4)]"
                           />
                           {p.label}
                         </label>
@@ -681,12 +682,12 @@ export default function DashboardPage() {
                   </div>
                   <button
                     onClick={handleCreateAlert}
-                    className="mt-3 rounded-full bg-[#c8a96e] px-4 py-2 font-['DM Mono',monospace] text-[0.74rem] uppercase tracking-[0.12em] text-black hover:bg-[#e4c98a]"
+                    className="mt-3 rounded-full bg-[#D4AF37] px-4 py-2 font-['DM Mono',monospace] text-[0.74rem] uppercase tracking-[0.12em] text-black hover:bg-[#F3E5AB]"
                   >
                     Save alert
                   </button>
 
-                  <div className="mt-4 border-t border-[rgba(200,169,110,0.2)] pt-3">
+                  <div className="mt-4 border-t border-[rgba(212,175,55,0.2)] pt-3">
                     <div className="mb-2 flex items-center gap-2">
                       <span className="font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.1em] text-[#6b6b60]">Active Alerts</span>
                       <PulseBell count={alerts.filter(a => a.is_active).length} animate={alerts.some(a => a.is_active)} />
@@ -710,7 +711,7 @@ export default function DashboardPage() {
                         {alerts.map((a) => (
                           <li
                             key={a.id}
-                            className="flex flex-nowrap items-center justify-between gap-3 rounded-md border border-[rgba(200,169,110,0.25)] px-3 py-2"
+                            className="flex flex-nowrap items-center justify-between gap-3 rounded-md border border-[rgba(212,175,55,0.25)] px-3 py-2"
                           >
                             <div className="min-w-0 flex-1">
                               <div className="text-[0.8rem] font-semibold text-[#f5f4ef]">
@@ -723,7 +724,7 @@ export default function DashboardPage() {
                                 {a.min_beds ? `${a.min_beds}+ beds` : "Any beds"}
                               </div>
                             </div>
-                            <div className="flex flex-shrink-0 flex-nowrap items-center gap-2 border-l border-[rgba(200,169,110,0.2)] pl-3">
+                            <div className="flex flex-shrink-0 flex-nowrap items-center gap-2 border-l border-[rgba(212,175,55,0.2)] pl-3">
                               <SmoothToggle
                                 checked={a.is_active}
                                 onChange={() => handleToggleAlert(a)}
@@ -761,7 +762,7 @@ export default function DashboardPage() {
                 <BouncingDots />
               </div>
             ) : (
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
                 {listings
                   .filter((l) =>
                     !addressSearch ||
@@ -770,68 +771,55 @@ export default function DashboardPage() {
                   .map((l) => (
                   <HoverCardWrapper key={l.id}>
                   <div
-                    className="listing-card card border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] p-6 backdrop-blur-md"
+                    className="group overflow-hidden rounded-xl transition-transform duration-300 hover:scale-[1.02]"
+                    style={{boxShadow: "0 0 0 1px rgba(212,175,55,0.2), 0 8px 32px rgba(0,0,0,0.4)"}}
                   >
-                    <div className="mb-4 flex items-start justify-between">
-                      <div>
-                        <h3 className="mb-1 text-[0.9rem] font-semibold leading-tight">{l.address}</h3>
-                        <p className="text-[1.6rem] font-extrabold tracking-[0.03em] text-[#c8a96e]">
-                          ${l.price.toLocaleString()}
-                        </p>
-                      </div>
-                      <span className="inline-block border border-[rgba(200,169,110,0.35)] px-2 py-0.5 font-['DM Mono',monospace] text-[0.58rem] uppercase tracking-[0.12em] text-[#c8a96e]">
+                    {/* Photo */}
+                    <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-[#1a1a14] to-[#0B0B0B]">
+                      {l.photos?.[0] && (
+                        <img src={l.photos[0]} alt={l.address} className="absolute inset-0 h-full w-full object-cover" />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+                      {/* Source badge */}
+                      <span className="absolute right-3 top-3 rounded-full bg-[rgba(0,0,0,0.6)] px-2.5 py-1 font-['DM_Mono',monospace] text-[0.58rem] uppercase tracking-[0.12em] text-[#D4AF37] backdrop-blur-sm">
                         {(l.source || "").toUpperCase()}
                       </span>
                     </div>
-                    <div className="mb-4 grid grid-cols-3 gap-4 text-center">
-                      <div>
-                        <div className="stat-value text-[1.05rem] font-bold">{l.beds || "—"}</div>
-                        <div className="stat-label mt-1 font-['DM Mono',monospace] text-[0.58rem] uppercase tracking-[0.08em] text-[#6b6b60]">
-                          Beds
+
+                    {/* Glass info overlay */}
+                    <div className="glass-panel p-5">
+                      <div className="mb-3">
+                        <div className="text-[1.8rem] font-extrabold text-[#D4AF37]">
+                          ${l.price.toLocaleString()}
+                        </div>
+                        <div className="mt-0.5 font-['DM_Mono',monospace] text-[0.72rem] text-[#6b6b60] leading-snug">
+                          {l.address}
                         </div>
                       </div>
-                      <div>
-                        <div className="stat-value text-[1.05rem] font-bold">{l.baths || "—"}</div>
-                        <div className="stat-label mt-1 font-['DM Mono',monospace] text-[0.58rem] uppercase tracking-[0.08em] text-[#6b6b60]">
-                          Baths
-                        </div>
+                      <div className="mb-4 grid grid-cols-3 gap-2 border-y border-[rgba(212,175,55,0.15)] py-3 text-center">
+                        {[["Beds", l.beds || "—"], ["Baths", l.baths || "—"], ["Sq Ft", l.sqft ? l.sqft.toLocaleString() : "—"]].map(([label, val]) => (
+                          <div key={String(label)}>
+                            <div className="text-[1rem] font-bold">{val}</div>
+                            <div className="mt-0.5 font-['DM_Mono',monospace] text-[0.55rem] uppercase tracking-[0.1em] text-[#6b6b60]">{label}</div>
+                          </div>
+                        ))}
                       </div>
-                      <div>
-                        <div className="stat-value text-[1.05rem] font-bold">
-                          {l.sqft ? l.sqft.toLocaleString() : "—"}
-                        </div>
-                        <div className="stat-label mt-1 font-['DM Mono',monospace] text-[0.58rem] uppercase tracking-[0.08em] text-[#6b6b60]">
-                          Sq Ft
-                        </div>
+                      <div className="flex gap-2">
+                        <a
+                          href={l.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex-1 border border-[rgba(212,175,55,0.3)] py-2 text-center font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-[#f5f4ef] no-underline transition-colors hover:border-[#D4AF37] hover:text-[#D4AF37]"
+                        >
+                          View Listing →
+                        </a>
+                        <button
+                          className="flex-1 gold-gradient gold-glow py-2 font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-black transition-opacity hover:opacity-90"
+                          onClick={() => setActiveTab("valuation")}
+                        >
+                          Valuate
+                        </button>
                       </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <a
-                        href={l.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[0.78rem] font-['DM Mono',monospace] uppercase tracking-[0.08em] text-[#f5f4ef] no-underline"
-                      >
-                        View Listing →
-                      </a>
-                      <button
-                        className="btn bg-[#c8a96e] px-4 py-2 font-['Syne',sans-serif] text-[0.8rem] font-bold uppercase tracking-[0.08em] text-black hover:bg-[#e4c98a]"
-                        onClick={() => {
-                          setValuationForm({
-                            neighbourhood: "",
-                            city: l.city || "Toronto",
-                            bedrooms: l.beds > 0 ? String(l.beds) : "",
-                            bathrooms: l.baths > 0 ? String(l.baths) : "",
-                            sqft: l.sqft > 0 ? String(l.sqft) : "",
-                            list_price: l.price > 0 ? String(l.price) : "",
-                          });
-                          setValuationResult(null);
-                          setValuationError(null);
-                          setActiveTab("valuation");
-                        }}
-                      >
-                        Valuate
-                      </button>
                     </div>
                   </div>
                   </HoverCardWrapper>
@@ -845,18 +833,18 @@ export default function DashboardPage() {
                 <button
                   disabled={page === 0}
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  className="rounded border border-[rgba(200,169,110,0.4)] px-4 py-2 font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.08em] text-[#c8a96e] transition-colors hover:bg-[rgba(200,169,110,0.1)] disabled:cursor-not-allowed disabled:opacity-30"
+                  className="rounded border border-[rgba(212,175,55,0.4)] px-4 py-2 font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.08em] text-[#D4AF37] transition-colors hover:bg-[rgba(212,175,55,0.1)] disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   ← Prev
                 </button>
                 <span className="font-['DM_Mono',monospace] text-[0.7rem] text-[#6b6b60]">
                   {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalListings)}{" "}
-                  <span className="text-[#c8a96e]">of {totalListings.toLocaleString()}</span>
+                  <span className="text-[#D4AF37]">of {totalListings.toLocaleString()}</span>
                 </span>
                 <button
                   disabled={(page + 1) * PAGE_SIZE >= totalListings}
                   onClick={() => setPage((p) => p + 1)}
-                  className="rounded border border-[rgba(200,169,110,0.4)] px-4 py-2 font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.08em] text-[#c8a96e] transition-colors hover:bg-[rgba(200,169,110,0.1)] disabled:cursor-not-allowed disabled:opacity-30"
+                  className="rounded border border-[rgba(212,175,55,0.4)] px-4 py-2 font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.08em] text-[#D4AF37] transition-colors hover:bg-[rgba(212,175,55,0.1)] disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   Next →
                 </button>
@@ -866,79 +854,94 @@ export default function DashboardPage() {
         )}
 
         {activeTab === "valuation" && (
-          <div className="tab-content mx-auto max-w-[60rem]">
-            <div className="card border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] p-6 backdrop-blur-md">
-              <h2 className="mb-6 text-[clamp(1.4rem,2vw,2.2rem)] font-extrabold tracking-[-0.02em]">
+          <div className="tab-content mx-auto max-w-[56rem]">
+            <div className="bg-[radial-gradient(ellipse_at_top,rgba(212,175,55,0.07),transparent_60%)] px-8 pb-10 pt-8">
+              <h2 className="mb-10 text-center font-display text-[clamp(2rem,3.5vw,3.5rem)] font-bold tracking-[-0.01em]">
                 Property Valuation
               </h2>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {[
-                  { label: "City", key: "city", placeholder: "Toronto" },
-                  { label: "Neighbourhood", key: "neighbourhood", placeholder: "King West" },
-                  { label: "Bedrooms", key: "bedrooms", placeholder: "3" },
-                  { label: "Bathrooms", key: "bathrooms", placeholder: "2" },
-                  { label: "Sq Ft", key: "sqft", placeholder: "1200" },
-                  { label: "List Price", key: "list_price", placeholder: "750000" },
-                ].map(({ label, key, placeholder }) => (
-                  <div key={key} className="flex flex-col gap-1">
-                    <label className="font-[‘DM Mono’,monospace] text-[0.65rem] uppercase tracking-[0.08em] text-[#6b6b60]">{label}</label>
-                    <input
-                      type="text"
-                      placeholder={placeholder}
-                      value={valuationForm[key as keyof typeof valuationForm]}
-                      onChange={e => setValuationForm(f => ({ ...f, [key]: e.target.value }))}
-                      className="border border-[rgba(200,169,110,0.2)] bg-transparent px-3 py-2 font-[‘DM Mono’,monospace] text-[0.8rem] text-[#f5f4ef] outline-none placeholder:text-[#6b6b60] focus:border-[#c8a96e]"
-                    />
-                  </div>
-                ))}
+              <div className="glass-panel p-8">
+                <div className="mb-6 grid gap-6 md:grid-cols-3">
+                  {[
+                    { label: "City", key: "city", placeholder: "Toronto" },
+                    { label: "Neighbourhood", key: "neighbourhood", placeholder: "King West" },
+                    { label: "Bedrooms", key: "bedrooms", placeholder: "3" },
+                  ].map(({ label, key, placeholder }) => (
+                    <div key={key}>
+                      <label className="mb-2 block font-[‘DM_Mono’,monospace] text-[0.6rem] uppercase tracking-[0.15em] text-[#6b6b60]">{label}</label>
+                      <input
+                        type="text"
+                        placeholder={placeholder}
+                        value={valuationForm[key as keyof typeof valuationForm]}
+                        onChange={e => setValuationForm(f => ({ ...f, [key]: e.target.value }))}
+                        className="w-full border-0 border-b border-[rgba(212,175,55,0.3)] bg-transparent pb-2 font-[‘DM_Mono’,monospace] text-[0.95rem] text-[#f5f4ef] outline-none transition-colors placeholder:text-[#3a3a32] focus:border-[#D4AF37]"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="mb-8 grid gap-6 md:grid-cols-3">
+                  {[
+                    { label: "Bathrooms", key: "bathrooms", placeholder: "2" },
+                    { label: "Sq Ft", key: "sqft", placeholder: "1200" },
+                    { label: "List Price", key: "list_price", placeholder: "750000" },
+                  ].map(({ label, key, placeholder }) => (
+                    <div key={key}>
+                      <label className="mb-2 block font-[‘DM_Mono’,monospace] text-[0.6rem] uppercase tracking-[0.15em] text-[#6b6b60]">{label}</label>
+                      <input
+                        type="text"
+                        placeholder={placeholder}
+                        value={valuationForm[key as keyof typeof valuationForm]}
+                        onChange={e => setValuationForm(f => ({ ...f, [key]: e.target.value }))}
+                        className="w-full border-0 border-b border-[rgba(212,175,55,0.3)] bg-transparent pb-2 font-[‘DM_Mono’,monospace] text-[0.95rem] text-[#f5f4ef] outline-none transition-colors placeholder:text-[#3a3a32] focus:border-[#D4AF37]"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <button
+                  disabled={valuationLoading}
+                  className="gold-gradient gold-glow w-full py-4 font-[‘DM_Mono’,monospace] text-[0.82rem] font-bold uppercase tracking-[0.15em] text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={async () => {
+                    setValuationLoading(true);
+                    setValuationError(null);
+                    setValuationResult(null);
+                    try {
+                      const result = await fetchValuation({
+                        neighbourhood: valuationForm.neighbourhood,
+                        property_type: "",
+                        city: valuationForm.city,
+                        bedrooms: Number(valuationForm.bedrooms) || 0,
+                        bathrooms: Number(valuationForm.bathrooms) || 0,
+                        sqft: Number(valuationForm.sqft) || 0,
+                        list_price: Number(valuationForm.list_price) || 0,
+                      });
+                      setValuationResult(result);
+                    } catch {
+                      setValuationError("Valuation failed — check API connection.");
+                    } finally {
+                      setValuationLoading(false);
+                    }
+                  }}
+                >
+                  {valuationLoading ? "Analysing…" : "Get Valuation"}
+                </button>
+                {valuationError && (
+                  <p className="mt-4 text-center font-[‘DM_Mono’,monospace] text-[0.75rem] text-[#e07060]">{valuationError}</p>
+                )}
               </div>
-              <button
-                disabled={valuationLoading}
-                className="mt-5 bg-[#c8a96e] px-6 py-2.5 font-[‘Syne’,sans-serif] text-[0.85rem] font-bold uppercase tracking-[0.08em] text-black hover:bg-[#e4c98a] disabled:opacity-50"
-                onClick={async () => {
-                  setValuationLoading(true);
-                  setValuationError(null);
-                  setValuationResult(null);
-                  try {
-                    const result = await fetchValuation({
-                      neighbourhood: valuationForm.neighbourhood,
-                      property_type: "",
-                      city: valuationForm.city,
-                      bedrooms: Number(valuationForm.bedrooms) || 0,
-                      bathrooms: Number(valuationForm.bathrooms) || 0,
-                      sqft: Number(valuationForm.sqft) || 0,
-                      list_price: Number(valuationForm.list_price) || 0,
-                    });
-                    setValuationResult(result);
-                  } catch {
-                    setValuationError("Valuation failed — check API connection.");
-                  } finally {
-                    setValuationLoading(false);
-                  }
-                }}
-              >
-                {valuationLoading ? "Estimating…" : "Get Valuation"}
-              </button>
-              {valuationError && (
-                <p className="mt-4 font-[‘DM Mono’,monospace] text-[0.78rem] text-red-400">{valuationError}</p>
-              )}
               {valuationResult && (
-                <div className="mt-6 border border-[rgba(200,169,110,0.2)] p-5">
-                  <p className="font-[‘DM Mono’,monospace] text-[0.65rem] uppercase tracking-[0.1em] text-[#6b6b60]">Estimated Value</p>
-                  <p className="text-[2rem] font-extrabold text-[#c8a96e]">
-                    ${valuationResult.estimated_value.toLocaleString()}
-                  </p>
-                  {valuationResult.price_per_sqft && (
-                    <p className="mt-1 font-[‘DM Mono’,monospace] text-[0.78rem] text-[#f5f4ef]">
-                      ${Math.round(valuationResult.price_per_sqft).toLocaleString()} / sqft
+                <div className="mt-6 glass-panel p-6" style={{boxShadow: "0 0 0 1px rgba(212,175,55,0.3), 0 0 20px rgba(212,175,55,0.1)"}}>
+                  <div className="mb-4 flex items-baseline gap-3">
+                    <span className="font-display text-[2.5rem] font-bold text-[#D4AF37]">
+                      ${valuationResult.estimated_value.toLocaleString()}
+                    </span>
+                    <span className="font-[‘DM_Mono’,monospace] text-[0.7rem] uppercase tracking-[0.1em] text-[#6b6b60]">
+                      Estimated value · {Math.round(valuationResult.confidence * 100)}% confidence
+                    </span>
+                  </div>
+                  {valuationResult.market_analysis && (
+                    <p className="font-[‘DM_Mono’,monospace] text-[0.78rem] leading-relaxed text-[#6b6b60]">
+                      {valuationResult.market_analysis}
                     </p>
                   )}
-                  <p className="mt-2 font-[‘DM Mono’,monospace] text-[0.78rem] text-[#6b6b60]">
-                    {valuationResult.market_analysis}
-                  </p>
-                  <p className="mt-1 font-[‘DM Mono’,monospace] text-[0.65rem] text-[#6b6b60]">
-                    Confidence: {Math.round(valuationResult.confidence * 100)}%
-                  </p>
                 </div>
               )}
             </div>
@@ -950,8 +953,8 @@ export default function DashboardPage() {
             <p className="mb-6 font-['DM Mono',monospace] text-[0.72rem] uppercase tracking-[0.1em] text-[#6b6b60]">
               Professional listing videos for GTA agents
             </p>
-            <h2 className="mb-4 text-[clamp(1.6rem,2.5vw,2.8rem)] font-extrabold text-[#f5f4ef]">
-              Turn any listing into a <span className="text-[#c8a96e]">cinematic video</span>
+            <h2 className="mb-4 font-display text-[clamp(1.6rem,2.5vw,2.8rem)] font-bold text-[#f5f4ef]">
+              Turn any listing into a <span className="text-[#D4AF37]">cinematic video</span>
             </h2>
             <p className="mb-10 max-w-xl font-['DM Mono',monospace] text-[0.8rem] text-[#6b6b60]">
               Paste a Realtor.ca or Zillow URL. We write the script, record the voiceover, and add music — your
@@ -959,7 +962,7 @@ export default function DashboardPage() {
             </p>
             <Link
               href="/video"
-              className="btn rounded-full bg-[#c8a96e] px-10 py-4 font-['Syne',sans-serif] text-[0.9rem] font-bold uppercase tracking-[0.08em] text-black no-underline hover:bg-[#e4c98a]"
+              className="btn gold-gradient gold-glow inline-block px-10 py-4 font-['DM_Mono',monospace] text-[0.82rem] font-bold uppercase tracking-[0.12em] text-black no-underline transition-opacity hover:opacity-90"
             >
               Order a Video →
             </Link>
@@ -967,10 +970,10 @@ export default function DashboardPage() {
         )}
       </main>
 
-      <footer className="flex items-center justify-between border-t border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.8)] px-16 py-10 max-md:flex-col max-md:gap-3 max-md:px-6">
+      <footer className="flex items-center justify-between border-t border-[rgba(212,175,55,0.2)] bg-[rgba(10,10,8,0.8)] px-16 py-10 max-md:flex-col max-md:gap-3 max-md:px-6">
         <div className="footer-logo text-[1.1rem] font-extrabold">
-          <span className="text-[#c8a96e]">416</span>
-          Homes
+          <span className="text-[#D4AF37]">416</span>
+          Homes Dashboard
         </div>
         <div className="footer-copy font-['DM_Mono',monospace] text-[0.62rem] text-[#6b6b60]">
           Toronto Real Estate Intelligence Platform
