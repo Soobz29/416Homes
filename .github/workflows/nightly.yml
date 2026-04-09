@@ -14,8 +14,8 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v4
-      with: { python-version: '3.11' }
-    - run: pip install -r requirements.txt
+      with: { python-version: '3.12' }
+    - run: pip install -r requirements-full.txt
     - name: Run nightly scraper
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -38,8 +38,8 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v4
-      with: { python-version: '3.11' }
-    - run: pip install -r requirements.txt
+      with: { python-version: '3.12' }
+    - run: pip install -r requirements-full.txt
     - name: Train valuation model
       env:
         PYTHONPATH: ${{ github.workspace }}
@@ -60,8 +60,8 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v4
-      with: { python-version: '3.11' }
-    - run: pip install -r requirements.txt
+      with: { python-version: '3.12' }
+    - run: pip install -r requirements-railway.txt
     - name: Run agent matching loop
       env:
         PYTHONPATH: ${{ github.workspace }}
