@@ -4,6 +4,7 @@
 
 LightGBM model for property valuation based on sold comps.
 """
+from __future__ import annotations
 
 # Temporarily disabled for Railway deployment (data science stack removed)
 try:
