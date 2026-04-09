@@ -1,0 +1,33 @@
+name: 416homes
+region: tor
+
+services:
+  - name: api-server
+    github:
+      repo: Soobz29/416Homes
+      branch: main
+      deploy_on_push: true
+    build_command: pip install --no-cache-dir --retries 5 --timeout 60 -r requirements-railway.txt
+    run_command: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    http_port: 8080
+    health_check:
+      http_path: /api/health
+    envs:
+      - key: PYTHONPATH
+        value: /workspace
+
+  - name: telegram-worker
+    github:
+      repo: Soobz29/416Homes
+      branch: main
+      deploy_on_push: true
+    build_command: pip install --no-cache-dir --retries 5 --timeout 60 -r requirements-railway.txt
+    run_command: python run_agent.py
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    kind: WORKER
+    envs:
+      - key: PYTHONPATH
+        value: /workspace
