@@ -12,7 +12,7 @@ import { SmoothToggle } from "@/components/ui/smooth-toggle";
 import { PulseBell } from "@/components/ui/pulse-bell";
 import { BouncingDots } from "@/components/ui/bouncing-dots";
 import { ExpandSearch } from "@/components/ui/expand-search";
-import { HoverCardWrapper } from "@/components/ui/hover-card-wrapper";
+import { ListingCard } from "@/components/listing-card";
 
 const CITIES = [
   { value: "GTA", label: "All GTA" },
@@ -768,61 +768,13 @@ export default function DashboardPage() {
                     !addressSearch ||
                     (l.address || "").toLowerCase().includes(addressSearch.toLowerCase())
                   )
-                  .map((l) => (
-                  <HoverCardWrapper key={l.id}>
-                  <div
-                    className="group overflow-hidden rounded-xl transition-transform duration-300 hover:scale-[1.02]"
-                    style={{boxShadow: "0 0 0 1px rgba(212,175,55,0.2), 0 8px 32px rgba(0,0,0,0.4)"}}
-                  >
-                    {/* Photo */}
-                    <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-[#1a1a14] to-[#0B0B0B]">
-                      {l.photos?.[0] && (
-                        <img src={l.photos[0]} alt={l.address} className="absolute inset-0 h-full w-full object-cover" />
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-                      {/* Source badge */}
-                      <span className="absolute right-3 top-3 rounded-full bg-[rgba(0,0,0,0.6)] px-2.5 py-1 font-['DM_Mono',monospace] text-[0.58rem] uppercase tracking-[0.12em] text-[#D4AF37] backdrop-blur-sm">
-                        {(l.source || "").toUpperCase()}
-                      </span>
-                    </div>
-
-                    {/* Glass info overlay */}
-                    <div className="glass-panel p-5">
-                      <div className="mb-3">
-                        <div className="text-[1.8rem] font-extrabold text-[#D4AF37]">
-                          ${l.price.toLocaleString()}
-                        </div>
-                        <div className="mt-0.5 font-['DM_Mono',monospace] text-[0.72rem] text-[#6b6b60] leading-snug">
-                          {l.address}
-                        </div>
-                      </div>
-                      <div className="mb-4 grid grid-cols-3 gap-2 border-y border-[rgba(212,175,55,0.15)] py-3 text-center">
-                        {[["Beds", l.beds || "—"], ["Baths", l.baths || "—"], ["Sq Ft", l.sqft ? l.sqft.toLocaleString() : "—"]].map(([label, val]) => (
-                          <div key={String(label)}>
-                            <div className="text-[1rem] font-bold">{val}</div>
-                            <div className="mt-0.5 font-['DM_Mono',monospace] text-[0.55rem] uppercase tracking-[0.1em] text-[#6b6b60]">{label}</div>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="flex gap-2">
-                        <a
-                          href={l.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex-1 border border-[rgba(212,175,55,0.3)] py-2 text-center font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-[#f5f4ef] no-underline transition-colors hover:border-[#D4AF37] hover:text-[#D4AF37]"
-                        >
-                          View Listing →
-                        </a>
-                        <button
-                          className="flex-1 gold-gradient gold-glow py-2 font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-black transition-opacity hover:opacity-90"
-                          onClick={() => setActiveTab("valuation")}
-                        >
-                          Valuate
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  </HoverCardWrapper>
+                  .map((l, i) => (
+                  <ListingCard
+                    key={l.id}
+                    listing={l}
+                    index={i}
+                    onValuate={() => setActiveTab("valuation")}
+                  />
                 ))}
               </div>
             )}
