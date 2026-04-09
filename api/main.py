@@ -105,6 +105,24 @@ async def _video_worker_loop() -> None:
                             pass
 
                 asyncio.create_task(_run_job(jid))
+
+            # Also pick up revision_requested jobs
+            rev_rows = (
+                supabase_client.table("video_jobs")
+                .select("id")
+                .eq("status", "revision_requested")
+                .order("updated_at")
+                .limit(1)
+                .execute()
+            )
+            if rev_rows.data:
+                jid = rev_rows.data[0]["id"]
+                logger.info("Video worker: re-processing revision job %s", jid)
+                supabase_client.table("video_jobs").update({
+                    "status": "generating_script",
+                    "progress": 0,
+                }).eq("id", jid).execute()
+                asyncio.create_task(_run_job(jid))
         except Exception as exc:
             logger.error("Video worker poll error: %s", exc)
 
@@ -378,6 +396,11 @@ async def resolve_session(payload: SessionRequest):
 
 
 # Health check
+@app.get("/")
+async def root():
+    return {"status": "ok", "service": "416Homes API"}
+
+
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint"""
