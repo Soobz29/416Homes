@@ -1,5 +1,19 @@
 import type { Metadata } from "next";
+import { Inter, Cormorant_Garamond } from "next/font/google";
 import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700", "800"],
+  variable: "--font-sans",
+});
+
+const cormorant = Cormorant_Garamond({
+  subsets: ["latin"],
+  weight: ["400", "600", "700"],
+  style: ["normal", "italic"],
+  variable: "--font-serif",
+});
 
 export const metadata: Metadata = {
   title: "416Homes - Toronto Real Estate Platform",
@@ -21,7 +35,10 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body style={{ fontFamily: "'Inter', sans-serif" }}>{children}</body>
+      <body className={`${inter.variable} ${cormorant.variable}`} style={{ fontFamily: "'Inter', sans-serif" }}>
+        {children}
+      </body>
     </html>
   );
 }
+

@@ -2,20 +2,19 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { createAlert } from "@/lib/alerts";
 import { fetchListings } from "@/lib/api";
 import type { Listing } from "@/types";
 
 const STATIC_TICKER = [
-  "🏠 King West 2BR — $899K → Fair Value +4.2% underpriced",
-  "🏢 Square One Condo — $549K → Agent contacted ✓",
-  "🏡 Port Credit Semi — $1.1M → Comp avg $1.08M -1.8%",
-  "📍 GTA — 5 new listings matched your alert",
-  "🏠 Leslieville Detached — $1.35M → Fair Value +6.1% underpriced",
-  "⚡ Eglinton Crosstown now open — transit-adjacent listings tracking +$38K premium",
-  "🏠 Erin Mills 3BR — $1.05M → 5 comps pulled, showing booked",
+  "King West 2BR - $899K - Fair Value +4.2% underpriced",
+  "Square One Condo - $549K - Agent contacted",
+  "Port Credit Semi - $1.1M - Comp avg $1.08M -1.8%",
+  "GTA - 5 new listings matched your alert",
+  "Leslieville Detached - $1.35M - Fair Value +6.1% underpriced",
+  "Eglinton Crosstown now open - transit-adjacent listings tracking +$38K premium",
+  "Erin Mills 3BR - $1.05M - 5 comps pulled, showing booked",
 ];
 
 function formatPrice(n: number) {
@@ -24,9 +23,14 @@ function formatPrice(n: number) {
   return `$${n}`;
 }
 
+function formatPriceFull(n: number) {
+  return `$${Math.max(0, n).toLocaleString()}`;
+}
+
 export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [tickerItems, setTickerItems] = useState<string[]>(STATIC_TICKER);
+  const [featuredListing, setFeaturedListing] = useState<Listing | null>(null);
 
   // Form state
   const [email, setEmail] = useState("");
@@ -41,6 +45,30 @@ export default function LandingPage() {
   const [formSuccess, setFormSuccess] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  // Scroll-reveal
+  useEffect(() => {
+    const steps = document.querySelectorAll<HTMLElement>(".step,.feat,.ss-item");
+    const obs = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            const el = e.target as HTMLElement;
+            el.style.opacity = "1";
+            el.style.transform = "translateY(0)";
+          }
+        });
+      },
+      { threshold: 0.1 },
+    );
+    steps.forEach((el) => {
+      el.style.opacity = "0";
+      el.style.transform = "translateY(18px)";
+      el.style.transition = "opacity 0.5s ease,transform 0.5s ease";
+      obs.observe(el);
+    });
+    return () => obs.disconnect();
+  }, []);
+
   // Live ticker from API
   useEffect(() => {
     fetchListings({ city: undefined })
@@ -48,9 +76,10 @@ export default function LandingPage() {
         if (listings.length > 0) {
           const items = listings.slice(0, 10).map(
             (l: Listing) =>
-              `🏠 ${l.address} — ${formatPrice(l.price)} → ${l.beds}bd/${l.baths}ba`,
+              `${l.address} - ${formatPrice(l.price)} - ${l.beds}bd/${l.baths}ba`,
           );
           setTickerItems(items);
+          setFeaturedListing(listings[0] ?? null);
         }
       })
       .catch(() => {
@@ -104,11 +133,11 @@ export default function LandingPage() {
   const displayTicker = [...tickerItems, ...tickerItems];
 
   return (
-    <div className="min-h-screen bg-[#0B0B0B] text-[#f5f4ef] font-['Syne',system-ui,sans-serif]">
+    <div className="min-h-screen bg-[#0a0a08] text-[#f5f4ef] font-['Syne',system-ui,sans-serif]">
       {/* Top nav */}
-      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between border-b border-[rgba(212,175,55,0.2)] bg-[rgba(10,10,8,0.75)] px-16 py-6 backdrop-blur-xl max-md:px-6">
+      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between border-b border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.75)] px-16 py-6 backdrop-blur-xl max-md:px-6">
         <div className="logo text-[1.3rem] font-extrabold tracking-[0.05em]">
-          <span className="text-[#D4AF37]">416</span>
+          <span className="text-[#c8a96e]">416</span>
           Homes
           <sub className="ml-1 align-middle font-['DM_Mono',monospace] text-[0.6rem] font-normal tracking-[0.1em] text-[#6b6b60]">
             GTA
@@ -118,7 +147,7 @@ export default function LandingPage() {
           <li>
             <button
               onClick={() => scrollToId("how")}
-              className="bg-transparent text-inherit transition-colors hover:text-[#D4AF37]"
+              className="bg-transparent text-inherit transition-colors hover:text-[#c8a96e]"
             >
               How It Works
             </button>
@@ -126,7 +155,7 @@ export default function LandingPage() {
           <li>
             <button
               onClick={() => scrollToId("features")}
-              className="bg-transparent text-inherit transition-colors hover:text-[#D4AF37]"
+              className="bg-transparent text-inherit transition-colors hover:text-[#c8a96e]"
             >
               Features
             </button>
@@ -134,7 +163,7 @@ export default function LandingPage() {
           <li>
             <button
               onClick={() => scrollToId("alert")}
-              className="bg-transparent text-inherit transition-colors hover:text-[#D4AF37]"
+              className="bg-transparent text-inherit transition-colors hover:text-[#c8a96e]"
             >
               Get Started
             </button>
@@ -142,7 +171,7 @@ export default function LandingPage() {
         </ul>
         <div className="flex items-center gap-3">
           <button
-            className="nav-cta gold-gradient gold-glow px-6 py-2 font-['DM_Mono',monospace] text-[0.72rem] font-medium uppercase tracking-[0.08em] text-black transition-opacity hover:opacity-90"
+            className="nav-cta bg-[#c8a96e] px-6 py-2 font-['DM_Mono',monospace] text-[0.72rem] font-medium uppercase tracking-[0.08em] text-black transition-colors hover:bg-[#e4c98a]"
             onClick={() => scrollToId("alert")}
           >
             Set My Alert
@@ -154,28 +183,28 @@ export default function LandingPage() {
             aria-label={menuOpen ? "Close menu" : "Open menu"}
             aria-expanded={menuOpen}
           >
-            <span className={`block h-px w-5 bg-[#D4AF37] transition-all ${menuOpen ? "translate-y-[6px] rotate-45" : ""}`} />
-            <span className={`block h-px w-5 bg-[#D4AF37] transition-all ${menuOpen ? "opacity-0" : ""}`} />
-            <span className={`block h-px w-5 bg-[#D4AF37] transition-all ${menuOpen ? "-translate-y-[6px] -rotate-45" : ""}`} />
+            <span className={`block h-px w-5 bg-[#c8a96e] transition-all ${menuOpen ? "translate-y-[6px] rotate-45" : ""}`} />
+            <span className={`block h-px w-5 bg-[#c8a96e] transition-all ${menuOpen ? "opacity-0" : ""}`} />
+            <span className={`block h-px w-5 bg-[#c8a96e] transition-all ${menuOpen ? "-translate-y-[6px] -rotate-45" : ""}`} />
           </button>
         </div>
       </nav>
 
       {/* Mobile menu */}
       {menuOpen && (
-        <div className="fixed inset-x-0 top-[4.3rem] z-40 border-b border-[rgba(212,175,55,0.2)] bg-[rgba(10,10,8,0.97)] px-6 py-6 md:hidden">
+        <div className="fixed inset-x-0 top-[4.3rem] z-40 border-b border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.97)] px-6 py-6 md:hidden">
           <ul className="flex flex-col gap-6 font-['DM_Mono',monospace] text-[0.8rem] uppercase tracking-[0.1em] text-[#6b6b60]">
-            <li><button onClick={() => scrollToId("how")} className="hover:text-[#D4AF37]">How It Works</button></li>
-            <li><button onClick={() => scrollToId("features")} className="hover:text-[#D4AF37]">Features</button></li>
-            <li><button onClick={() => scrollToId("alert")} className="hover:text-[#D4AF37]">Get Started</button></li>
-            <li><Link href="/dashboard" className="text-[#D4AF37] hover:text-[#F3E5AB]" onClick={() => setMenuOpen(false)}>Dashboard →</Link></li>
+            <li><button onClick={() => scrollToId("how")} className="hover:text-[#c8a96e]">How It Works</button></li>
+            <li><button onClick={() => scrollToId("features")} className="hover:text-[#c8a96e]">Features</button></li>
+            <li><button onClick={() => scrollToId("alert")} className="hover:text-[#c8a96e]">Get Started</button></li>
+            <li><Link href="/dashboard" className="text-[#c8a96e] hover:text-[#e4c98a]" onClick={() => setMenuOpen(false)}>Dashboard</Link></li>
           </ul>
         </div>
       )}
 
       {/* Ticker */}
-      <div className="fixed left-0 right-0 top-[4.5rem] z-40 border-b border-[rgba(212,175,55,0.2)] bg-[rgba(10,10,8,0.9)] py-2 max-md:hidden">
-        <div className="flex animate-[ticker_35s_linear_infinite] gap-20 whitespace-nowrap text-[0.68rem] font-['DM_Mono',monospace] text-[#6b6b60]">
+      <div className="fixed left-0 right-0 top-[4.5rem] z-40 border-b border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.9)] py-2 max-md:hidden">
+        <div className="ticker-track flex animate-[ticker_35s_linear_infinite] gap-20 whitespace-nowrap text-[0.68rem] font-['DM_Mono',monospace] text-[#6b6b60]">
           {displayTicker.map((text, idx) => (
             <span key={idx}>{text}</span>
           ))}
@@ -183,75 +212,84 @@ export default function LandingPage() {
       </div>
 
       {/* Hero */}
-      <section className="grid min-h-screen grid-cols-1 pt-[7.5rem] md:grid-cols-2">
-        <div className="flex flex-col justify-center px-16 pb-16 pt-24 max-md:px-6">
-          <div className="mb-8 flex items-center gap-3 font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.18em] text-[#D4AF37]">
-            <span className="h-px w-8 bg-[#D4AF37]" />
+      <section className="mx-auto grid min-h-screen max-w-[1240px] grid-cols-1 gap-10 px-12 pb-8 pt-[8.2rem] md:grid-cols-[1.05fr_0.95fr]">
+        <div className="flex flex-col justify-center rounded-[18px] border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.02)] px-10 py-12 max-md:px-6">
+          <div className="mb-8 flex items-center gap-3 font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.18em] text-[#c8a96e]">
+            <span className="h-px w-8 bg-[#c8a96e]" />
             Toronto &amp; Mississauga property search, done for you
           </div>
-          <h1 className="mb-8 font-display text-[clamp(2.8rem,4.5vw,5rem)] font-bold leading-[0.95] tracking-[-0.02em]">
+          <h1 className="mb-6 text-[clamp(2.9rem,4.9vw,5.2rem)] font-extrabold leading-[0.92] tracking-[-0.035em]">
             Stop chasing.
             <br />
             Let listings
             <br />
-            <span className="text-[#D4AF37]">chase you.</span>
+            <span className="text-[#c8a96e]">chase you.</span>
           </h1>
           <div className="mb-10 flex gap-2">
-            <span className="border border-[rgba(212,175,55,0.2)] bg-[rgba(212,175,55,0.12)] px-3 py-1 font-['DM_Mono',monospace] text-[0.65rem] uppercase tracking-[0.1em] text-[#D4AF37]">
+            <span className="border border-[rgba(200,169,110,0.2)] bg-[rgba(200,169,110,0.12)] px-3 py-1 font-['DM_Mono',monospace] text-[0.65rem] uppercase tracking-[0.1em] text-[#c8a96e]">
               Toronto
             </span>
-            <span className="border border-[rgba(212,175,55,0.2)] bg-[rgba(212,175,55,0.12)] px-3 py-1 font-['DM_Mono',monospace] text-[0.65rem] uppercase tracking-[0.1em] text-[#D4AF37]">
+            <span className="border border-[rgba(200,169,110,0.2)] bg-[rgba(200,169,110,0.12)] px-3 py-1 font-['DM_Mono',monospace] text-[0.65rem] uppercase tracking-[0.1em] text-[#c8a96e]">
               Mississauga
             </span>
-            <span className="border border-[rgba(212,175,55,0.2)] px-3 py-1 font-['DM_Mono',monospace] text-[0.65rem] uppercase tracking-[0.1em] text-[#D4AF37]">
+            <span className="border border-[rgba(200,169,110,0.2)] px-3 py-1 font-['DM_Mono',monospace] text-[0.65rem] uppercase tracking-[0.1em] text-[#c8a96e]">
               50+ Neighbourhoods
             </span>
           </div>
-          <p className="mb-10 max-w-[40ch] font-['DM_Mono',monospace] text-[0.88rem] leading-[1.75] text-[#6b6b60]">
+          <p className="mb-10 max-w-[53ch] font-['DM_Mono',monospace] text-[0.95rem] leading-[1.78] text-[#6b6b60]">
             416Homes watches 4 listing platforms around the clock, checks each property against what homes in that
             neighbourhood actually sold for, and reaches out to listing agents on your behalf — so you don&apos;t have to.
           </p>
           <div className="flex items-center gap-4">
             <Button
-              variant="gold"
-              className="gold-glow px-8 py-3 text-[0.88rem] font-bold uppercase tracking-[0.05em]"
+              className="bg-[#c8a96e] px-8 py-3 text-[0.88rem] font-bold uppercase tracking-[0.05em] text-black hover:bg-[#e4c98a]"
               onClick={() => scrollToId("alert")}
             >
               Set My Alert Free
             </Button>
             <button
-              className="border border-[rgba(212,175,55,0.2)] px-7 py-3 font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.08em] text-[#f5f4ef] transition-colors hover:border-[#D4AF37] hover:text-[#D4AF37]"
+              className="border border-[rgba(200,169,110,0.2)] px-7 py-3 font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.08em] text-[#f5f4ef] transition-colors hover:border-[#c8a96e] hover:text-[#c8a96e]"
               onClick={() => scrollToId("how")}
             >
-              See How →
+              See How
             </button>
           </div>
         </div>
 
         {/* Hero card — illustrative example */}
-        <div className="relative hidden items-center justify-center p-16 md:flex">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(212,175,55,0.07)_0%,transparent_70%)]" />
-          <div className="w-[340px] animate-[float_6s_ease-in-out_infinite] glass-panel p-8">
-            <div className="mb-6 flex items-center gap-2 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.15em] text-[#D4AF37]">
-              <span className="h-[6px] w-[6px] animate-[pulse_2s_ease-in-out_infinite] rounded-full bg-[#D4AF37]" aria-hidden="true" />
+        <div className="relative hidden items-center justify-center px-4 py-6 md:flex">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(200,169,110,0.07)_0%,transparent_70%)]" />
+          <div className="w-[420px] animate-[float_6s_ease-in-out_infinite] border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.03)] p-9 backdrop-blur-md">
+            <div className="mb-6 flex items-center gap-2 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.15em] text-[#c8a96e]">
+              <span className="h-[6px] w-[6px] animate-[pulse_2s_ease-in-out_infinite] rounded-full bg-[#c8a96e]" aria-hidden="true" />
               Live Update
             </div>
-            <div className="mb-2 inline-block bg-[rgba(212,175,55,0.1)] px-2 py-1 font-['DM_Mono',monospace] text-[0.6rem] uppercase tracking-[0.15em] text-[#D4AF37]">
-              Mississauga
+            <div className="mb-2 inline-block bg-[rgba(200,169,110,0.1)] px-2 py-1 font-['DM_Mono',monospace] text-[0.6rem] uppercase tracking-[0.15em] text-[#c8a96e]">
+              {featuredListing?.source ? featuredListing.source.toUpperCase() : "Mississauga"}
             </div>
-            <div className="mb-1 text-[1rem] font-bold">1480 Erin Mills Pkwy, Unit 12</div>
+            <div className="mb-1 text-[1rem] font-bold">
+              {featuredListing?.address ?? "1480 Erin Mills Pkwy, Unit 12"}
+            </div>
             <div className="mb-6 font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-[#6b6b60]">
-              Erin Mills · Example listing
+              {featuredListing ? "Live listing from your feed" : "Connecting to live listings..."}
             </div>
-            <div className="mb-2 text-[1.9rem] font-extrabold">$1,049,000</div>
+            <div className="mb-2 text-[1.9rem] font-extrabold">
+              {featuredListing ? formatPriceFull(featuredListing.price) : "$1,049,000"}
+            </div>
             <div className="mb-6 flex items-center gap-2">
               <span className="bg-[rgba(46,213,115,0.15)] px-2 py-0.5 font-['DM_Mono',monospace] text-[0.62rem] text-[#2ed573]">
-                ▲ 4.8% Underpriced
+                {featuredListing ? "Live from Supabase" : "Syncing listing data"}
               </span>
-              <span className="font-['DM_Mono',monospace] text-[0.62rem] text-[#6b6b60]">vs. 9 comps</span>
+              <span className="font-['DM_Mono',monospace] text-[0.62rem] text-[#6b6b60]">
+                {featuredListing ? "Auto-refreshed from listings API" : "Waiting for API"}
+              </span>
             </div>
-            <div className="mb-5 grid grid-cols-3 gap-2 border-y border-[rgba(212,175,55,0.2)] py-5">
-              {[["3", "Beds"], ["2", "Baths"], ["11", "DOM"]].map(([v, l]) => (
+            <div className="mb-5 grid grid-cols-3 gap-2 border-y border-[rgba(200,169,110,0.2)] py-5">
+              {[
+                [featuredListing ? String(featuredListing.beds || "—") : "3", "Beds"],
+                [featuredListing ? String(featuredListing.baths || "—") : "2", "Baths"],
+                [featuredListing ? (featuredListing.sqft ? featuredListing.sqft.toLocaleString() : "—") : "11", featuredListing ? "Sq Ft" : "DOM"],
+              ].map(([v, l]) => (
                 <div key={l} className="text-center">
                   <div className="text-[1.05rem] font-bold">{v}</div>
                   <div className="mt-1 font-['DM_Mono',monospace] text-[0.58rem] uppercase tracking-[0.08em] text-[#6b6b60]">{l}</div>
@@ -260,98 +298,87 @@ export default function LandingPage() {
             </div>
             <Link
               href="/dashboard"
-              className="block w-full bg-[#D4AF37] px-4 py-3 text-center font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-black transition-colors hover:bg-[#F3E5AB]"
+              className="block w-full bg-[#c8a96e] px-4 py-3 text-center font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-black transition-colors hover:bg-[#e4c98a]"
             >
-              View Live Listings →
+              View Live Listings
             </Link>
           </div>
         </div>
       </section>
 
       {/* Stats strip */}
-      <div className="grid border-y border-[rgba(212,175,55,0.2)] md:grid-cols-4">
+      <div className="mx-auto grid max-w-[1240px] border-y border-[rgba(200,169,110,0.2)] md:grid-cols-4">
         {[
           ["24/7", "Continuous monitoring"],
           ["50+", "GTA neighbourhoods"],
           ["2", "Cities: Toronto & Mississauga"],
           ["$0", "To get started"],
-        ].map(([num, label], i) => (
-          <motion.div
-            key={label}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: i * 0.1 }}
-            className="border-r border-[rgba(212,175,55,0.2)] p-10 last:border-r-0"
-          >
-            <div className="mb-1 text-[2.8rem] font-extrabold text-[#D4AF37]">{num}</div>
+        ].map(([num, label]) => (
+          <div key={label} className="ss-item border-r border-[rgba(200,169,110,0.2)] p-10 last:border-r-0">
+            <div className="mb-1 text-[2.8rem] font-extrabold text-[#c8a96e]">{num}</div>
             <div className="font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-[#6b6b60]">
               {label}
             </div>
-          </motion.div>
+          </div>
         ))}
       </div>
 
       {/* Process */}
-      <section id="how" className="px-16 py-28 max-md:px-6 max-md:py-16">
-        <div className="mb-3 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.2em] text-[#D4AF37]">
+      <section id="how" className="mx-auto max-w-[1240px] px-12 py-[5.5rem] max-md:px-6 max-md:py-16">
+        <div className="mb-3 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.2em] text-[#c8a96e]">
           Process
         </div>
-        <h2 className="mb-16 max-w-[22ch] font-display text-[clamp(1.8rem,3vw,3.2rem)] font-bold leading-[1.05] tracking-[-0.01em]">
+        <h2 className="mb-16 max-w-[22ch] text-[clamp(1.8rem,3vw,3.2rem)] font-extrabold leading-[1.05] tracking-[-0.02em]">
           Four steps, then you&apos;re done
         </h2>
         <div className="grid gap-[2px] md:grid-cols-4">
           {[
             {
               n: "01 / 04",
-              icon: "🔍",
+              icon: "Find",
               t: "Tell us what you want",
               d: "Set your price range, cities, neighbourhood, property type and minimum beds. Takes about 90 seconds.",
             },
             {
               n: "02 / 04",
-              icon: "🏠",
+              icon: "Scan",
               t: "We scan every night",
               d: "Checks Realtor.ca, HouseSigma, Zolo, and Zoocasa nightly. Fresh listings appear in your dashboard every morning.",
             },
             {
               n: "03 / 04",
-              icon: "📊",
+              icon: "Value",
               t: "Every listing gets priced",
               d: "Each property is compared against what similar homes in that area actually sold for — not the asking price. Good deals get flagged with a clear number.",
             },
             {
               n: "04 / 04",
-              icon: "📨",
+              icon: "Reach",
               t: "We reach out to the agent",
               d: "When something matches your criteria, a professional note goes to the listing agent requesting a showing — so the email is already sent by the time you wake up.",
             },
-          ].map((s, i) => (
-            <motion.div
+          ].map((s) => (
+            <div
               key={s.n}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: i * 0.1 }}
-              className="border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.02)] p-10 transition-colors hover:bg-[rgba(212,175,55,0.04)]"
+              className="step border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.02)] p-10 transition-colors hover:bg-[rgba(200,169,110,0.04)]"
             >
-              <div className="mb-5 font-['DM_Mono',monospace] text-[0.62rem] tracking-[0.18em] text-[#D4AF37]">
+              <div className="mb-5 font-['DM_Mono',monospace] text-[0.62rem] tracking-[0.18em] text-[#c8a96e]">
                 {s.n}
               </div>
-              <div className="mb-3 text-[1.4rem]">{s.icon}</div>
+              <div className="mb-3 inline-flex min-h-8 min-w-8 items-center justify-center rounded-full border border-[rgba(200,169,110,0.3)] px-3 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.1em] text-[#c8a96e]">{s.icon}</div>
               <div className="mb-2 text-[1.05rem] font-bold">{s.t}</div>
               <div className="font-['DM_Mono',monospace] text-[0.74rem] leading-[1.7] text-[#6b6b60]">{s.d}</div>
-            </motion.div>
+            </div>
           ))}
         </div>
       </section>
 
       {/* Intelligence */}
-      <section id="features" className="border-y border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.01)] px-16 py-28 max-md:px-6 max-md:py-16">
-        <div className="mb-3 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.2em] text-[#D4AF37]">
+      <section id="features" className="mx-auto max-w-[1240px] border-y border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.01)] px-12 py-[5.5rem] max-md:px-6 max-md:py-16">
+        <div className="mb-3 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.2em] text-[#c8a96e]">
           Why it&apos;s different
         </div>
-        <h2 className="mb-16 max-w-[22ch] font-display text-[clamp(1.8rem,3vw,3.2rem)] font-bold leading-[1.05] tracking-[-0.01em]">
+        <h2 className="mb-16 max-w-[22ch] text-[clamp(1.8rem,3vw,3.2rem)] font-extrabold leading-[1.05] tracking-[-0.02em]">
           Built for the way the GTA actually works
         </h2>
         <div className="grid gap-[2px] md:grid-cols-2">
@@ -376,34 +403,30 @@ export default function LandingPage() {
               title: "Assignment sales, tracked",
               desc: "The GTA has one of North America's largest pre-construction markets. 416Homes watches assignment sales — where the original buyer transfers their purchase contract before closing — a segment that most search tools don't show at all.",
             },
-          ].map((f, i) => (
-            <motion.div
+          ].map((f) => (
+            <div
               key={f.title}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: i * 0.1 }}
-              className="relative overflow-hidden border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.02)] p-12"
+              className="feat relative overflow-hidden border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.02)] p-12"
             >
-              <div className="mb-3 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.18em] text-[#D4AF37]">
+              <div className="mb-3 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.18em] text-[#c8a96e]">
                 {f.label}
               </div>
               <div className="mb-3 text-[1.25rem] font-bold leading-tight">{f.title}</div>
               <div className="font-['DM_Mono',monospace] text-[0.76rem] leading-[1.75] text-[#6b6b60]">
                 {f.desc}
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
       </section>
 
       {/* Alert section */}
-      <section id="alert" className="grid gap-20 px-16 py-28 md:grid-cols-2 max-md:px-6 max-md:py-16">
+      <section id="alert" className="mx-auto grid max-w-[1240px] gap-14 px-12 py-[5.5rem] md:grid-cols-2 max-md:px-6 max-md:py-16">
         <div>
-          <div className="mb-3 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.2em] text-[#D4AF37]">
+          <div className="mb-3 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.2em] text-[#c8a96e]">
             Free to start
           </div>
-          <h2 className="mb-5 font-display text-[clamp(1.8rem,3vw,3.2rem)] font-bold leading-[1.05] tracking-[-0.01em]">
+          <h2 className="mb-5 text-[clamp(1.8rem,3vw,3.2rem)] font-extrabold leading-[1.05] tracking-[-0.02em]">
             Set it once.
             <br />
             We handle the rest.
@@ -422,13 +445,13 @@ export default function LandingPage() {
             ].map(([name, role, badge]) => (
               <div
                 key={name}
-                className="flex items-center justify-between border-b border-[rgba(212,175,55,0.2)] py-4 last:border-b-0"
+                className="flex items-center justify-between border-b border-[rgba(200,169,110,0.2)] py-4 last:border-b-0"
               >
                 <div>
                   <div className="text-[0.95rem] font-semibold">{name}</div>
                   <div className="mt-1 font-['DM_Mono',monospace] text-[0.68rem] text-[#6b6b60]">{role}</div>
                 </div>
-                <span className="border border-[rgba(212,175,55,0.3)] px-2 py-0.5 font-['DM_Mono',monospace] text-[0.58rem] uppercase tracking-[0.1em] text-[#D4AF37]">
+                <span className="border border-[rgba(200,169,110,0.3)] px-2 py-0.5 font-['DM_Mono',monospace] text-[0.58rem] uppercase tracking-[0.1em] text-[#c8a96e]">
                   {badge}
                 </span>
               </div>
@@ -437,14 +460,14 @@ export default function LandingPage() {
         </div>
 
         {/* Form — wired to /api/alerts */}
-        <div className="border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.02)] p-10">
+        <div className="border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.02)] p-10">
           <div className="mb-4 flex items-center justify-between gap-4">
             <div className="text-[1.1rem] font-bold">Create Your Alert</div>
             <Link
               href="/dashboard"
-              className="shrink-0 font-['DM_Mono',monospace] text-[0.7rem] uppercase tracking-[0.1em] text-[#D4AF37] no-underline hover:text-[#F3E5AB]"
+              className="shrink-0 font-['DM_Mono',monospace] text-[0.7rem] uppercase tracking-[0.1em] text-[#c8a96e] no-underline hover:text-[#e4c98a]"
             >
-              Sign in or manage alerts →
+              Sign in or manage alerts
             </Link>
           </div>
           <p className="mb-8 font-['DM_Mono',monospace] text-[0.72rem] leading-[1.6] text-[#6b6b60]">
@@ -456,10 +479,10 @@ export default function LandingPage() {
               aria-live="polite"
               className="border border-[rgba(46,213,115,0.3)] bg-[rgba(46,213,115,0.08)] px-4 py-6 text-center font-['DM_Mono',monospace] text-[0.82rem] text-[#2ed573]"
             >
-              ✅ You&apos;re set. Check your inbox — we&apos;ll send your first matches tomorrow morning.
+              You&apos;re set. Check your inbox - we&apos;ll send your first matches tomorrow morning.
               <br />
-              <Link href="/dashboard" className="mt-3 block text-[#D4AF37] hover:text-[#F3E5AB]">
-                Manage your alerts in the dashboard →
+              <Link href="/dashboard" className="mt-3 block text-[#c8a96e] hover:text-[#e4c98a]">
+                Manage your alerts in the dashboard
               </Link>
             </div>
           ) : (
@@ -474,7 +497,7 @@ export default function LandingPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.05)] px-3 py-2 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none transition-colors focus:border-[#D4AF37] placeholder:text-[#6b6b60]"
+                  className="w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.05)] px-3 py-2 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none transition-colors focus:border-[#c8a96e] placeholder:text-[#6b6b60]"
                   placeholder="you@example.com"
                 />
               </div>
@@ -488,7 +511,7 @@ export default function LandingPage() {
                       type="checkbox"
                       checked={toronto}
                       onChange={(e) => setToronto(e.target.checked)}
-                      className="accent-[#D4AF37]"
+                      className="accent-[#c8a96e]"
                     />
                     Toronto
                   </label>
@@ -497,7 +520,7 @@ export default function LandingPage() {
                       type="checkbox"
                       checked={mississauga}
                       onChange={(e) => setMississauga(e.target.checked)}
-                      className="accent-[#D4AF37]"
+                      className="accent-[#c8a96e]"
                     />
                     Mississauga
                   </label>
@@ -512,7 +535,7 @@ export default function LandingPage() {
                     id="alert-min-price"
                     value={minPrice}
                     onChange={(e) => setMinPrice(e.target.value)}
-                    className="w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.05)] px-3 py-2 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none transition-colors focus:border-[#D4AF37] placeholder:text-[#6b6b60]"
+                    className="w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.05)] px-3 py-2 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none transition-colors focus:border-[#c8a96e] placeholder:text-[#6b6b60]"
                     placeholder="500000"
                   />
                 </div>
@@ -524,7 +547,7 @@ export default function LandingPage() {
                     id="alert-max-price"
                     value={maxPrice}
                     onChange={(e) => setMaxPrice(e.target.value)}
-                    className="w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.05)] px-3 py-2 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none transition-colors focus:border-[#D4AF37] placeholder:text-[#6b6b60]"
+                    className="w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.05)] px-3 py-2 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none transition-colors focus:border-[#c8a96e] placeholder:text-[#6b6b60]"
                     placeholder="1200000"
                   />
                 </div>
@@ -540,7 +563,7 @@ export default function LandingPage() {
                     min="0"
                     value={minBeds}
                     onChange={(e) => setMinBeds(e.target.value)}
-                    className="w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.05)] px-3 py-2 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none transition-colors focus:border-[#D4AF37] placeholder:text-[#6b6b60]"
+                    className="w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.05)] px-3 py-2 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none transition-colors focus:border-[#c8a96e] placeholder:text-[#6b6b60]"
                     placeholder="2"
                   />
                 </div>
@@ -552,7 +575,7 @@ export default function LandingPage() {
                     id="alert-property-type"
                     value={propertyType}
                     onChange={(e) => setPropertyType(e.target.value)}
-                    className="w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.05)] px-3 py-2 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none transition-colors focus:border-[#D4AF37] placeholder:text-[#6b6b60]"
+                    className="w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.05)] px-3 py-2 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none transition-colors focus:border-[#c8a96e] placeholder:text-[#6b6b60]"
                     placeholder="Condo, Detached..."
                   />
                 </div>
@@ -565,7 +588,7 @@ export default function LandingPage() {
                   id="alert-neighbourhoods"
                   value={neighbourhoods}
                   onChange={(e) => setNeighbourhoods(e.target.value)}
-                  className="w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.05)] px-3 py-2 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none transition-colors focus:border-[#D4AF37] placeholder:text-[#6b6b60]"
+                  className="w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.05)] px-3 py-2 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none transition-colors focus:border-[#c8a96e] placeholder:text-[#6b6b60]"
                   placeholder="Port Credit, King West, Erin Mills..."
                 />
               </div>
@@ -579,9 +602,9 @@ export default function LandingPage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="gold-gradient gold-glow mt-1 w-full px-4 py-3 font-['Syne',sans-serif] text-[0.88rem] font-bold uppercase tracking-[0.05em] text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-1 w-full bg-[#c8a96e] px-4 py-3 font-['Syne',sans-serif] text-[0.88rem] font-bold uppercase tracking-[0.05em] text-black transition-colors hover:bg-[#e4c98a] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {submitting ? "Saving..." : "Activate My Alert →"}
+                {submitting ? "Saving..." : "Activate My Alert"}
               </button>
             </form>
           )}
@@ -589,15 +612,15 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="flex items-center justify-between border-t border-[rgba(212,175,55,0.2)] px-16 py-10 max-md:flex-col max-md:gap-3 max-md:px-6">
+      <footer className="mx-auto flex max-w-[1240px] items-center justify-between border-t border-[rgba(200,169,110,0.2)] px-12 py-10 max-md:flex-col max-md:gap-3 max-md:px-6">
         <div className="text-[1.1rem] font-extrabold">
-          <span className="text-[#D4AF37]">416</span>Homes
+          <span className="text-[#c8a96e]">416</span>Homes
         </div>
         <div className="font-['DM_Mono',monospace] text-[0.62rem] text-[#6b6b60]">
           Covering Toronto &amp; Mississauga · Built on real sold data
         </div>
         <div className="font-['DM_Mono',monospace] text-[0.62rem] text-[#6b6b60]">
-          © 2026 416Homes · All rights reserved
+          © 2025 416Homes · Early Access
         </div>
       </footer>
     </div>

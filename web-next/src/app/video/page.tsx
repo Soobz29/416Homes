@@ -27,6 +27,54 @@ const VOICES: { id: string; name: string; desc: string }[] = [
   { id: "male_deep", name: "Premium Male", desc: "Rich & cinematic" },
 ];
 
+const SOCIAL_PROOF = [
+  {
+    quote:
+      "\"Saved me $3,200 on my last listing. The video looked just as good as what my usual production company delivers - honestly couldn't tell the difference.\"",
+    author: "Marcus T.",
+    role: "Sales Rep · RE/MAX Toronto",
+  },
+  {
+    quote:
+      "\"I ordered three videos in one afternoon. At $199 each I can now offer video to every single client, not just the million-dollar listings. Total game changer.\"",
+    author: "Priya S.",
+    role: "Broker · Right At Home Realty",
+  },
+  {
+    quote:
+      "\"The Mississauga condo I listed with a 416Homes video got 3x the showing requests versus my previous listings with just photos. Listing sold in 6 days.\"",
+    author: "David K.",
+    role: "Agent · Royal LePage Mississauga",
+  },
+];
+
+const FAQ_ITEMS = [
+  {
+    q: "How long does it actually take?",
+    a: "Typically 10-15 minutes from URL submission to downloadable MP4. The main bottleneck is image animation - each of 6 photos takes ~45 seconds to process through our rendering engine.",
+  },
+  {
+    q: "Does it work for Mississauga listings?",
+    a: "Yes - any Realtor.ca or Zillow listing URL works, regardless of city. We're built for the full GTA market including Mississauga, Brampton, and Oakville.",
+  },
+  {
+    q: "What if the listing photos are bad?",
+    a: "The animation works best on well-lit, staged photos. If photos are dark or cluttered, we apply a Ken Burns effect (smooth zoom/pan) rather than full cinematic motion. The result is still professional.",
+  },
+  {
+    q: "Can I get a revision?",
+    a: "Yes - one free revision is included. Email us with what you'd like changed (different voice, script edits, different photos) and we'll regenerate within 24 hours.",
+  },
+  {
+    q: "Do I own the video?",
+    a: "Yes, full commercial rights. Use it on MLS, Instagram Reels, YouTube, email campaigns, wherever you want. No attribution required.",
+  },
+  {
+    q: "What format is the output?",
+    a: "1920×1080 MP4 (Full HD), 30 seconds, ~80-120MB. Compatible with all social platforms, email, and MLS video upload fields.",
+  },
+];
+
 function VideoOrderForm({
   uploadMethod,
   setUploadMethod,
@@ -75,7 +123,7 @@ function VideoOrderForm({
   setFormCustomMusic: (f: File | null) => void;
 }) {
   return (
-    <div className="order-form border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.025)] p-10">
+    <div className="order-form border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] p-10">
       <div className="form-title mb-1 text-[1.1rem] font-bold">Submit Your Listing</div>
       <p className="form-sub mb-6 font-['DM Mono',monospace] text-[0.7rem] leading-[1.6] text-[#6b6b60]">
         Provide a listing URL or upload custom photos. Your selected tier will be attached to this order.
@@ -86,8 +134,8 @@ function VideoOrderForm({
           onClick={() => setUploadMethod("url")}
           className={`submit-btn border px-4 py-2 text-[0.8rem] transition-colors ${
             uploadMethod === "url"
-              ? "border-[#D4AF37] bg-[#D4AF37] text-[#0B0B0B]"
-              : "border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.025)] text-[#f5f4ef]"
+              ? "border-[#c8a96e] bg-[#c8a96e] text-[#0a0a08]"
+              : "border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] text-[#f5f4ef]"
           }`}
         >
           Fetch by URL
@@ -97,8 +145,8 @@ function VideoOrderForm({
           onClick={() => setUploadMethod("custom")}
           className={`submit-btn border px-4 py-2 text-[0.8rem] transition-colors ${
             uploadMethod === "custom"
-              ? "border-[#D4AF37] bg-[#D4AF37] text-[#0B0B0B]"
-              : "border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.025)] text-[#f5f4ef]"
+              ? "border-[#c8a96e] bg-[#c8a96e] text-[#0a0a08]"
+              : "border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] text-[#f5f4ef]"
           }`}
         >
           Custom Upload
@@ -113,7 +161,7 @@ function VideoOrderForm({
             type="text"
             value={formListingUrl}
             onChange={(e) => setFormListingUrl(e.target.value)}
-            className="fi w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
+            className="fi w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
             placeholder="zoocasa.com/oakville-on-real-estate/136-n-park-blvd"
           />
         </div>
@@ -128,7 +176,7 @@ function VideoOrderForm({
               type="text"
               value={formCustomAddress}
               onChange={(e) => setFormCustomAddress(e.target.value)}
-              className="fi w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
+              className="fi w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
               placeholder="123 Main St, Toronto"
             />
           </div>
@@ -141,7 +189,7 @@ function VideoOrderForm({
                 type="text"
                 value={formCustomPrice}
                 onChange={(e) => setFormCustomPrice(e.target.value)}
-                className="fi w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
+                className="fi w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
                 placeholder="$1,149,000"
               />
             </div>
@@ -153,7 +201,7 @@ function VideoOrderForm({
                 type="text"
                 value={formCustomBeds}
                 onChange={(e) => setFormCustomBeds(e.target.value)}
-                className="fi w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
+                className="fi w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
                 placeholder="3 Beds, 2 Baths"
               />
             </div>
@@ -166,7 +214,7 @@ function VideoOrderForm({
               type="file"
               accept="image/jpeg,image/png,image/webp"
               multiple
-              className="fi w-full border border-[rgba(212,175,55,0.2)] bg-transparent px-4 py-2 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
+              className="fi w-full border border-[rgba(200,169,110,0.2)] bg-transparent px-4 py-2 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
               onChange={(e) => setFormCustomPhotos(e.target.files)}
             />
           </div>
@@ -177,7 +225,7 @@ function VideoOrderForm({
             <input
               type="file"
               accept="audio/mpeg,audio/mp3"
-              className="fi w-full border border-[rgba(212,175,55,0.2)] bg-transparent px-4 py-2 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
+              className="fi w-full border border-[rgba(200,169,110,0.2)] bg-transparent px-4 py-2 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
               onChange={(e) => setFormCustomMusic(e.target.files?.[0] ?? null)}
             />
             <p className="mt-1 font-['DM Mono',monospace] text-[0.6rem] text-[#6b6b60]">
@@ -194,7 +242,7 @@ function VideoOrderForm({
           type="email"
           value={formEmail}
           onChange={(e) => setFormEmail(e.target.value)}
-          className="fi w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
+          className="fi w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
           placeholder="agent@yourbrokerage.com"
         />
       </div>
@@ -206,7 +254,7 @@ function VideoOrderForm({
           type="text"
           value={formName}
           onChange={(e) => setFormName(e.target.value)}
-          className="fi w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
+          className="fi w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
           placeholder="Jane Smith"
         />
       </div>
@@ -222,8 +270,8 @@ function VideoOrderForm({
               onClick={() => setSelectedVoice(v.id)}
               className={`voice-opt cursor-pointer border p-3 text-center transition-colors ${
                 selectedVoice === v.id
-                  ? "border-[#D4AF37] bg-[rgba(212,175,55,0.08)]"
-                  : "border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.02)] hover:border-[rgba(212,175,55,0.5)]"
+                  ? "border-[#c8a96e] bg-[rgba(200,169,110,0.08)]"
+                  : "border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.02)] hover:border-[rgba(200,169,110,0.5)]"
               }`}
             >
               <div className="voice-name text-[0.82rem] font-semibold">{v.name}</div>
@@ -236,9 +284,9 @@ function VideoOrderForm({
         type="button"
         disabled={submitLoading}
         onClick={onSubmit}
-        className="submit-btn mt-2 w-full bg-[#D4AF37] px-4 py-4 font-['Syne',sans-serif] text-[0.95rem] font-extrabold uppercase tracking-[0.05em] text-black transition-all hover:-translate-y-[1px] hover:bg-[#F3E5AB] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+        className="submit-btn mt-2 w-full bg-[#c8a96e] px-4 py-4 font-['Syne',sans-serif] text-[0.95rem] font-extrabold uppercase tracking-[0.05em] text-black transition-all hover:-translate-y-[1px] hover:bg-[#e4c98a] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
       >
-        {submitLoading ? "Processing..." : `Order ${tier.charAt(0).toUpperCase() + tier.slice(1)} — $${price} CAD →`}
+        {submitLoading ? "Processing..." : `Order ${tier.charAt(0).toUpperCase() + tier.slice(1)} - $${price} CAD`}
       </button>
       <p className="form-note mt-3 text-center font-['DM Mono',monospace] text-[0.62rem] text-[#6b6b60]">
         Secure payment via Stripe. Video delivered to your email when ready.
@@ -259,6 +307,13 @@ function ProgressPanel({
   videoUrl,
   videoLoadError,
   onVideoError,
+  revisionVisible,
+  revisionNotes,
+  onRevisionNotesChange,
+  onSubmitRevision,
+  revisionSubmitting,
+  revisionMessage,
+  revisionSuccess,
 }: {
   progressAddr: string;
   stepMessages: Record<string, string>;
@@ -269,29 +324,36 @@ function ProgressPanel({
   videoUrl: string | null;
   videoLoadError: boolean;
   onVideoError: () => void;
+  revisionVisible: boolean;
+  revisionNotes: string;
+  onRevisionNotesChange: (notes: string) => void;
+  onSubmitRevision: () => void;
+  revisionSubmitting: boolean;
+  revisionMessage: string | null;
+  revisionSuccess: boolean;
 }) {
   const steps = [
-    { key: "scrape", label: "Fetching listing & photos", icon: "🔗", msgKey: "scrape" },
-    { key: "script", label: "Writing voiceover script", icon: "✍️", msgKey: "script" },
-    { key: "audio", label: "Recording narration + music", icon: "🎙️", msgKey: "audio" },
-    { key: "animate", label: "Animating listing photos", icon: "🎬", msgKey: "animate" },
-    { key: "assemble", label: "Assembling final video", icon: "📽️", msgKey: "assemble" },
+    { key: "scrape", label: "Fetching listing & photos", icon: "1", msgKey: "scrape" },
+    { key: "script", label: "Writing voiceover script", icon: "2", msgKey: "script" },
+    { key: "audio", label: "Recording narration + music", icon: "3", msgKey: "audio" },
+    { key: "animate", label: "Animating listing photos", icon: "4", msgKey: "animate" },
+    { key: "assemble", label: "Assembling final video", icon: "5", msgKey: "assemble" },
   ];
   const apiBase = (process.env.NEXT_PUBLIC_API_URL || (typeof window !== "undefined" ? window.location.origin : "http://localhost:8000")).replace(/\/$/, "");
   return (
-    <div className="progress-panel border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.025)] p-10">
+    <div className="progress-panel border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] p-10">
       <div className="prog-title mb-1 text-[1rem] font-bold">Generating your video...</div>
-      <div className="prog-addr mb-8 font-['DM Mono',monospace] text-[0.72rem] text-[#D4AF37]">{progressAddr}</div>
+      <div className="prog-addr mb-8 font-['DM Mono',monospace] text-[0.72rem] text-[#c8a96e]">{progressAddr}</div>
       <div className="prog-steps flex flex-col gap-0">
         {steps.map((s) => (
-          <div key={s.key} className="prog-step flex items-center gap-4 border-b border-[rgba(212,175,55,0.08)] py-4 last:border-b-0">
+          <div key={s.key} className="prog-step flex items-center gap-4 border-b border-[rgba(200,169,110,0.08)] py-4 last:border-b-0">
             <div
               className={`prog-icon flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border text-[0.75rem] ${
                 stepStates[s.key] === "done"
                   ? "border-[#2ed573] bg-[rgba(46,213,115,0.15)]"
                   : stepStates[s.key] === "active"
-                    ? "animate-pulse border-[#D4AF37] bg-[rgba(212,175,55,0.1)]"
-                    : "border-[rgba(212,175,55,0.2)] opacity-30"
+                    ? "animate-pulse border-[#c8a96e] bg-[rgba(200,169,110,0.1)]"
+                    : "border-[rgba(200,169,110,0.2)] opacity-30"
               }`}
             >
               {stepStates[s.key] === "done" ? "✓" : s.icon}
@@ -307,7 +369,7 @@ function ProgressPanel({
       </div>
       {downloadVisible && (
         <div className="download-block mt-8 border border-[rgba(46,213,115,0.2)] bg-[rgba(46,213,115,0.05)] p-6">
-          <div className="dl-title text-[#2ed573] text-[1rem] font-bold">✅ Your video is ready!</div>
+          <div className="dl-title text-[#2ed573] text-[1rem] font-bold">Your video is ready.</div>
           <div className="dl-sub mb-4 font-['DM Mono',monospace] text-[0.7rem] text-[#6b6b60]">{downloadSubtitle}</div>
           {videoUrl && (
             <div className="mb-4 max-w-[640px] overflow-hidden rounded-lg bg-black">
@@ -327,10 +389,46 @@ function ProgressPanel({
           <a
             href={videoUrl || (jobId ? `${apiBase}/video/download/${jobId}` : "#") || "#"}
             download
-            className="dl-btn inline-block bg-[#2ed573] px-6 py-3 font-['Syne',sans-serif] text-[0.85rem] font-bold text-[#0B0B0B] no-underline"
+            className="dl-btn inline-block bg-[#2ed573] px-6 py-3 font-['Syne',sans-serif] text-[0.85rem] font-bold text-[#0a0a08] no-underline"
           >
-            ⬇ Download Video
+            Download Video
           </a>
+          {revisionVisible && (
+            <div className="mt-8 rounded-[12px] border border-[rgba(200,169,110,0.25)] p-6">
+              <div className="mb-3 font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.1em] text-[#c8a96e]">
+                Request Free Revision
+              </div>
+              <p className="mb-4 text-[0.85rem] leading-[1.5] text-[rgba(245,244,239,0.7)]">
+                One free revision is included. Describe what you&apos;d like changed - different voice tone, music style,
+                scene order, or script edits.
+              </p>
+              <textarea
+                value={revisionNotes}
+                onChange={(e) => onRevisionNotesChange(e.target.value)}
+                placeholder="e.g. Make the voiceover slower and use jazz music instead of orchestral. Open with the kitchen shot."
+                className="min-h-[84px] w-full resize-y border border-[rgba(200,169,110,0.25)] bg-[rgba(255,255,255,0.05)] p-3 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none"
+              />
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={onSubmitRevision}
+                  disabled={revisionSubmitting}
+                  className="bg-[#c8a96e] px-5 py-2 font-['DM_Mono',monospace] text-[0.75rem] font-bold uppercase tracking-[0.08em] text-[#0a0a08] disabled:opacity-60"
+                >
+                  {revisionSubmitting ? "Submitting..." : "Submit Revision"}
+                </button>
+                {revisionMessage && (
+                  <span
+                    className={`font-['DM_Mono',monospace] text-[0.72rem] ${
+                      revisionSuccess ? "text-[#49ca84]" : "text-[#cf6357]"
+                    }`}
+                  >
+                    {revisionMessage}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -361,6 +459,11 @@ export default function VideoPage() {
   const [formCustomBeds, setFormCustomBeds] = useState("");
   const [formCustomPhotos, setFormCustomPhotos] = useState<FileList | null>(null);
   const [formCustomMusic, setFormCustomMusic] = useState<File | null>(null);
+  const [revisionNotes, setRevisionNotes] = useState("");
+  const [revisionSubmitting, setRevisionSubmitting] = useState(false);
+  const [revisionMessage, setRevisionMessage] = useState<string | null>(null);
+  const [revisionSuccess, setRevisionSuccess] = useState(false);
+  const [revisionVisible, setRevisionVisible] = useState(false);
 
   const price = tier === "basic" ? 99 : tier === "cinematic" ? 249 : 299;
 
@@ -382,6 +485,11 @@ export default function VideoPage() {
     setDownloadVisible(false);
     setVideoUrl(null);
     setVideoLoadError(false);
+    setRevisionNotes("");
+    setRevisionSubmitting(false);
+    setRevisionMessage(null);
+    setRevisionSuccess(false);
+    setRevisionVisible(false);
   }, []);
 
   const updateProgressFromApi = useCallback((data: { status?: string; progress_step?: string; progress_message?: string; listing_address?: string; error?: string; video_url?: string }, jobId: string | null) => {
@@ -403,6 +511,7 @@ export default function VideoPage() {
       const playUrl = data.video_url || (jobId ? `${API_BASE}/video/download/${jobId}` : null);
       setVideoUrl(playUrl);
       setVideoLoadError(false);
+      setRevisionVisible(!(data as { revision_count?: number }).revision_count);
       if (pollRef.current) {
         clearInterval(pollRef.current);
         pollRef.current = null;
@@ -415,7 +524,49 @@ export default function VideoPage() {
         pollRef.current = null;
       }
     }
+
+    if (data.status === "revision_requested") {
+      setRevisionVisible(false);
+      setRevisionSuccess(true);
+      setRevisionMessage("Revision submitted - we will send the updated video within 24 hours.");
+    }
   }, []);
+
+  const submitRevision = useCallback(async () => {
+    const notes = revisionNotes.trim();
+    if (!notes) {
+      setRevisionSuccess(false);
+      setRevisionMessage("Please describe what you would like changed.");
+      return;
+    }
+    if (!currentJobId) {
+      setRevisionSuccess(false);
+      setRevisionMessage("No active job found.");
+      return;
+    }
+    setRevisionSubmitting(true);
+    setRevisionMessage("Submitting...");
+    setRevisionSuccess(false);
+    try {
+      const resp = await fetch(`${API_BASE}/api/video-jobs/${currentJobId}/revision`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({} as { detail?: string }));
+        throw new Error(err.detail || "Failed to submit revision. Please email us directly.");
+      }
+      setRevisionSuccess(true);
+      setRevisionMessage("Revision submitted - we will send the updated video within 24 hours.");
+      setRevisionVisible(false);
+    } catch (err: unknown) {
+      setRevisionSuccess(false);
+      setRevisionMessage(err instanceof Error ? err.message : "Network error. Please email us directly.");
+    } finally {
+      setRevisionSubmitting(false);
+    }
+  }, [currentJobId, revisionNotes]);
 
   useEffect(() => {
     if (!currentJobId || !progressVisible) return;
@@ -564,49 +715,49 @@ export default function VideoPage() {
     setTimeout(() => {
       setStepStates({ scrape: "done", script: "done", audio: "done", animate: "done", assemble: "done" });
       setDownloadVisible(true);
-      setDownloadSubtitle("Demo mode — connect API for real video generation");
+      setDownloadSubtitle("Demo mode - connect API for real video generation");
     }, 15000);
   }
 
   return (
-    <div className="min-h-screen bg-[#0B0B0B] text-[#f5f4ef]">
+    <div className="min-h-screen bg-[#0a0a08] text-[#f5f4ef]">
       {/* Nav */}
-      <nav className="flex items-center justify-between border-b border-[rgba(212,175,55,0.2)] bg-[rgba(10,10,8,0.8)] px-16 py-6 backdrop-blur-xl max-md:px-6">
+      <nav className="flex items-center justify-between border-b border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.8)] px-16 py-6 backdrop-blur-xl max-md:px-6">
         <div className="logo text-[1.2rem] font-extrabold">
-          <span className="text-[#D4AF37]">416</span>
+          <span className="text-[#c8a96e]">416</span>
           Homes <span className="align-middle font-['DM Mono',monospace] text-[0.75rem] font-normal tracking-[0.1em] text-[#6b6b60]">
             VIDEO
           </span>
         </div>
         <Link
           href="/"
-          className="nav-back flex items-center gap-2 font-['DM Mono',monospace] text-[0.7rem] uppercase tracking-[0.1em] text-[#6b6b60] no-underline hover:text-[#D4AF37]"
+          className="nav-back flex items-center gap-2 font-['DM Mono',monospace] text-[0.7rem] uppercase tracking-[0.1em] text-[#6b6b60] no-underline hover:text-[#c8a96e]"
         >
-          ← Back to 416Homes
+          Back to 416Homes
         </Link>
       </nav>
 
       {/* Hero */}
-      <section className="hero grid gap-12 border-b border-[rgba(212,175,55,0.2)] px-16 pb-16 pt-24 md:grid-cols-2 max-md:px-6">
+      <section className="hero grid gap-12 border-b border-[rgba(200,169,110,0.2)] px-16 pb-16 pt-24 md:grid-cols-2 max-md:px-6">
         <div>
-          <div className="hero-tag mb-6 flex items-center gap-3 font-['DM Mono',monospace] text-[0.65rem] uppercase tracking-[0.2em] text-[#D4AF37]">
-            <span className="h-px w-6 bg-[#D4AF37]" />
+          <div className="hero-tag mb-6 flex items-center gap-3 font-['DM Mono',monospace] text-[0.65rem] uppercase tracking-[0.2em] text-[#c8a96e]">
+            <span className="h-px w-6 bg-[#c8a96e]" />
             Cinematic Listing Videos for GTA Agents
           </div>
-          <h1 className="mb-6 font-display text-[clamp(2.5rem,4vw,4.5rem)] font-bold leading-[0.95] tracking-[-0.02em]">
+          <h1 className="mb-6 text-[clamp(2.5rem,4vw,4.5rem)] font-extrabold leading-[0.95] tracking-[-0.03em]">
             Professional listing
             <br />
-            videos from <span className="text-[#D4AF37]">$
+            videos from <span className="text-[#c8a96e]">$
               {tier === "basic" ? "99" : tier === "cinematic" ? "249" : "299"}.</span>
             <br />
             Not $5,000.
           </h1>
           <p className="hero-sub mb-8 max-w-[44ch] font-['DM Mono',monospace] text-[0.85rem] leading-[1.8] text-[#6b6b60]">
             Paste any Realtor.ca or Zillow URL. We animate your listing photos, write the narration,
-            record the voiceover, and deliver a polished 30-second video — in under 15 minutes.
+            record the voiceover, and deliver a polished 30-second video - in under 15 minutes.
           </p>
           <div className="price-block mb-10 flex items-baseline gap-6">
-            <div className="price-main text-[3rem] font-extrabold text-[#D4AF37]">
+            <div className="price-main text-[3rem] font-extrabold text-[#c8a96e]">
               {tier === "basic" ? "$99" : tier === "cinematic" ? "$249" : "$299"}
             </div>
             <div className="price-compare font-['DM Mono',monospace] text-[0.75rem] leading-[1.5] text-[#6b6b60]">
@@ -616,29 +767,25 @@ export default function VideoPage() {
             </div>
           </div>
           <button
-            className="submit-btn inline-block bg-[#D4AF37] px-10 py-4 font-['Syne',sans-serif] text-[0.95rem] font-extrabold uppercase tracking-[0.05em] text-black transition-all hover:-translate-y-[1px] hover:bg-[#F3E5AB]"
+            className="submit-btn inline-block bg-[#c8a96e] px-10 py-4 font-['Syne',sans-serif] text-[0.95rem] font-extrabold uppercase tracking-[0.05em] text-black transition-all hover:-translate-y-[1px] hover:bg-[#e4c98a]"
             onClick={() => {
               const el = document.getElementById("order");
               if (el) el.scrollIntoView({ behavior: "smooth" });
             }}
           >
-            Order a Video →
+            Order a Video
           </button>
         </div>
 
-        {/* Video preview — HTML5 sample (use NEXT_PUBLIC_HERO_VIDEO_URL for your own sample) */}
-        <div className="video-preview relative aspect-[16/9] overflow-hidden border border-[rgba(212,175,55,0.2)] bg-black">
+        {/* Video preview */}
+        <div className="video-preview relative aspect-[16/9] overflow-hidden border border-[rgba(200,169,110,0.2)] bg-black">
           <div className="video-preview-inner relative h-full w-full overflow-hidden bg-black">
-            <video
-              className="absolute left-0 top-0 h-full w-full object-cover"
-              src={process.env.NEXT_PUBLIC_HERO_VIDEO_URL || "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"}
-              controls
-              playsInline
-              loop
-              muted
-              autoPlay
-              preload="metadata"
-              title="416Homes sample — listing video"
+            <iframe
+              className="absolute left-0 top-0 h-full w-full"
+              src="https://player.vimeo.com/video/1172407404?badge=0&autopause=0&player_id=0&app_id=58479&autoplay=1&loop=1"
+              allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
+              referrerPolicy="strict-origin-when-cross-origin"
+              title="416Homes sample video"
             />
             <div className="vp-caption absolute bottom-[8%] left-0 right-0 px-6">
               <div className="vp-headline mb-1 text-[1.1rem] font-bold">
@@ -646,10 +793,10 @@ export default function VideoPage() {
               </div>
               <div className="vp-address font-['DM Mono',monospace] text-[0.65rem] text-[#6b6b60]">
                 218 Broadview Ave, Leslieville ·{" "}
-                <span className="vp-price-tag font-bold text-[#D4AF37]">$1,149,000</span>
+                <span className="vp-price-tag font-bold text-[#c8a96e]">$1,149,000</span>
               </div>
             </div>
-            <div className="vp-badge absolute right-[5%] top-[10%] border border-[rgba(212,175,55,0.2)] bg-[rgba(10,10,8,0.7)] px-2 py-1 font-['DM Mono',monospace] text-[0.6rem] uppercase tracking-[0.1em] text-[#D4AF37]">
+            <div className="vp-badge absolute right-[5%] top-[10%] border border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.7)] px-2 py-1 font-['DM Mono',monospace] text-[0.6rem] uppercase tracking-[0.1em] text-[#c8a96e]">
               Sample Video
             </div>
           </div>
@@ -657,46 +804,46 @@ export default function VideoPage() {
       </section>
 
       {/* Process */}
-      <section className="process border-b border-[rgba(212,175,55,0.2)] px-16 py-20 max-md:px-6">
-        <div className="sec-tag mb-3 font-['DM Mono',monospace] text-[0.62rem] uppercase tracking-[0.2em] text-[#D4AF37]">
+      <section className="process border-b border-[rgba(200,169,110,0.2)] px-16 py-20 max-md:px-6">
+        <div className="sec-tag mb-3 font-['DM Mono',monospace] text-[0.62rem] uppercase tracking-[0.2em] text-[#c8a96e]">
           How It Works
         </div>
-        <h2 className="sec-h mb-12 font-display text-[clamp(1.6rem,2.5vw,2.8rem)] font-bold tracking-[-0.01em]">
+        <h2 className="sec-h mb-12 text-[clamp(1.6rem,2.5vw,2.8rem)] font-extrabold tracking-[-0.02em]">
           Five steps, one URL, one video.
         </h2>
         <div className="steps grid gap-0 md:grid-cols-5">
           {[
             {
               n: "01",
-              icon: "🔗",
+              icon: "URL",
               t: "Paste listing URL",
               d: "Realtor.ca or Zillow. We scrape the best 6 photos and all property details automatically.",
               tool: "",
             },
             {
               n: "02",
-              icon: "✍️",
-              t: "Script written for your listing",
-              d: "We write a 30-second cinematic voiceover script tailored to the property details and neighbourhood.",
-              tool: "Gemini 2.0",
+              icon: "Script",
+              t: "Script crafted for your listing",
+              d: "We analyze the listing details and write a 30-second cinematic voiceover script tailored to the property.",
+              tool: "Script studio",
             },
             {
               n: "03",
-              icon: "🎙️",
-              t: "Voiceover recorded",
-              d: "ElevenLabs generates professional narration. Choose from warm female or deep male voice.",
-              tool: "ElevenLabs",
+              icon: "Voice",
+              t: "Narration recorded",
+              d: "Professional narration is recorded with premium voices and paired with cinematic music.",
+              tool: "Voice studio",
             },
             {
               n: "04",
-              icon: "🎬",
-              t: "Photos animated",
-              d: "Each photo gets a cinematic dolly shot, pan, or zoom — luxury motion styling.",
-              tool: "Calico",
+              icon: "Motion",
+              t: "Photos brought to life",
+              d: "Each photo gets a cinematic dolly shot, pan, or zoom - with luxury motion styling that feels like a custom shoot.",
+              tool: "Motion studio",
             },
             {
               n: "05",
-              icon: "📥",
+              icon: "Deliver",
               t: "Download MP4",
               d: "Final video assembled with captions, music, and narration. Ready to post on Instagram, MLS, or email.",
               tool: "~12 min total",
@@ -704,18 +851,18 @@ export default function VideoPage() {
           ].map((s) => (
             <div
               key={s.n}
-              className="step relative border-r border-[rgba(212,175,55,0.2)] p-8 last:border-r-0"
+              className="step relative border-r border-[rgba(200,169,110,0.2)] p-8 last:border-r-0"
             >
-              <div className="step-n mb-4 font-['DM Mono',monospace] text-[0.6rem] text-[#D4AF37] tracking-[0.15em]">
+              <div className="step-n mb-4 font-['DM Mono',monospace] text-[0.6rem] text-[#c8a96e] tracking-[0.15em]">
                 {s.n}
               </div>
-              <div className="step-ico mb-3 text-[1.3rem]">{s.icon}</div>
+              <div className="step-ico mb-3 inline-flex min-h-8 min-w-8 items-center justify-center rounded-full border border-[rgba(200,169,110,0.35)] px-3 font-['DM_Mono',monospace] text-[0.6rem] uppercase tracking-[0.1em] text-[#c8a96e]">{s.icon}</div>
               <div className="step-t mb-2 text-[0.9rem] font-bold">{s.t}</div>
               <div className="step-d font-['DM Mono',monospace] text-[0.68rem] leading-[1.65] text-[#6b6b60]">
                 {s.d}
               </div>
               {s.tool && (
-                <div className="step-tool mt-2 inline-block border border-[rgba(212,175,55,0.2)] px-1.5 py-0.5 font-['DM Mono',monospace] text-[0.58rem] text-[#D4AF37]">
+                <div className="step-tool mt-2 inline-block border border-[rgba(200,169,110,0.2)] px-1.5 py-0.5 font-['DM Mono',monospace] text-[0.58rem] text-[#c8a96e]">
                   {s.tool}
                 </div>
               )}
@@ -725,16 +872,16 @@ export default function VideoPage() {
       </section>
 
       {/* Order section — matches API server video page */}
-      <section id="order" className="order-section grid gap-16 border-b border-[rgba(212,175,55,0.2)] px-16 py-20 md:grid-cols-2 max-md:px-6">
+      <section id="order" className="order-section grid gap-16 border-b border-[rgba(200,169,110,0.2)] px-16 py-20 md:grid-cols-2 max-md:px-6">
         <div className="order-info">
           <h2 className="mb-4 text-[2rem] font-extrabold tracking-[-0.02em]">
             Order your listing video
           </h2>
           <p className="mb-6 font-['DM Mono',monospace] text-[0.78rem] leading-[1.8] text-[#6b6b60]">
             Paste your listing URL below. We&apos;ll scrape the photos, write the script, record the voiceover,
-            animate the images, and assemble your video — all automatically. Download ready in ~12 minutes.
+            animate the images, and assemble your video - all automatically. Download ready in ~12 minutes.
           </p>
-          <div className="cost-breakdown border border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.025)] p-6">
+          <div className="cost-breakdown border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] p-6">
             {[
               ["Basic", "$99 CAD"],
               ["Cinematic (Most Popular)", "$249 CAD"],
@@ -747,12 +894,12 @@ export default function VideoPage() {
             ].map(([label, value], i) => (
               <div
                 key={label}
-                className={`cost-row flex items-center justify-between border-b border-[rgba(212,175,55,0.1)] py-2 text-[0.72rem] font-['DM Mono',monospace] ${
+                className={`cost-row flex items-center justify-between border-b border-[rgba(200,169,110,0.1)] py-2 text-[0.72rem] font-['DM Mono',monospace] ${
                   i === 7 ? "border-b-0 text-[0.85rem] font-bold" : ""
                 }`}
               >
                 <span className="cost-label text-[#6b6b60]">{label}</span>
-                <span className={`cost-value ${i === 7 ? "text-[1.1rem] text-[#D4AF37]" : "text-[#f5f4ef]"}`}>
+                <span className={`cost-value ${i === 7 ? "text-[1.1rem] text-[#c8a96e]" : "text-[#f5f4ef]"}`}>
                   {value}
                 </span>
               </div>
@@ -767,17 +914,17 @@ export default function VideoPage() {
                 onClick={() => selectTier(t.id, t.price)}
                 className={`relative cursor-pointer border p-6 text-left transition-colors ${
                   tier === t.id
-                    ? "border-[#D4AF37] bg-[rgba(212,175,55,0.08)]"
-                    : "border-[rgba(212,175,55,0.2)] bg-[rgba(255,255,255,0.025)] hover:border-[rgba(212,175,55,0.5)]"
+                    ? "border-[#c8a96e] bg-[rgba(200,169,110,0.08)]"
+                    : "border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] hover:border-[rgba(200,169,110,0.5)]"
                 }`}
               >
                 {t.badge && (
-                  <span className="absolute right-4 top-4 bg-[#D4AF37] px-2 py-0.5 font-['DM Mono',monospace] text-[0.6rem] uppercase tracking-[0.1em] text-[#0B0B0B]">
+                  <span className="absolute right-4 top-4 bg-[#c8a96e] px-2 py-0.5 font-['DM Mono',monospace] text-[0.6rem] uppercase tracking-[0.1em] text-[#0a0a08]">
                     {t.badge}
                   </span>
                 )}
                 <h3 className="mb-1 text-[1.1rem] font-bold">{t.title}</h3>
-                <p className="mb-3 text-[1.4rem] font-extrabold text-[#D4AF37]">${t.price}</p>
+                <p className="mb-3 text-[1.4rem] font-extrabold text-[#c8a96e]">${t.price}</p>
                 <ul className="list-none pl-0 font-['DM Mono',monospace] text-[0.7rem] leading-[1.7] text-[#6b6b60]">
                   {t.features.map((f) => (
                     <li key={f}>{f}</li>
@@ -826,22 +973,60 @@ export default function VideoPage() {
             videoUrl={videoUrl}
             videoLoadError={videoLoadError}
             onVideoError={() => setVideoLoadError(true)}
+            revisionVisible={revisionVisible}
+            revisionNotes={revisionNotes}
+            onRevisionNotesChange={setRevisionNotes}
+            onSubmitRevision={submitRevision}
+            revisionSubmitting={revisionSubmitting}
+            revisionMessage={revisionMessage}
+            revisionSuccess={revisionSuccess}
           />
         )}
       </section>
 
-      {/* Social proof + FAQ text left as-is in HTML; we can port those 1:1 next if you want the full page parity. */}
+      {/* Social proof */}
+      <section className="grid gap-[2px] border-b border-[rgba(200,169,110,0.2)] px-16 py-16 md:grid-cols-3 max-md:px-6">
+        {SOCIAL_PROOF.map((item) => (
+          <div
+            key={item.author}
+            className="border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] p-8"
+          >
+            <div className="mb-4 text-[0.85rem] tracking-[0.1em] text-[#c8a96e]">★★★★★</div>
+            <p className="mb-5 font-['DM Mono',monospace] text-[0.78rem] leading-[1.7] text-[#6b6b60]">{item.quote}</p>
+            <div className="text-[0.85rem] font-bold">{item.author}</div>
+            <div className="font-['DM Mono',monospace] text-[0.62rem] text-[#6b6b60]">{item.role}</div>
+          </div>
+        ))}
+      </section>
 
-      <footer className="flex items-center justify-between border-t border-[rgba(212,175,55,0.2)] px-16 py-8 max-md:flex-col max-md:gap-3 max-md:px-6">
+      {/* FAQ */}
+      <section className="px-16 py-20 max-md:px-6">
+        <div className="mb-3 font-['DM Mono',monospace] text-[0.62rem] uppercase tracking-[0.2em] text-[#c8a96e]">
+          Questions
+        </div>
+        <h2 className="mb-12 text-[clamp(1.6rem,2.5vw,2.8rem)] font-extrabold tracking-[-0.02em]">
+          Frequently asked.
+        </h2>
+        <div className="grid gap-8 md:grid-cols-2">
+          {FAQ_ITEMS.map((item) => (
+            <div key={item.q} className="border-b border-[rgba(200,169,110,0.2)] pb-6">
+              <div className="mb-2 text-[0.95rem] font-bold">{item.q}</div>
+              <div className="font-['DM Mono',monospace] text-[0.74rem] leading-[1.7] text-[#6b6b60]">{item.a}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <footer className="flex items-center justify-between border-t border-[rgba(200,169,110,0.2)] px-16 py-8 max-md:flex-col max-md:gap-3 max-md:px-6">
         <div className="footer-logo text-[1rem] font-extrabold">
-          <span className="text-[#D4AF37]">416</span>
+          <span className="text-[#c8a96e]">416</span>
           Homes Video
         </div>
         <div className="footer-copy font-['DM Mono',monospace] text-[0.6rem] text-[#6b6b60]">
-          Cinematic listing videos · Greater Toronto Area · From $99
+          Cinematic listing videos · Toronto + Mississauga · From $199
         </div>
         <div className="footer-copy font-['DM Mono',monospace] text-[0.6rem] text-[#6b6b60]">
-          © 2026 416Homes · hello@416homes.ca
+          © 2025 416Homes · hello@416homes.ca
         </div>
       </footer>
     </div>

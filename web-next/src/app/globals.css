@@ -20,6 +20,48 @@ body {
   font-family: var(--font-sans), Inter, sans-serif;
 }
 
+/* Shared motion for top listing ticker */
+@keyframes ticker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.ticker-track {
+  width: max-content;
+  will-change: transform;
+}
+
+/* Global gold remap so all pages match live palette */
+[class*="text-[#c8a96e]"] { color: #D4AF37 !important; }
+[class*="hover:text-[#e4c98a]"]:hover { color: #F3E5AB !important; }
+[class*="hover:text-[#c8a96e]"]:hover { color: #D4AF37 !important; }
+[class*="bg-[#c8a96e]"] { background-color: #D4AF37 !important; }
+[class*="hover:bg-[#e4c98a]"]:hover { background-color: #F3E5AB !important; }
+[class*="border-[#c8a96e]"] { border-color: #D4AF37 !important; }
+[class*="hover:border-[#e4c98a]"]:hover { border-color: #F3E5AB !important; }
+[class*="hover:border-[#c8a96e]"]:hover { border-color: #D4AF37 !important; }
+[class*="focus:border-[#c8a96e]"]:focus { border-color: #D4AF37 !important; }
+[class*="accent-[#c8a96e]"] { accent-color: #D4AF37 !important; }
+[class*="border-[rgba(200,169,110,0.08)]"] { border-color: rgba(212,175,55,0.08) !important; }
+[class*="border-[rgba(200,169,110,0.1)]"] { border-color: rgba(212,175,55,0.1) !important; }
+[class*="border-[rgba(200,169,110,0.2)]"] { border-color: rgba(212,175,55,0.2) !important; }
+[class*="border-[rgba(200,169,110,0.25)]"] { border-color: rgba(212,175,55,0.25) !important; }
+[class*="border-[rgba(200,169,110,0.3)]"] { border-color: rgba(212,175,55,0.3) !important; }
+[class*="border-[rgba(200,169,110,0.35)]"] { border-color: rgba(212,175,55,0.35) !important; }
+[class*="border-[rgba(200,169,110,0.4)]"] { border-color: rgba(212,175,55,0.4) !important; }
+[class*="border-[rgba(200,169,110,0.5)]"] { border-color: rgba(212,175,55,0.5) !important; }
+[class*="bg-[rgba(200,169,110,0.04)]"] { background-color: rgba(212,175,55,0.04) !important; }
+[class*="bg-[rgba(200,169,110,0.06)]"] { background-color: rgba(212,175,55,0.06) !important; }
+[class*="bg-[rgba(200,169,110,0.07)]"] { background-color: rgba(212,175,55,0.07) !important; }
+[class*="bg-[rgba(200,169,110,0.08)]"] { background-color: rgba(212,175,55,0.08) !important; }
+[class*="bg-[rgba(200,169,110,0.1)]"] { background-color: rgba(212,175,55,0.1) !important; }
+[class*="bg-[rgba(200,169,110,0.12)]"] { background-color: rgba(212,175,55,0.12) !important; }
+[class*="bg-[rgba(200,169,110,0.14)]"] { background-color: rgba(212,175,55,0.14) !important; }
+
 /* Serif display font — uses Cormorant Garamond loaded via next/font */
 .font-display {
   font-family: var(--font-serif), "Cormorant Garamond", Georgia, serif;
