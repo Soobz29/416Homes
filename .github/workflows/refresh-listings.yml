@@ -24,7 +24,9 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-full.txt
+          # Ensure playwright is installed regardless of scrapling/patchright conflicts
+          pip install playwright --upgrade
 
       - name: Install Playwright browsers (Chromium only)
         run: |

@@ -4,6 +4,7 @@
 
 LightGBM model for property valuation based on sold comps.
 """
+from __future__ import annotations
 
 # Temporarily disabled for Railway deployment (data science stack removed)
 try:
@@ -13,6 +14,7 @@ try:
     from sklearn.model_selection import train_test_split  # type: ignore
     from sklearn.metrics import mean_absolute_percentage_error  # type: ignore
     from sklearn.preprocessing import LabelEncoder  # type: ignore
+    import joblib
     _DS_ENABLED = True
 except Exception:  # pragma: no cover
     pd = None  # type: ignore
@@ -21,9 +23,9 @@ except Exception:  # pragma: no cover
     train_test_split = None  # type: ignore
     mean_absolute_percentage_error = None  # type: ignore
     LabelEncoder = None  # type: ignore
+    joblib = None  # type: ignore
     _DS_ENABLED = False
 from typing import List, Dict, Any
-import joblib
 import os
 from dotenv import load_dotenv
 import logging
@@ -33,6 +35,22 @@ from supabase import create_client
 
 load_dotenv()
 logger = logging.getLogger(__name__)
+
+def market_analysis_from_ppsf(price_per_sqft: float) -> str:
+    """Return a human-readable market analysis string based on $/sqft.
+
+    Thresholds reflect Toronto GTA 2026 market medians:
+      inner city $950–$1,100/sqft; suburbs/condos $700–$850/sqft.
+    """
+    if price_per_sqft < 650:
+        return "Priced below market value — strong buying opportunity"
+    elif price_per_sqft < 900:
+        return "Priced competitively for the GTA market"
+    elif price_per_sqft < 1100:
+        return "Priced above market — room to negotiate"
+    else:
+        return "Priced significantly above market value"
+
 
 class ValuationModel:
     """LightGBM-based property valuation model"""
@@ -149,6 +167,7 @@ class ValuationModel:
         
         # Train LightGBM model
         with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
             model = lgb.LGBMRegressor(
                 objective='regression',
                 n_estimators=100,
@@ -186,11 +205,14 @@ class ValuationModel:
     
     def save_model(self, filepath: str = 'valuation_model.pkl'):
         """Save the trained model and encoders"""
-        
+
         if self.model is None:
             logger.error("No model to save")
             return False
-        
+        if joblib is None:
+            logger.error("joblib not available; cannot save model")
+            return False
+
         try:
             # Save model
             joblib.dump(self.model, filepath)
@@ -208,7 +230,11 @@ class ValuationModel:
     
     def load_model(self, filepath: str = 'valuation_model.pkl'):
         """Load the trained model and encoders"""
-        
+
+        if joblib is None:
+            logger.warning("joblib not available; model loading skipped")
+            return False
+
         try:
             # Load model
             self.model = joblib.load(filepath)
@@ -273,7 +299,7 @@ class ValuationModel:
             estimated_price = price_per_sqft_pred[0] * sqft_val
 
             # Confidence: distance of prediction from the training median $/sqft
-            median_ppsf = self.numeric_medians.get('price_per_sqft', 700)
+            median_ppsf = self.numeric_medians.get('price_per_sqft', 900)
             deviation = abs(price_per_sqft_pred[0] - median_ppsf) / max(median_ppsf, 1)
             confidence = round(min(0.92, max(0.65, 1.0 - deviation * 0.5)), 2)
             
@@ -291,22 +317,13 @@ class ValuationModel:
     def generate_market_analysis(self, estimated_price: int, property_data: Dict[str, Any]) -> str:
         """Generate market analysis text"""
 
-        # Simple heuristics for market analysis
         sqft = property_data.get('sqft') or 1000
         try:
             sqft = float(sqft) or 1000
         except (TypeError, ValueError):
             sqft = 1000
         price_per_sqft = estimated_price / sqft
-        
-        if price_per_sqft < 400:
-            return "Priced below market value - good opportunity"
-        elif price_per_sqft < 600:
-            return "Priced competitively for market"
-        elif price_per_sqft < 800:
-            return "Priced above market value - negotiate"
-        else:
-            return "Priced significantly above market value"
+        return market_analysis_from_ppsf(price_per_sqft)
 
 def main():
     """Main training pipeline"""

@@ -3,9 +3,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   images: {
-    domains: [
-      "images.expcloud.com",
-      "qbmxwkctscpkmxfbksmb.supabase.co",
+    remotePatterns: [
+      { protocol: "https", hostname: "images.expcloud.com" },
+      { protocol: "https", hostname: "qbmxwkctscpkmxfbksmb.supabase.co" },
     ],
     unoptimized: process.env.NODE_ENV === "development",
   },

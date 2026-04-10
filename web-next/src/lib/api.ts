@@ -8,12 +8,16 @@ export async function fetchListings(params?: {
   minPrice?: number;
   maxPrice?: number;
   propertyTypes?: string[];
+  limit?: number;
+  offset?: number;
 }) {
   const queryParams = new URLSearchParams();
   if (params?.city) queryParams.append("city", params.city);
   if (params?.minPrice) queryParams.append("min_price", params.minPrice.toString());
   if (params?.maxPrice) queryParams.append("max_price", params.maxPrice.toString());
   if (params?.propertyTypes?.length) queryParams.append("property_types", params.propertyTypes.join(","));
+  queryParams.append("limit", String(params?.limit ?? 20));
+  queryParams.append("offset", String(params?.offset ?? 0));
 
   const url = `${API_BASE}/api/listings?${queryParams.toString()}`;
 
@@ -39,7 +43,7 @@ export async function fetchListings(params?: {
       property_type: l.strategy ?? "Unknown",
       source: l.source,
       url: l.url,
-      photos: [],
+      photos: Array.isArray(l.photos) ? l.photos : (l.photo ? [l.photo] : []),
       created_at: l.scraped_at,
     })),
     total: typeof data?.total === "number" ? data.total : rawListings.length,

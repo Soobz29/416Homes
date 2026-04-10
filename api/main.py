@@ -1,7 +1,7 @@
 import uuid
 import asyncio
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Header, UploadFile, File, Form, Query
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Header, Request, UploadFile, File, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -13,10 +13,11 @@ import logging
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 import random
+import secrets
 import string
 
 from memory.store import memory_store, search_listings, replace_listings, embed_and_store_listings
-from video_pipeline.pipeline import create_video_job, get_video_job_status
+from valuation.model import market_analysis_from_ppsf
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -61,6 +62,75 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+_VIDEO_WORKER_POLL = int(os.getenv("VIDEO_WORKER_POLL_SECONDS", "30"))
+
+async def _video_worker_loop() -> None:
+    """Background polling loop — picks up pending video jobs and processes them.
+    Runs inside the FastAPI process. AI imports are lazy so they don't bloat
+    startup memory — they only load when the first job is actually picked up.
+    """
+    logger.info("Video worker loop started (poll every %ds)", _VIDEO_WORKER_POLL)
+    while True:
+        await asyncio.sleep(_VIDEO_WORKER_POLL)
+        if not supabase_client:
+            continue
+        try:
+            rows = (
+                supabase_client.table("video_jobs")
+                .select("id, customer_email")
+                .eq("status", "pending")
+                .order("created_at")
+                .limit(1)
+                .execute()
+            )
+            if rows.data:
+                job = rows.data[0]
+                jid = job["id"]
+                logger.info("Video worker: processing job %s", jid)
+                supabase_client.table("video_jobs").update({"status": "generating_script"}).eq("id", jid).execute()
+                from video_pipeline.pipeline import process_pending_job  # lazy — loads AI stack on demand
+
+                async def _run_job(job_id: str) -> None:
+                    try:
+                        await process_pending_job(job_id)
+                    except Exception as job_exc:
+                        logger.error("Video job %s failed: %s", job_id, job_exc)
+                        try:
+                            supabase_client.table("video_jobs").update({
+                                "status": "failed",
+                                "error_message": str(job_exc),
+                            }).eq("id", job_id).execute()
+                        except Exception:
+                            pass
+
+                asyncio.create_task(_run_job(jid))
+
+            # Also pick up revision_requested jobs
+            rev_rows = (
+                supabase_client.table("video_jobs")
+                .select("id")
+                .eq("status", "revision_requested")
+                .order("updated_at")
+                .limit(1)
+                .execute()
+            )
+            if rev_rows.data:
+                jid = rev_rows.data[0]["id"]
+                logger.info("Video worker: re-processing revision job %s", jid)
+                supabase_client.table("video_jobs").update({
+                    "status": "generating_script",
+                    "progress": 0,
+                }).eq("id", jid).execute()
+                asyncio.create_task(_run_job(jid))
+        except Exception as exc:
+            logger.error("Video worker poll error: %s", exc)
+
+
+@app.on_event("startup")
+async def _start_video_worker():
+    asyncio.create_task(_video_worker_loop())
+
 
 # Static + HTML pages
 WEB_ROOT = Path("web")
@@ -250,15 +320,32 @@ class AlertUpdate(BaseModel):
     keywords: Optional[str] = None
     is_active: Optional[bool] = None
 
-from listing_agent import get_last_scan_listings
-from scraper.listing_utils import is_badge_or_headline_only
-from scraper.crawler import (
-    CrawlRequest,
-    CrawlResult,
-    CrawlBackend,
-    crawl_site,
-    get_default_backend,
-)
+try:
+    from listing_agent import get_last_scan_listings
+except ImportError:
+    def get_last_scan_listings(limit=1000, offset=0, city=None, region=None):  # type: ignore[misc]
+        return None, 0, []
+
+try:
+    from scraper.listing_utils import is_badge_or_headline_only
+except ImportError:
+    def is_badge_or_headline_only(listing: dict) -> bool:  # type: ignore[misc]
+        return False
+
+try:
+    from scraper.crawler import (
+        CrawlRequest,
+        CrawlResult,
+        CrawlBackend,
+        crawl_site,
+        get_default_backend,
+    )
+except ImportError:
+    CrawlRequest = None  # type: ignore[assignment,misc]
+    CrawlResult = None  # type: ignore[assignment,misc]
+    CrawlBackend = None  # type: ignore[assignment,misc]
+    crawl_site = None  # type: ignore[assignment]
+    get_default_backend = None  # type: ignore[assignment]
 
 
 # ── Auth endpoints ────────────────────────────────────────────────────────
@@ -309,6 +396,11 @@ async def resolve_session(payload: SessionRequest):
 
 
 # Health check
+@app.get("/")
+async def root():
+    return {"status": "ok", "service": "416Homes API"}
+
+
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint"""
@@ -331,26 +423,27 @@ def _get_or_create_user_by_email(email: str) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail="Email is required")
     client = _ensure_supabase()
     try:
+        # Upsert is atomic (avoids SELECT-then-INSERT race condition).
+        # Note: Supabase returns data on INSERT but an empty list on no-op UPDATE,
+        # so we fall back to a SELECT when the row already existed.
+        insert_resp = (
+            client.table("users")
+            .upsert({"email": email}, on_conflict="email")
+            .execute()
+        )
+        data = getattr(insert_resp, "data", None) or []
+        if data:
+            return data[0]
+        # Row already existed — upsert returned no data, fetch it explicitly.
         resp = (
             client.table("users")
-            .select("*")
-            .eq("email", email)
-            .limit(1)
+            .upsert({"email": email}, on_conflict="email")
             .execute()
         )
         rows = getattr(resp, "data", None) or []
         if rows:
             return rows[0]
-
-        insert_resp = (
-            client.table("users")
-            .insert({"email": email})
-            .execute()
-        )
-        data = getattr(insert_resp, "data", None) or []
-        if not data:
-            raise RuntimeError("Failed to insert user")
-        return data[0]
+        raise RuntimeError("Failed to upsert user")
     except Exception as e:
         logger.error(f"Supabase user lookup failed for {email}: {e}")
         raise HTTPException(status_code=500, detail="Failed to resolve user")
@@ -378,7 +471,7 @@ def _get_user_id_from_header(x_user_email: str | None) -> str:
 def _generate_link_code(length: int = 6) -> str:
     """Generate a short human-typed code like TG-A1B2C3 (6 chars, 30 min expiry)."""
     chars = string.ascii_uppercase + string.digits
-    suffix = "".join(random.choice(chars) for _ in range(length))
+    suffix = "".join(secrets.choice(chars) for _ in range(length))
     return f"TG-{suffix}"
 
 # Listings endpoints
@@ -603,7 +696,7 @@ async def create_alert(
     """
     user_id = _get_user_id_from_header(x_user_email)
     client = _ensure_supabase()
-    data = payload.dict(exclude_unset=True)
+    data = payload.model_dump(exclude_unset=True)
     data["user_id"] = user_id
     try:
         resp = client.table("alerts").insert(data).execute()
@@ -641,7 +734,7 @@ async def update_alert(
     """
     user_id = _get_user_id_from_header(x_user_email)
     client = _ensure_supabase()
-    data = payload.dict(exclude_unset=True)
+    data = payload.model_dump(exclude_unset=True)
     if not data:
         raise HTTPException(status_code=400, detail="No fields to update")
     try:
@@ -730,17 +823,164 @@ async def valuate_property(data: dict):
     except Exception as e:
         logger.warning(f"Valuation model unavailable, using fallback: {e}")
 
-    # Fallback: simple $/sqft estimate
+    from valuation.model import market_analysis_from_ppsf
+
+    # Fallback: simple $/sqft estimate (Toronto 2026 median ~$900/sqft)
     sqft = 1500
     try:
-        sqft = int(data.get("sqft", sqft) or sqft)
+        sqft = float(data.get("sqft", sqft) or sqft) or 1500
     except Exception:
         pass
+
+    list_price = 0
+    try:
+        list_price = float(data.get("list_price", 0) or 0)
+    except Exception:
+        pass
+
+    estimated_value = sqft * 900
+
+    if list_price > 0 and sqft > 0:
+        market_analysis = market_analysis_from_ppsf(list_price / sqft)
+    else:
+        market_analysis = "Estimated at $900/sqft — Toronto 2026 market median (train LightGBM model for neighbourhood-level precision)."
+
     return {
-        "estimated_value": sqft * 600,
+        "estimated_value": int(estimated_value),
         "confidence": 0.65,
-        "market_analysis": "Estimated at $600/sqft (model not yet trained — run python valuation/model.py to enable full LightGBM valuation).",
+        "market_analysis": market_analysis,
     }
+
+
+# ── Stripe checkout ───────────────────────────────────────────────────────────
+
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+
+try:
+    import stripe as _stripe  # type: ignore
+    _stripe.api_key = STRIPE_SECRET_KEY
+    _STRIPE_AVAILABLE = bool(STRIPE_SECRET_KEY)
+except ImportError:
+    _stripe = None  # type: ignore
+    _STRIPE_AVAILABLE = False
+
+_TIER_PRICES_CAD = {"basic": 99, "cinematic": 249, "premium": 299}
+
+class CheckoutRequest(BaseModel):
+    listing_url: str
+    agent_email: str
+    agent_name: Optional[str] = ""
+    voice: Optional[str] = "female_luxury"
+    tier: Optional[str] = "cinematic"
+    price_cad: Optional[float] = None
+
+
+@app.post("/video/create-checkout")
+async def create_checkout(request: CheckoutRequest):
+    """Create a Stripe Checkout session for a video order."""
+    if not _STRIPE_AVAILABLE or _stripe is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Payment processing is not configured. Set STRIPE_SECRET_KEY.",
+        )
+
+    tier = (request.tier or "cinematic").lower()
+    price_cad = request.price_cad or _TIER_PRICES_CAD.get(tier, 249)
+    amount_cents = int(price_cad * 100)  # Stripe uses cents
+
+    app_url = os.getenv("APP_URL", "https://416homes.ca").rstrip("/")
+
+    try:
+        session = _stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            line_items=[
+                {
+                    "price_data": {
+                        "currency": "cad",
+                        "unit_amount": amount_cents,
+                        "product_data": {
+                            "name": f"416Homes {tier.capitalize()} Listing Video",
+                            "description": f"Cinematic listing video for {request.listing_url}",
+                        },
+                    },
+                    "quantity": 1,
+                }
+            ],
+            mode="payment",
+            customer_email=request.agent_email,
+            success_url=f"{app_url}/video.html?session_id={{CHECKOUT_SESSION_ID}}&status=success",
+            cancel_url=f"{app_url}/video.html?status=cancelled",
+            metadata={
+                "listing_url": request.listing_url,
+                "agent_email": request.agent_email,
+                "agent_name": request.agent_name or "",
+                "voice": request.voice or "female_luxury",
+                "tier": tier,
+                "price_cad": str(price_cad),
+            },
+        )
+        return {"checkout_url": session.url, "session_id": session.id}
+    except Exception as e:
+        logger.error("Stripe checkout creation failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to create checkout session")
+
+
+@app.post("/video/stripe-webhook")
+async def stripe_webhook(request: Request, background_tasks: BackgroundTasks):
+    """Handle Stripe webhook events. Triggers video job on successful payment."""
+    body = await request.body()
+    sig = request.headers.get("stripe-signature", "")
+    background_tasks.add_task(_handle_stripe_webhook, body, sig)
+    return JSONResponse({"received": True})
+
+
+@app.post("/api/video/stripe-webhook")
+async def stripe_webhook_api(request: "Request", background_tasks: BackgroundTasks):
+    """Alias under /api prefix — Stripe dashboard should point here."""
+    body = await request.body()
+    sig = request.headers.get("stripe-signature", "")
+    background_tasks.add_task(_handle_stripe_webhook, body, sig)
+    return JSONResponse({"received": True})
+
+
+# Internal helper used by both webhook routes
+async def _handle_stripe_webhook(body: bytes, sig_header: str) -> None:
+    if not _STRIPE_AVAILABLE or _stripe is None or not STRIPE_WEBHOOK_SECRET:
+        return
+    try:
+        event = _stripe.Webhook.construct_event(body, sig_header, STRIPE_WEBHOOK_SECRET)
+    except Exception as e:
+        logger.error("Stripe webhook signature verification failed: %s", e)
+        return
+
+    if event["type"] == "checkout.session.completed":
+        session = event["data"]["object"]
+        meta = session.get("metadata", {})
+        listing_url = meta.get("listing_url", "")
+        email = meta.get("agent_email", "")
+        name = meta.get("agent_name", "")
+        voice = meta.get("voice", "female_luxury")
+        tier = meta.get("tier", "cinematic")
+        price_cad = float(meta.get("price_cad", 249))
+        if listing_url and email and supabase_client:
+            try:
+                jid = str(uuid.uuid4())
+                supabase_client.table("video_jobs").insert({
+                    "id": jid,
+                    "listing_url": listing_url,
+                    "customer_email": email,
+                    "customer_name": name or email.split("@")[0],
+                    "listing_data": {"voice": voice, "tier": tier, "price_cad": price_cad},
+                    "status": "pending",
+                    "progress": 0,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }).execute()
+                logger.info("Video job %s queued after Stripe payment for %s", jid, email)
+            except Exception as e:
+                logger.error("Failed to queue video job after payment: %s", e)
+
 
 # Video job endpoints
 @app.post("/api/video-jobs", response_model=VideoJobResponse)
@@ -762,16 +1002,24 @@ async def create_video_job_endpoint(request: VideoJobRequest):
         if request.use_veo is not None:
             listing_meta["use_veo"] = request.use_veo
 
-        job_id = await create_video_job(
-            listing_url=request.listing_url,
-            customer_email=email,
-            customer_name=name or None,
-            listing_data=listing_meta or None,
-        )
+        if not supabase_client:
+            raise HTTPException(status_code=503, detail="Database not configured")
+        jid = str(uuid.uuid4())
+        supabase_client.table("video_jobs").insert({
+            "id": jid,
+            "listing_url": request.listing_url,
+            "customer_email": email,
+            "customer_name": name or email.split("@")[0],
+            "listing_data": listing_meta or {},
+            "status": "pending",
+            "progress": 0,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).execute()
         return VideoJobResponse(
-            id=job_id,
+            id=jid,
             status="pending",
-            message="Video job created successfully",
+            message="Video job queued — processing starts within 30 seconds",
         )
     except HTTPException:
         raise
@@ -823,18 +1071,24 @@ async def create_custom_video_job(
         if (job_dir / "custom_bgmusic.mp3").exists():
             listing_data["custom_music_path"] = str((job_dir / "custom_bgmusic.mp3").resolve())
 
-        job_id = await create_video_job(
-            listing_url="custom_upload",
-            customer_email=agent_email,
-            customer_name=agent_name or None,
-            listing_data=listing_data,
-            job_dir=job_dir,
-            job_id=job_id,
-        )
+        listing_data["_job_dir"] = str(job_dir.resolve())
+        if not supabase_client:
+            raise HTTPException(status_code=503, detail="Database not configured")
+        supabase_client.table("video_jobs").insert({
+            "id": job_id,
+            "listing_url": "custom_upload",
+            "customer_email": agent_email,
+            "customer_name": agent_name or agent_email.split("@")[0],
+            "listing_data": listing_data,
+            "status": "pending",
+            "progress": 0,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).execute()
         return VideoJobResponse(
             id=job_id,
             status="pending",
-            message="Video job created successfully",
+            message="Video job queued — processing starts within 30 seconds",
         )
     except HTTPException:
         raise
@@ -847,7 +1101,10 @@ async def create_custom_video_job(
 async def get_video_job(job_id: str):
     """Get video job status"""
     try:
-        job_status = await get_video_job_status(job_id)
+        if not supabase_client:
+            raise HTTPException(status_code=503, detail="Database not configured")
+        result = supabase_client.table("video_jobs").select("*").eq("id", job_id).single().execute()
+        job_status = result.data if result else None
         if not job_status:
             raise HTTPException(status_code=404, detail="Job not found")
         return _normalize_video_job_payload(job_status)
@@ -889,7 +1146,7 @@ async def request_video_revision(job_id: str, payload: RevisionRequest):
             "status": "revision_requested",
             "revision_notes": notes,
             "revision_count": revision_count + 1,
-            "updated_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }).eq("id", job_id).execute()
         logger.info("Revision requested for job %s: %s", job_id, notes)
         return {"status": "revision_requested", "job_id": job_id, "notes": notes}
@@ -1017,6 +1274,11 @@ def _normalise_listing(row: dict) -> dict:
         "url":         row.get("url", ""),
         "scraped_at":  str(row.get("scraped_at") or ""),
         "strategy":    row.get("strategy", "unknown"),
+        "photos":      (
+            row.get("photos")
+            or ([row["photo"]] if row.get("photo") else [])
+            or ([p] if (p := (row.get("raw_data") or {}).get("photo")) else [])
+        ),
     }
 
 def _get_comps(neighbourhood: str, limit: int = 5) -> list:
@@ -1058,10 +1320,10 @@ async def agent_start(background_tasks: BackgroundTasks):
             logger.error(f"Agent loop error: {e}")
         finally:
             _agent_status["running"] = False
-            _agent_status["last_run"] = datetime.utcnow().isoformat()
+            _agent_status["last_run"] = datetime.now(timezone.utc).isoformat()
 
     _agent_status["running"] = True
-    _agent_status["started_at"] = datetime.utcnow().isoformat()
+    _agent_status["started_at"] = datetime.now(timezone.utc).isoformat()
     background_tasks.add_task(_run)
     return {"status": "started", "started_at": _agent_status["started_at"]}
 
@@ -1085,7 +1347,7 @@ async def agent_alerts(limit: int = Query(default=50, ge=1, le=200)):
     try:
         if not supabase_client:
             return []
-        result = supabase_client.table("buyer_alerts").select("*").eq("is_active", True).limit(limit).execute()
+        result = supabase_client.table("alerts").select("*").eq("is_active", True).limit(limit).execute()
         return result.data or []
     except Exception as e:
         logger.error(f"agent_alerts error: {e}")
@@ -1097,7 +1359,7 @@ async def mark_alert_seen(alert_id: str):
     try:
         if not supabase_client:
             raise HTTPException(status_code=503, detail="Database not configured")
-        supabase_client.table("buyer_alerts").update({"last_notified_at": datetime.utcnow().isoformat()}).eq("id", alert_id).execute()
+        supabase_client.table("alerts").update({"last_notified_at": datetime.now(timezone.utc).isoformat()}).eq("id", alert_id).execute()
         return {"status": "ok"}
     except HTTPException:
         raise

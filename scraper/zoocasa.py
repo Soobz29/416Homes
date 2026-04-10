@@ -4,7 +4,7 @@ import json
 import re
 import httpx
 from typing import List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 from scraper.stealth_headers import get_stealth_header_generator
 from scraper.listing_utils import is_sold_or_inactive, pick_display_address
@@ -110,7 +110,7 @@ async def _scrape_zoocasa_page(client, url: str) -> list:
                 "url": f"https://www.zoocasa.com{item.get('listing_url_absolute_path', '')}",
                 "photo": photo,
                 "source": "zoocasa",
-                "scraped_at": datetime.utcnow().isoformat(),
+                "scraped_at": datetime.now(timezone.utc).isoformat(),
                 "region": region,
                 "city": city,
             })

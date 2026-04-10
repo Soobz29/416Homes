@@ -5,18 +5,31 @@ from datetime import datetime
 from supabase import create_client, Client
 from dotenv import load_dotenv
 import os
+
+# google-genai is NOT imported at module level — lazy-loaded on first embedding call
+# to keep API server startup memory low (~100MB instead of ~400MB).
 _genai = None
 _GENAI_SDK = "none"
-try:
-    # New Gemini SDK (package: google-genai)
-    from google import genai as _genai  # type: ignore
-    _GENAI_SDK = "google-genai"
-except Exception:  # pragma: no cover
+_genai_loaded = False
+
+def _load_genai():
+    """Import google-genai once, on first use."""
+    global _genai, _GENAI_SDK, _genai_loaded
+    if _genai_loaded:
+        return
+    _genai_loaded = True
     try:
-        # Legacy Gemini SDK (package: google-generativeai)
-        import google.generativeai as _genai  # type: ignore
+        from google import genai as _g  # type: ignore
+        _genai = _g
+        _GENAI_SDK = "google-genai"
+        return
+    except Exception:
+        pass
+    try:
+        import google.generativeai as _g  # type: ignore
+        _genai = _g
         _GENAI_SDK = "google-generativeai"
-    except Exception:  # pragma: no cover
+    except Exception:
         _genai = None
         _GENAI_SDK = "none"
 
@@ -45,23 +58,29 @@ class MemoryStore:
                 logger.error("Failed to create Supabase client: %s", e)
                 self.supabase = None
         
-        # Initialize Gemini for embeddings. New SDK (google-genai) uses gemini-embedding-001; legacy uses text-embedding-004.
-        self.embedding_model_id = os.getenv("GEMINI_EMBEDDING_MODEL") or (
-            "gemini-embedding-001" if _GENAI_SDK == "google-genai" else "text-embedding-004"
-        )
-        self.client = None
-        try:
-            api_key = os.getenv("GEMINI_API_KEY")
-            if _GENAI_SDK == "google-genai" and _genai is not None:
-                self.client = _genai.Client(api_key=api_key)
-            elif _GENAI_SDK == "google-generativeai" and _genai is not None:
-                # google-generativeai uses global configure()
-                _genai.configure(api_key=api_key)
-        except Exception as e:
-            logger.warning("Gemini client init failed (%s): %s", _GENAI_SDK, e)
+        # Gemini client — lazy, initialised on first embedding call via _ensure_genai_client()
+        self._gemini_api_key = os.getenv("GEMINI_API_KEY")
+        self.embedding_model_id = os.getenv("GEMINI_EMBEDDING_MODEL") or "gemini-embedding-001"
+        self.client = None  # set on first use
 
         # In-memory LRU cache for embeddings (text → vector), avoids redundant API calls
         self._embedding_cache: Dict[str, List[float]] = {}
+
+    def _ensure_genai_client(self):
+        """Lazy-init the Gemini client — imports google-genai only on first call."""
+        if self.client is not None:
+            return
+        _load_genai()
+        try:
+            if _GENAI_SDK == "google-genai" and _genai is not None:
+                self.client = _genai.Client(api_key=self._gemini_api_key)
+                self.embedding_model_id = os.getenv("GEMINI_EMBEDDING_MODEL") or "gemini-embedding-001"
+            elif _GENAI_SDK == "google-generativeai" and _genai is not None:
+                _genai.configure(api_key=self._gemini_api_key)
+                self.client = _genai
+                self.embedding_model_id = os.getenv("GEMINI_EMBEDDING_MODEL") or "text-embedding-004"
+        except Exception as e:
+            logger.warning("Gemini client init failed (%s): %s", _GENAI_SDK, e)
 
     @staticmethod
     def _safe_scalar(value: Any, default: Any = None, prefer_int: bool = False) -> Any:
@@ -106,6 +125,27 @@ class MemoryStore:
         
         return "Unknown"
     
+    @staticmethod
+    def _to_coord(val: Any):
+        """Return float coordinate or None — never an empty string."""
+        if val is None or val == "":
+            return None
+        try:
+            return float(val) or None
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _parse_room_count(val: Any) -> str:
+        """Parse room count strings like '1 + 1' (bedroom + den) into their integer sum ('2').
+        Returns the value unchanged if it doesn't match that pattern."""
+        if isinstance(val, str) and '+' in val:
+            try:
+                return str(sum(int(x.strip()) for x in val.split('+')))
+            except (ValueError, TypeError):
+                pass
+        return str(val) if val not in (None, "") else ""
+
     def _normalise_for_listings(self, listing: Dict[str, Any]) -> Dict[str, Any]:
         """Translate scraper dict to exact Supabase listings column names. Coerce scalars so no dicts hit DB."""
         price = self._safe_scalar(listing.get("price"), 0, prefer_int=True)
@@ -115,8 +155,8 @@ class MemoryStore:
             price = int(price)
         except (TypeError, ValueError):
             price = 0
-        bedrooms = self._safe_scalar(listing.get("bedrooms"), "")
-        bathrooms = self._safe_scalar(listing.get("bathrooms"), "")
+        bedrooms = self._parse_room_count(self._safe_scalar(listing.get("bedrooms"), ""))
+        bathrooms = self._parse_room_count(self._safe_scalar(listing.get("bathrooms"), ""))
         sqft_raw = listing.get("area") or listing.get("sqft")
         sqft = self._safe_scalar(sqft_raw, 0, prefer_int=True)
         if isinstance(sqft, dict):
@@ -142,15 +182,16 @@ class MemoryStore:
             "neighbourhood": str(listing.get("neighbourhood") or self._extract_neighbourhood(listing.get("address", "") or "")),
             "city": str(listing.get("city", "Toronto") or "Toronto"),
             "price": price,
-            "bedrooms": bedrooms if not isinstance(bedrooms, dict) else "",
-            "bathrooms": bathrooms if not isinstance(bathrooms, dict) else "",
-            "sqft": sqft,
+            "bedrooms": (bedrooms if not isinstance(bedrooms, dict) else None) or None,
+            "bathrooms": (bathrooms if not isinstance(bathrooms, dict) else None) or None,
+            "area": sqft,
             "property_type": str(listing.get("property_type", "Unknown") or "Unknown"),
             "days_on_market": days_on_market,
+            "photo": str(listing.get("photo") or "") or None,
             "listing_agent_email": listing.get("listing_agent_email"),
             "listing_agent_name": listing.get("listing_agent_name"),
-            "lat": listing.get("lat"),
-            "lng": listing.get("lng"),
+            "lat": self._to_coord(listing.get("lat")),
+            "lng": self._to_coord(listing.get("lng")),
             "raw_data": listing,
             "embedding": None,  # Will be filled later
             "scraped_at": listing.get("scraped_at", "") or "",
@@ -159,6 +200,11 @@ class MemoryStore:
     
     def _normalise_for_sold_comps(self, comp: Dict[str, Any]) -> Dict[str, Any]:
         """Translate scraper dict to exact Supabase sold_comps column names"""
+        dom_raw = comp.get("days_on_market", 0)
+        try:
+            dom = int(dom_raw) if dom_raw not in (None, "") else 0
+        except (TypeError, ValueError):
+            dom = 0
         return {
             "id": comp.get("id", ""),
             "address": comp.get("address", ""),
@@ -168,12 +214,12 @@ class MemoryStore:
             "list_price": comp.get("list_price"),
             "bedrooms": comp.get("bedrooms", ""),
             "bathrooms": comp.get("bathrooms", ""),
-            "sqft": comp.get("area", comp.get("sqft", "0")),  # Map area → sqft
+            "area": comp.get("area", comp.get("sqft", "0")),
             "property_type": comp.get("property_type", "Unknown"),
             "sold_date": comp.get("sold_date"),
-            "days_on_market": comp.get("days_on_market", 0),
-            "lat": comp.get("lat"),
-            "lng": comp.get("lng"),
+            "days_on_market": dom,
+            "lat": self._to_coord(comp.get("lat")),
+            "lng": self._to_coord(comp.get("lng")),
             "scraped_at": comp.get("scraped_at", "")
         }
     
@@ -191,21 +237,20 @@ class MemoryStore:
         return embedding
 
     async def _embed_text_uncached(self, text: str) -> List[float]:
-        """Internal: call Gemini API without caching."""
+        """Internal: call Gemini API without caching. Lazily loads google-genai on first call."""
         try:
             if not text:
                 return [0.0] * 768
+
+            self._ensure_genai_client()
 
             if _GENAI_SDK == "google-genai":
                 if not self.client:
                     raise RuntimeError("Gemini client not initialized")
                 kwargs = {"model": self.embedding_model_id, "contents": text}
-                if self.embedding_model_id == "gemini-embedding-001":
-                    kwargs["output_dimensionality"] = 768
                 response = self.client.models.embed_content(**kwargs)
                 embedding = list(response.embeddings[0].values) if response.embeddings else []
             elif _GENAI_SDK == "google-generativeai" and _genai is not None:
-                # google-generativeai API
                 resp = _genai.embed_content(
                     model=f"models/{self.embedding_model_id}",
                     content=text,
@@ -239,7 +284,7 @@ class MemoryStore:
             {normalised['address']}
             {normalised['bedrooms']} bedrooms
             {normalised['bathrooms']} bathrooms
-            {normalised['sqft']} sqft
+            {normalised['area']} sqft
             ${normalised['price']:,}
             {normalised['source']}
             """.strip()
@@ -259,7 +304,21 @@ class MemoryStore:
                 return False
                 
         except Exception as e:
-            logger.error(f"Error storing listing {listing.get('id', 'unknown')}: {e}")
+            err_str = str(e)
+            logger.error(f"Error storing listing {listing.get('id', 'unknown')}: {err_str}")
+            if "numeric" in err_str or "integer" in err_str or "invalid input" in err_str:
+                # Log each numeric field to find the culprit
+                try:
+                    n = self._normalise_for_listings(listing)
+                    logger.error(
+                        f"Numeric fields dump for {listing.get('id')}: "
+                        f"price={n.get('price')!r} area={n.get('area')!r} "
+                        f"days_on_market={n.get('days_on_market')!r} "
+                        f"lat={n.get('lat')!r} lng={n.get('lng')!r} "
+                        f"bedrooms={n.get('bedrooms')!r} bathrooms={n.get('bathrooms')!r}"
+                    )
+                except Exception:
+                    pass
             return False
     
     async def embed_and_store_listings(self, listings: List[Dict[str, Any]]) -> int:

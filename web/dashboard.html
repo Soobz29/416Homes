@@ -459,6 +459,12 @@
     </style>
 </head>
 <script src="/auth.js"></script>
+<script>
+    // Auth guard — redirect to login if not authenticated
+    if (window.Auth && !window.Auth.isLoggedIn()) {
+        window.location.href = '/login';
+    }
+</script>
 <body>
     <div id="root"></div>
 
@@ -1046,9 +1052,9 @@
 
                     {/* Footer */}
                     <footer>
-                        <div className="footer-logo"><span>416</span>Homes Dashboard</div>
+                        <div className="footer-logo"><span>416</span>Homes</div>
                         <div className="footer-copy">Toronto Real Estate Intelligence Platform</div>
-                        <div className="footer-copy">© 2024 416Homes · Dashboard</div>
+                        <div className="footer-copy">© 2026 416Homes · All rights reserved</div>
                     </footer>
                 </div>
             );

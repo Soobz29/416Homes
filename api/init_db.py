@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS listings (
     lng DECIMAL(11, 8),
     source TEXT NOT NULL,
     url TEXT NOT NULL,
+    photo TEXT,
     scraped_at TIMESTAMP WITH TIME ZONE NOT NULL,
     strategy TEXT DEFAULT 'unknown',
     searchable_text TEXT,
@@ -35,6 +36,9 @@ CREATE TABLE IF NOT EXISTS listings (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Migration: add photo column if not present (safe to run multiple times)
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS photo TEXT;
 
 -- Sold comparable properties
 CREATE TABLE IF NOT EXISTS sold_comps (
@@ -68,11 +72,15 @@ CREATE TABLE IF NOT EXISTS video_jobs (
     script_data JSONB,
     audio_url TEXT,
     final_video_path TEXT,
+    listing_data JSONB DEFAULT '{}',
     revision_count INTEGER DEFAULT 0,
     revision_notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Add listing_data column if upgrading an existing database
+ALTER TABLE video_jobs ADD COLUMN IF NOT EXISTS listing_data JSONB DEFAULT '{}';
 
 -- Buyer alerts table
 CREATE TABLE IF NOT EXISTS buyer_alerts (

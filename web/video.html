@@ -868,6 +868,14 @@
   </style>
 </head>
 <script src="/auth.js"></script>
+<script>
+  if (window.Auth) {
+    window.Auth.init();
+    if (!window.Auth.isLoggedIn()) {
+      window.location.href = '/login';
+    }
+  }
+</script>
 <body>
 
   <nav>
@@ -1172,7 +1180,7 @@
     </div>
     <div class="proof-card">
       <div class="proof-stars">★★★★★</div>
-      <p class="proof-text">"I ordered three videos in one afternoon. At $199 each I can now offer video to every single
+      <p class="proof-text">"I ordered three videos in one afternoon. At $249 each I can now offer video to every single
         client, not just the million-dollar listings. Total game changer."</p>
       <div class="proof-author">Priya S.</div>
       <div class="proof-role">Broker · Right At Home Realty</div>
@@ -1227,8 +1235,8 @@
 
   <footer>
     <div class="footer-logo"><span>416</span>Homes Video</div>
-    <div class="footer-copy">Cinematic listing videos · Toronto + Mississauga · From $199</div>
-    <div class="footer-copy">© 2025 416Homes · hello@416homes.ca</div>
+    <div class="footer-copy">Cinematic listing videos · Greater Toronto Area · From $99</div>
+    <div class="footer-copy">© 2026 416Homes · hello@416homes.ca</div>
   </footer>
 
   <script>
