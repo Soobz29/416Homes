@@ -613,9 +613,9 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="mx-auto flex max-w-[1240px] items-center justify-between border-t border-[rgba(200,169,110,0.2)] px-12 py-10 max-md:flex-col max-md:gap-3 max-md:px-6">
-        <div className="text-[1.1rem] font-extrabold">
+        <Link href="/" className="text-[1.1rem] font-extrabold transition-colors hover:text-[#c8a96e]">
           <span className="text-[#c8a96e]">416</span>Homes
-        </div>
+        </Link>
         <div className="font-['DM_Mono',monospace] text-[0.62rem] text-[#6b6b60]">
           Covering Toronto &amp; Mississauga · Built on real sold data
         </div>
