@@ -132,6 +132,20 @@ def _parse_sqft(raw: str) -> str:
         return ""
 
 
+def _extract_photo_from_attrs(attrs: Dict[str, Any]) -> str:
+    """Return first absolute URL found in common image attributes."""
+    for key in ("src", "data-src", "data-original", "data-url"):
+        val = str(attrs.get(key) or "").strip()
+        if val.startswith("http://") or val.startswith("https://"):
+            return val
+    srcset = str(attrs.get("srcset") or attrs.get("data-srcset") or "").strip()
+    if srcset:
+        first = srcset.split(",")[0].strip().split(" ")[0].strip()
+        if first.startswith("http://") or first.startswith("https://"):
+            return first
+    return ""
+
+
 def _parse_listing_item(item: dict, region_name: str) -> dict | None:
     """Parse a single Realtor.ca API result item into a listing dict."""
     mls = item.get("MlsNumber", "")
@@ -470,6 +484,31 @@ def _scrape_realtor_browser_sync(area: str) -> List[Dict[str, Any]]:
             text = (link.text or "").strip()
             if text:
                 link_groups[href].append(text)
+            # Some cards expose photo URL in link attrs or child image attrs.
+            link_photo = _extract_photo_from_attrs({
+                "src": link.attr("src"),
+                "data-src": link.attr("data-src"),
+                "data-original": link.attr("data-original"),
+                "data-url": link.attr("data-url"),
+                "srcset": link.attr("srcset"),
+                "data-srcset": link.attr("data-srcset"),
+            })
+            if link_photo:
+                link_groups[href].append(link_photo)
+            try:
+                for img in link.eles("tag:img"):
+                    img_url = _extract_photo_from_attrs({
+                        "src": img.attr("src"),
+                        "data-src": img.attr("data-src"),
+                        "data-original": img.attr("data-original"),
+                        "data-url": img.attr("data-url"),
+                        "srcset": img.attr("srcset"),
+                        "data-srcset": img.attr("data-srcset"),
+                    })
+                    if img_url:
+                        link_groups[href].append(img_url)
+            except Exception:
+                pass
 
         logger.info(f"Realtor.ca (browser): found {len(link_groups)} unique listing links")
 
@@ -479,6 +518,7 @@ def _scrape_realtor_browser_sync(area: str) -> List[Dict[str, Any]]:
                 address = ""
                 beds = ""
                 baths = ""
+                photo = ""
 
                 for text in texts:
                     # Price link contains $
@@ -488,6 +528,8 @@ def _scrape_realtor_browser_sync(area: str) -> List[Dict[str, Any]]:
                             price = int(m.group(1).replace(",", ""))
                     elif looks_like_real_address(text):
                         address = text
+                    elif (text.startswith("http://") or text.startswith("https://")) and not photo:
+                        photo = text
 
                 if price <= 0:
                     continue
@@ -511,6 +553,7 @@ def _scrape_realtor_browser_sync(area: str) -> List[Dict[str, Any]]:
                         "bedrooms": beds,
                         "bathrooms": baths,
                         "sqft": "",
+                        "photo": photo,
                         "lat": None,
                         "lng": None,
                         "scraped_at": datetime.now(timezone.utc).isoformat(),
@@ -568,11 +611,24 @@ async def _scrape_realtor_scrapling(area: str) -> List[Dict[str, Any]]:
             text = (link.text or "").strip()
             if text:
                 link_groups[href].append(text)
+            # Attach image URLs found on link attributes.
+            img_url = _extract_photo_from_attrs(link.attrib or {})
+            if img_url:
+                link_groups[href].append(img_url)
+            # Attach child image URLs.
+            try:
+                for img in link.css("img"):
+                    u = _extract_photo_from_attrs(img.attrib or {})
+                    if u:
+                        link_groups[href].append(u)
+            except Exception:
+                pass
 
         for href, texts in link_groups.items():
             try:
                 price = 0
                 address = ""
+                photo = ""
                 for text in texts:
                     if "$" in text and not price:
                         m = re.search(r"[\$C]*\$([\d,]+)", text)
@@ -580,6 +636,8 @@ async def _scrape_realtor_scrapling(area: str) -> List[Dict[str, Any]]:
                             price = int(m.group(1).replace(",", ""))
                     elif looks_like_real_address(text):
                         address = text
+                    elif (text.startswith("http://") or text.startswith("https://")) and not photo:
+                        photo = text
                 if price <= 0:
                     continue
                 display_addr = pick_display_address(address) if address else "Unknown"
@@ -596,6 +654,7 @@ async def _scrape_realtor_scrapling(area: str) -> List[Dict[str, Any]]:
                     "bedrooms": "",
                     "bathrooms": "",
                     "sqft": "",
+                    "photo": photo,
                     "lat": None,
                     "lng": None,
                     "scraped_at": datetime.now(timezone.utc).isoformat(),
@@ -701,6 +760,22 @@ def _parse_realtor_crawled_page(page: "CrawlPage") -> Optional[Dict[str, Any]]:
         return None
     beds_el = soup.select_one(".bedrooms, .bed, [data-testid='bedrooms']")
     baths_el = soup.select_one(".bathrooms, .bath, [data-testid='bathrooms']")
+    photo_url = ""
+    for selector in ("meta[property='og:image']", "meta[name='twitter:image']", "img"):
+        if selector.startswith("meta"):
+            meta = soup.select_one(selector)
+            if meta:
+                cand = (meta.get("content") or "").strip()
+                if cand.startswith("http://") or cand.startswith("https://"):
+                    photo_url = cand
+                    break
+        else:
+            img = soup.select_one(selector)
+            if img:
+                cand = _extract_photo_from_attrs(img.attrs or {})
+                if cand:
+                    photo_url = cand
+                    break
     beds = int(beds_el.get_text(strip=True)) if beds_el and beds_el.get_text(strip=True).isdigit() else 0
     baths = int(baths_el.get_text(strip=True)) if baths_el and baths_el.get_text(strip=True).isdigit() else 0
     city = "Mississauga" if "mississauga" in (address + page.url).lower() else "Toronto"
@@ -715,6 +790,7 @@ def _parse_realtor_crawled_page(page: "CrawlPage") -> Optional[Dict[str, Any]]:
         "bedrooms": str(beds) if beds else "",
         "bathrooms": str(baths) if baths else "",
         "sqft": "",
+        "photo": photo_url,
         "lat": None,
         "lng": None,
         "scraped_at": datetime.now(timezone.utc).isoformat(),

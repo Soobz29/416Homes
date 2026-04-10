@@ -16,6 +16,31 @@ REDFIN_URLS = {
     "gta": "https://www.redfin.ca/city/14075/ON/Toronto",
 }
 
+def _extract_photo_from_card(card) -> str:
+    """Extract best-effort listing image URL from a Redfin listing card."""
+    try:
+        selectors = [
+            "img",
+            ".HomeCard img",
+            "[data-rf-test-id='homecard-photo'] img",
+            "[data-rf-test-id='basic-card'] img",
+        ]
+        for selector in selectors:
+            for img in card.css(selector):
+                attrs = img.attrib or {}
+                for key in ("src", "data-src", "data-rf-test-value", "data-url"):
+                    val = (attrs.get(key) or "").strip()
+                    if val.startswith("http://") or val.startswith("https://"):
+                        return val
+                srcset = (attrs.get("srcset") or attrs.get("data-srcset") or "").strip()
+                if srcset:
+                    first = srcset.split(",")[0].strip().split(" ")[0].strip()
+                    if first.startswith("http://") or first.startswith("https://"):
+                        return first
+    except Exception:
+        return ""
+    return ""
+
 async def scrape_redfin(area: str = "toronto") -> List[Dict[str, Any]]:
     """Scrape Redfin listings with Scrapling v0.3. For area=gta, scrape both Toronto and Mississauga."""
     try:
@@ -58,6 +83,7 @@ async def scrape_with_scrapling(area: str) -> List[Dict[str, Any]]:
                 price = int(price_match.group(1)) if price_match else 0
                 if price <= 0:
                     continue
+                photo = _extract_photo_from_card(card)
                 lid = hashlib.md5(full_url.encode()).hexdigest()[:12]
                 listings.append({
                     "id": f"redfin_{lid}",
@@ -71,7 +97,7 @@ async def scrape_with_scrapling(area: str) -> List[Dict[str, Any]]:
                     "lng": None,
                     "source": "redfin",
                     "url": full_url,
-                    "photo": "",
+                    "photo": photo,
                     "scraped_at": datetime.now(timezone.utc).isoformat(),
                     "strategy": "scrapling",
                 })

@@ -3,6 +3,69 @@ const API_BASE = (
   (typeof window !== "undefined" ? window.location.origin : "http://localhost:8000")
 ).replace(/\/$/, "");
 
+function coercePhotoUrls(value: unknown): string[] {
+  if (!value) return [];
+  if (typeof value === "string") {
+    const v = value.trim();
+    return /^https?:\/\//i.test(v) ? [v] : [];
+  }
+  if (Array.isArray(value)) {
+    const out: string[] = [];
+    for (const item of value) {
+      if (typeof item === "string" && /^https?:\/\//i.test(item.trim())) {
+        out.push(item.trim());
+      } else if (item && typeof item === "object") {
+        const obj = item as Record<string, unknown>;
+        const candidates = [obj.url, obj.href, obj.src, obj.highResPath, obj.HighResPath];
+        for (const cand of candidates) {
+          if (typeof cand === "string" && /^https?:\/\//i.test(cand.trim())) {
+            out.push(cand.trim());
+          }
+        }
+      }
+    }
+    return out;
+  }
+  if (value && typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    const candidates = [obj.url, obj.href, obj.src, obj.highResPath, obj.HighResPath];
+    return candidates
+      .filter((v): v is string => typeof v === "string")
+      .map((v) => v.trim())
+      .filter((v) => /^https?:\/\//i.test(v));
+  }
+  return [];
+}
+
+function extractListingPhotos(listing: any): string[] {
+  const raw = listing?.raw_data && typeof listing.raw_data === "object" ? listing.raw_data : {};
+  const candidates = [
+    listing?.photos,
+    listing?.photo,
+    (raw as any).photos,
+    (raw as any).photo,
+    (raw as any).image,
+    (raw as any).images,
+    (raw as any).image_url,
+    (raw as any).image_urls,
+    (raw as any).photo_url,
+    (raw as any).photo_urls,
+    (raw as any).thumbnail,
+    (raw as any).thumbnails,
+  ];
+  const seen = new Set<string>();
+  const photos: string[] = [];
+  for (const candidate of candidates) {
+    for (const url of coercePhotoUrls(candidate)) {
+      if (!seen.has(url)) {
+        seen.add(url);
+        photos.push(url);
+      }
+    }
+  }
+  return photos;
+}
+
 export async function fetchListings(params?: {
   city?: string;
   minPrice?: number;
@@ -43,7 +106,7 @@ export async function fetchListings(params?: {
       property_type: l.strategy ?? "Unknown",
       source: l.source,
       url: l.url,
-      photos: Array.isArray(l.photos) ? l.photos : (l.photo ? [l.photo] : []),
+      photos: extractListingPhotos(l),
       created_at: l.scraped_at,
     })),
     total: typeof data?.total === "number" ? data.total : rawListings.length,

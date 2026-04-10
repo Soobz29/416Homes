@@ -10,7 +10,7 @@ const buttonVariants = cva(
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary/90",
         gold:
-          "bg-gradient-to-r from-[#d4af37] to-[#b8941f] text-black font-semibold hover:from-[#c19b2f] hover:to-[#a17d1a]",
+          "rounded-none bg-gradient-to-r from-[#D4AF37] to-[#8E651E] text-black font-semibold tracking-wide shadow-[0_0_22px_rgba(212,175,55,0.38),inset_0_1px_0_rgba(255,255,255,0.16)] hover:from-[#F3E5AB] hover:to-[#A07818] hover:shadow-[0_0_28px_rgba(212,175,55,0.48),inset_0_1px_0_rgba(255,255,255,0.2)]",
         outline:
           "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
         ghost: "hover:bg-accent hover:text-accent-foreground",
