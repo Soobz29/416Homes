@@ -435,7 +435,7 @@ export default function DashboardPage() {
                 Active listings
               </div>
               <div className="dashboard-hero-metric-value text-[1.35rem] font-bold text-[#c8a96e]">
-                GTA‑wide
+                GTA-wide
               </div>
               <p className="mt-1 text-[0.72rem] text-[#6b6b60]">
                 Pulled from Realtor.ca, Zoocasa, Kijiji and more.
@@ -449,7 +449,7 @@ export default function DashboardPage() {
                 Every 30 min
               </div>
               <p className="mt-1 text-[0.72rem] text-[#6b6b60]">
-                Nightly full scans plus on‑demand refreshes for hot listings.
+                Nightly full scans plus on-demand refreshes for hot listings.
               </p>
             </div>
           </div>
@@ -459,7 +459,7 @@ export default function DashboardPage() {
               disabled={scanLoading}
               className="rounded border border-[rgba(200,169,110,0.4)] bg-transparent px-4 py-2 font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-[#c8a96e] transition-colors hover:bg-[rgba(200,169,110,0.1)] disabled:opacity-50"
             >
-              {scanLoading ? "Scanning…" : "↻ Refresh Listings"}
+              {scanLoading ? "Scanning..." : "Refresh Listings"}
             </button>
             {scanMessage && (
               <span className="font-['DM_Mono',monospace] text-[0.68rem] text-[#6b6b60]">{scanMessage}</span>
@@ -557,7 +557,7 @@ export default function DashboardPage() {
                   <div className="text-right">
                     {telegramLinked ? (
                       <div className="inline-block rounded-lg border border-[rgba(200,169,110,0.3)] bg-[rgba(200,169,110,0.06)] px-4 py-2 text-center">
-                        <div className="text-[1.1rem]">✅</div>
+                        <div className="font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.1em] text-[#c8a96e]">Linked</div>
                         <p className="font-['DM Mono',monospace] text-[0.75rem] font-semibold text-[#f5f4ef]">Connected</p>
                         <p className="font-['DM Mono',monospace] text-[0.65rem] text-[#6b6b60]">You&apos;ll receive alerts in Telegram</p>
                       </div>
@@ -579,7 +579,7 @@ export default function DashboardPage() {
                           disabled={checkingLinked}
                           className="mt-1 rounded-full border border-[rgba(200,169,110,0.4)] px-3 py-1.5 font-['DM Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-[#c8a96e] hover:border-[#e4c98a] disabled:opacity-50"
                         >
-                          {checkingLinked ? "Checking…" : "I've linked it, check status"}
+                          {checkingLinked ? "Checking..." : "I've linked it, check status"}
                         </button>
                       </div>
                     ) : (
@@ -589,7 +589,7 @@ export default function DashboardPage() {
                           disabled={linkLoading}
                           className="rounded-full border border-[rgba(200,169,110,0.4)] px-3 py-1.5 font-['DM Mono',monospace] text-[0.7rem] uppercase tracking-[0.11em] text-[#c8a96e] hover:border-[#e4c98a]"
                         >
-                          {linkLoading ? "Generating…" : "Connect Telegram"}
+                          {linkLoading ? "Generating..." : "Connect Telegram"}
                         </button>
                         {(linkMessage || meError) && !linkCode && (
                           <p className="text-[0.65rem] font-['DM Mono',monospace] text-[#e4a84a]">
@@ -784,7 +784,7 @@ export default function DashboardPage() {
                         rel="noreferrer"
                         className="text-[0.78rem] font-['DM Mono',monospace] uppercase tracking-[0.08em] text-[#f5f4ef] no-underline"
                       >
-                        View Listing →
+                        View Listing
                       </a>
                       <button
                         className="btn bg-[#c8a96e] px-4 py-2 font-['Syne',sans-serif] text-[0.8rem] font-bold uppercase tracking-[0.08em] text-black hover:bg-[#e4c98a]"
@@ -828,20 +828,20 @@ export default function DashboardPage() {
                   { label: "List Price", key: "list_price", placeholder: "750000" },
                 ].map(({ label, key, placeholder }) => (
                   <div key={key} className="flex flex-col gap-1">
-                    <label className="font-[‘DM Mono’,monospace] text-[0.65rem] uppercase tracking-[0.08em] text-[#6b6b60]">{label}</label>
+                    <label className="font-['DM_Mono',monospace] text-[0.65rem] uppercase tracking-[0.08em] text-[#6b6b60]">{label}</label>
                     <input
                       type="text"
                       placeholder={placeholder}
                       value={valuationForm[key as keyof typeof valuationForm]}
                       onChange={e => setValuationForm(f => ({ ...f, [key]: e.target.value }))}
-                      className="border border-[rgba(200,169,110,0.2)] bg-transparent px-3 py-2 font-[‘DM Mono’,monospace] text-[0.8rem] text-[#f5f4ef] outline-none placeholder:text-[#6b6b60] focus:border-[#c8a96e]"
+                      className="border border-[rgba(200,169,110,0.2)] bg-transparent px-3 py-2 font-['DM_Mono',monospace] text-[0.8rem] text-[#f5f4ef] outline-none placeholder:text-[#6b6b60] focus:border-[#c8a96e]"
                     />
                   </div>
                 ))}
               </div>
               <button
                 disabled={valuationLoading}
-                className="mt-5 bg-[#c8a96e] px-6 py-2.5 font-[‘Syne’,sans-serif] text-[0.85rem] font-bold uppercase tracking-[0.08em] text-black hover:bg-[#e4c98a] disabled:opacity-50"
+                className="mt-5 bg-[#c8a96e] px-6 py-2.5 font-['Syne',sans-serif] text-[0.85rem] font-bold uppercase tracking-[0.08em] text-black hover:bg-[#e4c98a] disabled:opacity-50"
                 onClick={async () => {
                   setValuationLoading(true);
                   setValuationError(null);
@@ -864,26 +864,26 @@ export default function DashboardPage() {
                   }
                 }}
               >
-                {valuationLoading ? "Estimating…" : "Get Valuation"}
+                {valuationLoading ? "Estimating..." : "Get Valuation"}
               </button>
               {valuationError && (
-                <p className="mt-4 font-[‘DM Mono’,monospace] text-[0.78rem] text-red-400">{valuationError}</p>
+                <p className="mt-4 font-['DM_Mono',monospace] text-[0.78rem] text-red-400">{valuationError}</p>
               )}
               {valuationResult && (
                 <div className="mt-6 border border-[rgba(200,169,110,0.2)] p-5">
-                  <p className="font-[‘DM Mono’,monospace] text-[0.65rem] uppercase tracking-[0.1em] text-[#6b6b60]">Estimated Value</p>
+                  <p className="font-['DM_Mono',monospace] text-[0.65rem] uppercase tracking-[0.1em] text-[#6b6b60]">Estimated Value</p>
                   <p className="text-[2rem] font-extrabold text-[#c8a96e]">
                     ${valuationResult.estimated_value.toLocaleString()}
                   </p>
                   {valuationResult.price_per_sqft && (
-                    <p className="mt-1 font-[‘DM Mono’,monospace] text-[0.78rem] text-[#f5f4ef]">
+                    <p className="mt-1 font-['DM_Mono',monospace] text-[0.78rem] text-[#f5f4ef]">
                       ${Math.round(valuationResult.price_per_sqft).toLocaleString()} / sqft
                     </p>
                   )}
-                  <p className="mt-2 font-[‘DM Mono’,monospace] text-[0.78rem] text-[#6b6b60]">
+                  <p className="mt-2 font-['DM_Mono',monospace] text-[0.78rem] text-[#6b6b60]">
                     {valuationResult.market_analysis}
                   </p>
-                  <p className="mt-1 font-[‘DM Mono’,monospace] text-[0.65rem] text-[#6b6b60]">
+                  <p className="mt-1 font-['DM_Mono',monospace] text-[0.65rem] text-[#6b6b60]">
                     Confidence: {Math.round(valuationResult.confidence * 100)}%
                   </p>
                 </div>
@@ -908,7 +908,7 @@ export default function DashboardPage() {
               href="/video"
               className="btn rounded-full bg-[#c8a96e] px-10 py-4 font-['Syne',sans-serif] text-[0.9rem] font-bold uppercase tracking-[0.08em] text-black no-underline hover:bg-[#e4c98a]"
             >
-              Order a Video →
+              Order a Video
             </Link>
           </div>
         )}

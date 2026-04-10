@@ -10,14 +10,16 @@
     rel="stylesheet">
   <style>
     :root {
-      --black: #0a0a08;
-      --white: #f5f4ef;
+      --black: #0b0d10;
+      --white: #f4f1ea;
       --gold: #c8a96e;
       --gold-light: #e4c98a;
-      --grey: #6b6b60;
-      --green: #2ed573;
-      --border: rgba(200, 169, 110, 0.2);
-      --card-bg: rgba(255, 255, 255, 0.025);
+      --grey: #948f84;
+      --green: #49ca84;
+      --border: rgba(200, 169, 110, 0.24);
+      --card-bg: rgba(255, 255, 255, 0.03);
+      --surface: #141a23;
+      --radius-md: 12px;
     }
 
     * {
@@ -31,22 +33,22 @@
     }
 
     body {
-      background: var(--black);
+      background: linear-gradient(180deg, #0b0d10 0%, #0d1219 100%);
       color: var(--white);
       font-family: 'Syne', sans-serif;
       overflow-x: hidden;
       min-height: 100vh;
     }
 
-    /* NOISE */
     body::before {
       content: '';
       position: fixed;
       inset: 0;
       pointer-events: none;
-      z-index: 999;
-      opacity: 0.35;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+      z-index: -1;
+      background:
+        radial-gradient(circle at 80% 12%, rgba(200,169,110,0.12), transparent 34%),
+        radial-gradient(circle at 16% 74%, rgba(200,169,110,0.08), transparent 46%);
     }
 
     /* NAV */
@@ -54,12 +56,14 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 1.5rem 4rem;
-      border-bottom: 1px solid var(--border);
-      background: rgba(10, 10, 8, 0.8);
+      padding: 1rem 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      margin: 1rem 1.25rem 0;
+      background: rgba(11,13,16,0.84);
       backdrop-filter: blur(12px);
       position: sticky;
-      top: 0;
+      top: 1rem;
       z-index: 100;
     }
 
@@ -97,6 +101,13 @@
 
     .nav-back:hover {
       color: var(--gold);
+    }
+    .submit-btn:focus-visible,
+    .nav-back:focus-visible,
+    .fi:focus-visible,
+    .voice-opt:focus-visible {
+      outline: 2px solid var(--gold-light);
+      outline-offset: 2px;
     }
 
     /* HERO */
@@ -181,6 +192,7 @@
       aspect-ratio: 16/9;
       overflow: hidden;
       border: 1px solid var(--border);
+      border-radius: var(--radius-md);
     }
 
     .video-preview-inner {
@@ -351,7 +363,7 @@
     }
 
     .step-ico {
-      font-size: 1.3rem;
+      font-size: 1rem;
       margin-bottom: 0.75rem;
     }
 
@@ -405,6 +417,7 @@
 
     .cost-breakdown {
       border: 1px solid var(--border);
+      border-radius: var(--radius-md);
       padding: 1.5rem;
       background: var(--card-bg);
     }
@@ -442,6 +455,7 @@
     /* FORM */
     .order-form {
       border: 1px solid var(--border);
+      border-radius: var(--radius-md);
       padding: 2.5rem;
       background: var(--card-bg);
     }
@@ -478,6 +492,7 @@
       width: 100%;
       background: rgba(255, 255, 255, 0.04);
       border: 1px solid var(--border);
+      border-radius: 8px;
       color: var(--white);
       padding: 0.75rem 1rem;
       font-family: 'DM Mono', monospace;
@@ -502,6 +517,7 @@
 
     .voice-opt {
       border: 1px solid var(--border);
+      border-radius: 8px;
       padding: 0.75rem;
       text-align: center;
       cursor: pointer;
@@ -532,7 +548,7 @@
     .submit-btn {
       width: 100%;
       background: var(--gold);
-      color: var(--black);
+      color: #111;
       border: none;
       padding: 1.1rem;
       font-family: 'Syne', sans-serif;
@@ -569,6 +585,7 @@
     .progress-panel {
       display: none;
       border: 1px solid var(--border);
+      border-radius: var(--radius-md);
       padding: 2.5rem;
       background: var(--card-bg);
     }
@@ -664,8 +681,8 @@
     .download-block {
       margin-top: 2rem;
       padding: 1.5rem;
-      border: 1px solid rgba(46, 213, 115, 0.2);
-      background: rgba(46, 213, 115, 0.05);
+      border: 1px solid rgba(73, 202, 132, 0.24);
+      background: rgba(73, 202, 132, 0.08);
       display: none;
     }
 
@@ -724,6 +741,7 @@
     .proof-card {
       padding: 2rem;
       border: 1px solid var(--border);
+      border-radius: var(--radius-md);
       background: var(--card-bg);
     }
 
@@ -806,6 +824,9 @@
       font-size: 0.6rem;
       color: var(--grey);
     }
+    @media (prefers-reduced-motion: reduce) {
+      * { animation:none !important; transition:none !important; scroll-behavior:auto !important; }
+    }
 
     @media(max-width:900px) {
       nav {
@@ -851,7 +872,7 @@
 
   <nav>
     <div class="logo"><span>416</span>Homes <em>VIDEO</em></div>
-    <a href="416homes.html" class="nav-back">← Back to 416Homes</a>
+    <a href="416homes.html" class="nav-back">Back to 416Homes</a>
   </nav>
 
   <!-- HERO -->
@@ -866,7 +887,7 @@
         <div class="price-compare">Tiered per-listing pricing<br><s>Industry avg: $1,000–$5,000</s></div>
       </div>
       <button class="submit-btn" style="width:auto;padding:1rem 2.5rem"
-        onclick="document.getElementById('order').scrollIntoView({behavior:'smooth'})">Order a Video →</button>
+        onclick="document.getElementById('order').scrollIntoView({behavior:'smooth'})">Order a Video</button>
     </div>
     <div class="video-preview">
       <div class="video-preview-inner">
@@ -895,7 +916,7 @@
       <div class="step">
         <div class="step-arrow"></div>
         <div class="step-n">01</div>
-        <div class="step-ico">🔗</div>
+        <div class="step-ico">URL</div>
         <div class="step-t">Paste listing URL</div>
         <div class="step-d">Realtor.ca or Zillow. We scrape the best 6 photos and all property details automatically.
         </div>
@@ -903,7 +924,7 @@
       <div class="step">
         <div class="step-arrow"></div>
         <div class="step-n">02</div>
-        <div class="step-ico">✍️</div>
+        <div class="step-ico">Script</div>
         <div class="step-t">Script crafted for your listing</div>
         <div class="step-d">We analyze the listing details and write a 30-second cinematic voiceover script tailored to
           the property.</div>
@@ -912,7 +933,7 @@
       <div class="step">
         <div class="step-arrow"></div>
         <div class="step-n">03</div>
-        <div class="step-ico">🎙️</div>
+        <div class="step-ico">Voice</div>
         <div class="step-t">Narration recorded</div>
         <div class="step-d">Professional narration is recorded with premium voices and paired with cinematic music.
         </div>
@@ -921,7 +942,7 @@
       <div class="step">
         <div class="step-arrow"></div>
         <div class="step-n">04</div>
-        <div class="step-ico">🎬</div>
+        <div class="step-ico">Motion</div>
         <div class="step-t">Photos brought to life</div>
         <div class="step-d">Each photo gets a cinematic dolly shot, pan, or zoom — with luxury motion styling that feels like a custom shoot.
         </div>
@@ -929,7 +950,7 @@
       </div>
       <div class="step">
         <div class="step-n">05</div>
-        <div class="step-ico">📥</div>
+        <div class="step-ico">Deliver</div>
         <div class="step-t">Download MP4</div>
         <div class="step-d">Final video assembled with captions, music, and narration. Ready to post on Instagram, MLS,
           or email.</div>
@@ -1070,7 +1091,7 @@
             </div>
           </div>
         </div>
-        <button class="submit-btn" id="submitBtn" onclick="submitOrder()">Order Video — $99 CAD →</button>
+        <button class="submit-btn" id="submitBtn" onclick="submitOrder()">Order Video - $99 CAD</button>
         <p class="form-note">Secure payment via Stripe. Video delivered to your email when ready.<br>Questions?
           hello@416homes.ca</p>
       </div>
@@ -1082,35 +1103,35 @@
       <div class="prog-addr" id="progAddr"></div>
       <div class="prog-steps">
         <div class="prog-step" id="pScrape">
-          <div class="prog-icon active" id="iScrape">🔗</div>
+          <div class="prog-icon active" id="iScrape">1</div>
           <div>
             <div class="prog-label">Fetching listing & photos</div>
             <div class="prog-msg" id="mScrape">Connecting to listing...</div>
           </div>
         </div>
         <div class="prog-step" id="pScript">
-          <div class="prog-icon pending" id="iScript">✍️</div>
+          <div class="prog-icon pending" id="iScript">2</div>
           <div>
             <div class="prog-label">Writing voiceover script</div>
             <div class="prog-msg" id="mScript">Waiting...</div>
           </div>
         </div>
         <div class="prog-step" id="pAudio">
-          <div class="prog-icon pending" id="iAudio">🎙️</div>
+          <div class="prog-icon pending" id="iAudio">3</div>
           <div>
             <div class="prog-label">Recording narration + music</div>
             <div class="prog-msg" id="mAudio">Waiting...</div>
           </div>
         </div>
         <div class="prog-step" id="pAnimate">
-          <div class="prog-icon pending" id="iAnimate">🎬</div>
+          <div class="prog-icon pending" id="iAnimate">4</div>
           <div>
             <div class="prog-label">Animating listing photos</div>
             <div class="prog-msg" id="mAnimate">Waiting...</div>
           </div>
         </div>
         <div class="prog-step" id="pAssemble">
-          <div class="prog-icon pending" id="iAssemble">📽️</div>
+          <div class="prog-icon pending" id="iAssemble">5</div>
           <div>
             <div class="prog-label">Assembling final video</div>
             <div class="prog-msg" id="mAssemble">Waiting...</div>
@@ -1118,13 +1139,13 @@
         </div>
       </div>
       <div class="download-block" id="downloadBlock">
-        <div class="dl-title">✅ Your video is ready!</div>
+        <div class="dl-title">Your video is ready.</div>
         <div class="dl-sub" id="dlSubtitle">Cinematic listing video — 1920×1080 MP4</div>
         <div class="dl-video-wrap" id="dlVideoWrap">
           <video id="dlVideo" controls playsinline preload="metadata" style="width:100%;display:block;"></video>
           <div id="dlVideoError" style="display:none;background:#1a1a1a;color:#888;padding:2rem;font-size:0.9rem;text-align:center;border-radius:8px;">Video could not be loaded. Use the Download button below.</div>
         </div>
-        <a class="dl-btn" id="dlBtn" href="#" download>⬇ Download Video</a>
+        <a class="dl-btn" id="dlBtn" href="#" download>Download Video</a>
 
         <!-- Free revision request (shown after video is ready) -->
         <div id="revisionBlock" style="margin-top:2rem;padding:1.5rem;border:1px solid rgba(200,169,110,0.25);border-radius:12px;display:none;">
@@ -1230,7 +1251,7 @@
 
       if (tierInput) tierInput.value = tier;
       if (amountInput) amountInput.value = String(price);
-      if (submitBtn) submitBtn.textContent = `Order ${tier.charAt(0).toUpperCase() + tier.slice(1)} — $${price} CAD →`;
+      if (submitBtn) submitBtn.textContent = `Order ${tier.charAt(0).toUpperCase() + tier.slice(1)} - $${price} CAD`;
       if (youPay) youPay.textContent = `$${price}`;
       if (heroPrice) heroPrice.textContent = `$${price}`;
     }
@@ -1278,7 +1299,7 @@
     function showPreview() {
       // Simulate a playing video with animated placeholder
       const vp = document.querySelector('.vp-content');
-      vp.innerHTML = '<div style="font-family:\'DM Mono\',monospace;font-size:0.7rem;color:var(--gold);letter-spacing:0.1em;">▶ PLAYING SAMPLE...</div>';
+      vp.innerHTML = '<div style="font-family:\'DM Mono\',monospace;font-size:0.7rem;color:var(--gold);letter-spacing:0.1em;">PLAYING SAMPLE...</div>';
     }
 
     async function submitOrder() {
@@ -1405,7 +1426,7 @@
         errEl.style.cssText = 'background:rgba(192,57,43,0.12);border:1px solid rgba(192,57,43,0.4);border-radius:8px;padding:1rem;margin-top:1rem;color:#e74c3c;font-family:\'DM Mono\',monospace;font-size:0.78rem;';
         form.appendChild(errEl);
       }
-      errEl.textContent = '⚠ ' + message;
+      errEl.textContent = message;
       errEl.style.display = 'block';
     }
 
@@ -1489,7 +1510,7 @@
 
       if (data.status === 'revision_requested') {
         const revMsg = document.getElementById('revisionMsg');
-        if (revMsg) { revMsg.style.color = '#2ed573'; revMsg.textContent = '✅ Revision submitted — we\'ll send the updated video within 24 hours.'; revMsg.style.display = 'inline'; }
+        if (revMsg) { revMsg.style.color = '#49ca84'; revMsg.textContent = 'Revision submitted - we will send the updated video within 24 hours.'; revMsg.style.display = 'inline'; }
         const revBtn = document.getElementById('revisionBtn');
         if (revBtn) revBtn.disabled = true;
       }
@@ -1499,8 +1520,8 @@
       const notes = (document.getElementById('revisionNotes').value || '').trim();
       const msg = document.getElementById('revisionMsg');
       const btn = document.getElementById('revisionBtn');
-      if (!notes) { msg.style.color = '#e74c3c'; msg.textContent = '⚠ Please describe what you\'d like changed.'; msg.style.display = 'inline'; return; }
-      if (!currentJobId) { msg.style.color = '#e74c3c'; msg.textContent = '⚠ No active job found.'; msg.style.display = 'inline'; return; }
+      if (!notes) { msg.style.color = '#cf6357'; msg.textContent = 'Please describe what you would like changed.'; msg.style.display = 'inline'; return; }
+      if (!currentJobId) { msg.style.color = '#cf6357'; msg.textContent = 'No active job found.'; msg.style.display = 'inline'; return; }
       btn.disabled = true;
       msg.style.color = 'var(--gold)'; msg.textContent = '⏳ Submitting...'; msg.style.display = 'inline';
       try {
@@ -1510,17 +1531,17 @@
           body: JSON.stringify({ notes }),
         });
         if (resp.ok) {
-          msg.style.color = '#2ed573';
-          msg.textContent = '✅ Revision submitted — we\'ll send the updated video within 24 hours.';
+          msg.style.color = '#49ca84';
+          msg.textContent = 'Revision submitted - we will send the updated video within 24 hours.';
         } else {
           const err = await resp.json().catch(() => ({}));
-          msg.style.color = '#e74c3c';
-          msg.textContent = `⚠ ${err.detail || 'Failed to submit revision. Please email us directly.'}`;
+          msg.style.color = '#cf6357';
+          msg.textContent = err.detail || 'Failed to submit revision. Please email us directly.';
           btn.disabled = false;
         }
       } catch {
-        msg.style.color = '#e74c3c';
-        msg.textContent = '⚠ Network error. Please email us directly.';
+        msg.style.color = '#cf6357';
+        msg.textContent = 'Network error. Please email us directly.';
         btn.disabled = false;
       }
     }

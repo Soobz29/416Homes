@@ -7,29 +7,50 @@
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --black: #0a0a08;
-      --white: #f5f4ef;
+      --bg: #0b0d10;
+      --surface: #141a23;
+      --surface-2: #1a2230;
+      --text: #f4f1ea;
+      --text-muted: #9b958a;
       --gold: #c8a96e;
-      --grey: #6b6b60;
-      --border: rgba(200,169,110,0.25);
+      --gold-strong: #debc7a;
+      --ok: #49ca84;
+      --error: #cf6357;
+      --border: rgba(200,169,110,0.24);
+      --ring: rgba(200,169,110,0.56);
+      --radius-md: 14px;
+      --radius-sm: 8px;
+      --shadow: 0 16px 42px rgba(0,0,0,0.35);
     }
     * { box-sizing:border-box; margin:0; padding:0; }
     body {
       min-height:100vh;
-      background:var(--black);
-      color:var(--white);
+      background:linear-gradient(180deg,#0b0d10 0%,#0d1219 100%);
+      color:var(--text);
       font-family:'Syne',system-ui,sans-serif;
       display:flex;
       align-items:center;
       justify-content:center;
       padding:2rem;
     }
+    body::before {
+      content:'';
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      z-index:-1;
+      background:
+        radial-gradient(circle at 75% 16%, rgba(200,169,110,0.12), transparent 32%),
+        radial-gradient(circle at 16% 80%, rgba(200,169,110,0.07), transparent 46%);
+    }
     .card {
       width:100%;
       max-width:420px;
       border:1px solid var(--border);
-      background:rgba(255,255,255,0.02);
+      border-radius:var(--radius-md);
+      background:linear-gradient(180deg, rgba(20,26,35,0.9), rgba(18,24,33,0.92));
       padding:2.5rem 2.25rem;
+      box-shadow:var(--shadow);
     }
     h1 {
       font-size:1.6rem;
@@ -39,8 +60,9 @@
     .sub {
       font-family:'DM Mono',monospace;
       font-size:0.74rem;
-      color:var(--grey);
+      color:var(--text-muted);
       margin-bottom:1.75rem;
+      line-height:1.7;
     }
     label {
       display:block;
@@ -48,35 +70,46 @@
       font-size:0.62rem;
       letter-spacing:0.14em;
       text-transform:uppercase;
-      color:var(--grey);
+      color:var(--text-muted);
       margin-bottom:0.4rem;
     }
     input[type="email"] {
       width:100%;
       padding:0.85rem 0.9rem;
-      background:rgba(255,255,255,0.04);
+      background:var(--surface);
       border:1px solid var(--border);
-      color:var(--white);
+      border-radius:var(--radius-sm);
+      color:var(--text);
       font-family:'DM Mono',monospace;
       font-size:0.82rem;
       outline:none;
       margin-bottom:1rem;
+      transition:border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
     }
     input[type="email"]:focus {
-      border-color:var(--gold);
+      border-color:var(--gold-strong);
+      background:var(--surface-2);
+      box-shadow:0 0 0 3px var(--ring);
     }
     button {
       width:100%;
       padding:0.95rem;
-      border:none;
+      border:1px solid transparent;
+      border-radius:var(--radius-sm);
       background:var(--gold);
-      color:var(--black);
+      color:#111;
       font-family:'Syne',sans-serif;
       font-size:0.9rem;
       font-weight:700;
       letter-spacing:0.08em;
       text-transform:uppercase;
       cursor:pointer;
+      transition:background-color 180ms ease, transform 180ms ease;
+    }
+    button:hover { background:var(--gold-strong); transform:translateY(-1px); }
+    button:focus-visible, input:focus-visible {
+      outline:2px solid var(--gold-strong);
+      outline-offset:2px;
     }
     button:disabled {
       opacity:0.6;
@@ -86,7 +119,7 @@
       margin-top:1rem;
       font-family:'DM Mono',monospace;
       font-size:0.62rem;
-      color:var(--grey);
+      color:var(--text-muted);
       line-height:1.7;
     }
     .msg {
@@ -115,13 +148,13 @@
       const btn = document.getElementById('sendBtn');
       const email = (emailInput.value || '').trim();
       if (!email || !email.includes('@')) {
-        msg.style.color = '#c0392b';
-        msg.textContent = '⚠ Please enter a valid email address.';
+        msg.style.color = 'var(--error)';
+        msg.textContent = 'Please enter a valid email address.';
         return;
       }
       btn.disabled = true;
       msg.style.color = '#c8a96e';
-      msg.textContent = '⏳ Sending magic link...';
+      msg.textContent = 'Sending magic link...';
       try {
         const resp = await fetch(`${API_BASE}/auth/magic-link`, {
           method: 'POST',
@@ -129,17 +162,17 @@
           body: JSON.stringify({ email }),
         });
         if (resp.ok) {
-          msg.style.color = '#2ed573';
-          msg.textContent = '✅ Magic link sent! Check your email to sign in.';
+          msg.style.color = 'var(--ok)';
+          msg.textContent = 'Magic link sent. Check your email to sign in.';
         } else {
           const err = await resp.json().catch(() => ({}));
-          msg.style.color = '#c0392b';
-          msg.textContent = `⚠ ${err.detail || 'Failed to send magic link. Please try again.'}`;
+          msg.style.color = 'var(--error)';
+          msg.textContent = err.detail || 'Failed to send magic link. Please try again.';
           btn.disabled = false;
         }
       } catch {
-        msg.style.color = '#c0392b';
-        msg.textContent = '⚠ Network error. Please check your connection and try again.';
+        msg.style.color = 'var(--error)';
+        msg.textContent = 'Network error. Please check your connection and try again.';
         btn.disabled = false;
       }
     }

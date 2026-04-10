@@ -15,152 +15,399 @@
     --green: #2ed573;
     --red: #c0392b;
     --border: rgba(200,169,110,0.2);
+
+    /* aliases so current structure/styles still work */
+    --bg: var(--black);
+    --surface-1: rgba(255,255,255,0.025);
+    --surface-2: rgba(255,255,255,0.04);
+    --surface-3: rgba(255,255,255,0.06);
+    --text-strong: var(--white);
+    --text-body: var(--grey);
+    --text-muted: var(--grey);
+    --gold-strong: var(--gold-light);
+    --gold-soft: rgba(200,169,110,0.12);
+    --ok: var(--green);
+    --down: var(--red);
+    --ring: rgba(200,169,110,0.3);
+    --radius-lg: 18px;
+    --radius-md: 12px;
+    --radius-sm: 8px;
+    --shadow-lg: 0 26px 60px rgba(0, 0, 0, 0.45);
+    --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.28);
   }
   * { margin:0; padding:0; box-sizing:border-box; }
   html { scroll-behavior:smooth; }
-  body { background:var(--black); color:var(--white); font-family:'Syne',sans-serif; overflow-x:hidden; }
+  body {
+    background:var(--black);
+    color: var(--text-strong);
+    font-family:'Syne',sans-serif;
+    overflow-x:hidden;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
   body::before {
-    content:''; position:fixed; inset:0; pointer-events:none; z-index:1000; opacity:0.4;
+    content:'';
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    z-index:1000;
+    opacity:0.4;
     background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+  a, button, input { font: inherit; }
+  button, .nav-links a, .pill, .city-check label { cursor: pointer; }
+  button:focus-visible,
+  input:focus-visible,
+  .nav-links a:focus-visible {
+    outline: 2px solid var(--gold-strong);
+    outline-offset: 2px;
   }
 
   /* NAV */
-  nav { position:fixed; top:0; left:0; right:0; z-index:100; display:flex; justify-content:space-between; align-items:center; padding:1.5rem 4rem; border-bottom:1px solid var(--border); backdrop-filter:blur(12px); background:rgba(10,10,8,0.75); }
-  .logo { font-size:1.3rem; font-weight:800; letter-spacing:0.05em; }
+  nav {
+    position:fixed;
+    top:0;
+    left:0;
+    right:0;
+    z-index:100;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:1rem 3rem;
+    border-bottom:1px solid var(--border);
+    backdrop-filter: blur(14px);
+    background: rgba(10,10,8,0.75);
+  }
+  .logo { font-size:1.2rem; font-weight:800; letter-spacing:0.02em; }
   .logo span { color:var(--gold); }
-  .logo sub { font-size:0.6rem; color:var(--grey); vertical-align:middle; letter-spacing:0.1em; margin-left:0.3rem; font-weight:400; font-family:'DM Mono',monospace; }
-  .nav-links { display:flex; gap:2.5rem; list-style:none; font-family:'DM Mono',monospace; font-size:0.72rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--grey); }
-  .nav-links a { color:inherit; text-decoration:none; transition:color 0.2s; }
-  .nav-links a:hover { color:var(--gold); }
-  .nav-cta { background:var(--gold); color:var(--black); border:none; padding:0.65rem 1.5rem; font-family:'DM Mono',monospace; font-size:0.72rem; font-weight:500; letter-spacing:0.08em; text-transform:uppercase; cursor:pointer; transition:background 0.2s; }
-  .nav-cta:hover { background:var(--gold-light); }
+  .logo sub { font-size:0.58rem; color:var(--text-muted); vertical-align:middle; letter-spacing:0.08em; margin-left:0.35rem; font-weight:400; font-family:'DM Mono',monospace; }
+  .nav-links { display:flex; gap:1.65rem; list-style:none; font-family:'DM Mono',monospace; font-size:0.68rem; letter-spacing:0.11em; text-transform:uppercase; color:var(--text-muted); }
+  .nav-links a { color:inherit; text-decoration:none; transition:color 180ms ease; }
+  .nav-links a:hover { color:var(--text-strong); }
+  .nav-cta {
+    background: var(--gold);
+    color: #111;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    padding: 0.6rem 1.1rem;
+    font-family:'DM Mono',monospace;
+    font-size:0.67rem;
+    font-weight:600;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    transition: background-color 180ms ease, transform 180ms ease;
+  }
+  .nav-cta:hover { background:var(--gold-strong); transform:translateY(-1px); }
 
   /* TICKER */
-  .ticker { position:fixed; top:4.5rem; left:0; right:0; z-index:99; background:rgba(10,10,8,0.9); border-bottom:1px solid var(--border); padding:0.6rem 0; overflow:hidden; }
-  .ticker-track { display:flex; gap:5rem; animation:ticker 35s linear infinite; white-space:nowrap; }
+  .ticker {
+    position:fixed;
+    top:4.4rem;
+    left:0;
+    right:0;
+    z-index:90;
+    background:rgba(10,10,8,0.9);
+    border-top:1px solid rgba(200,169,110,0.14);
+    border-bottom:1px solid rgba(200,169,110,0.2);
+    padding:0.55rem 0;
+    overflow:hidden;
+  }
+  .ticker-track { display:flex; gap:4rem; animation:ticker 36s linear infinite; white-space:nowrap; }
   @keyframes ticker { from{transform:translateX(0)} to{transform:translateX(-50%)} }
-  .tick { font-family:'DM Mono',monospace; font-size:0.68rem; color:var(--grey); flex-shrink:0; }
-  .tick .hi { color:var(--gold); } .tick .up { color:var(--green); } .tick .dn { color:var(--red); }
+  .tick { font-family:'DM Mono',monospace; font-size:0.66rem; color:var(--text-muted); flex-shrink:0; letter-spacing:0.04em; }
+  .tick .hi { color:var(--text-body); } .tick .up { color:var(--ok); } .tick .dn { color:var(--down); }
 
   /* HERO */
-  .hero { min-height:100vh; display:grid; grid-template-columns:1fr 1fr; padding-top:7.5rem; overflow:hidden; }
-  .hero-left { padding:6rem 4rem 4rem; display:flex; flex-direction:column; justify-content:center; }
-  .hero-tag { font-family:'DM Mono',monospace; font-size:0.68rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); margin-bottom:2rem; display:flex; align-items:center; gap:0.75rem; }
-  .hero-tag::before { content:''; width:2rem; height:1px; background:var(--gold); }
-  .hero-h1 { font-size:clamp(2.8rem,4.5vw,5rem); font-weight:800; line-height:0.95; letter-spacing:-0.03em; margin-bottom:2rem; }
-  .hero-h1 em { font-style:normal; color:var(--gold); }
-  .hero-sub { font-family:'DM Mono',monospace; font-size:0.88rem; line-height:1.75; color:var(--grey); max-width:40ch; margin-bottom:2.5rem; }
-  .city-pills { display:flex; gap:0.6rem; margin-bottom:2.5rem; }
-  .pill { font-family:'DM Mono',monospace; font-size:0.65rem; letter-spacing:0.1em; text-transform:uppercase; border:1px solid var(--border); padding:0.3rem 0.75rem; color:var(--gold); }
-  .pill.active { background:rgba(200,169,110,0.12); }
-  .hero-actions { display:flex; gap:1rem; align-items:center; }
-  .btn-p { background:var(--gold); color:var(--black); border:none; padding:0.9rem 2rem; font-family:'Syne',sans-serif; font-size:0.88rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; cursor:pointer; transition:all 0.2s; }
-  .btn-p:hover { background:var(--gold-light); transform:translateY(-1px); }
-  .btn-g { background:transparent; color:var(--white); border:1px solid var(--border); padding:0.9rem 1.8rem; font-family:'DM Mono',monospace; font-size:0.72rem; letter-spacing:0.08em; text-transform:uppercase; cursor:pointer; transition:all 0.2s; }
-  .btn-g:hover { border-color:var(--gold); color:var(--gold); }
+  .hero {
+    min-height:100vh;
+    display:grid;
+    grid-template-columns:1.05fr 0.95fr;
+    column-gap:2.5rem;
+    padding:8.2rem 3rem 2rem;
+    max-width:1240px;
+    margin:0 auto;
+    overflow:hidden;
+  }
+  .hero-left {
+    padding:3.4rem 2.6rem 2.6rem;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    border:1px solid var(--border);
+    border-radius:var(--radius-lg);
+    background:rgba(255,255,255,0.02);
+  }
+  .hero-tag { font-family:'DM Mono',monospace; font-size:0.68rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--gold); margin-bottom:1.5rem; display:flex; align-items:center; gap:0.7rem; }
+  .hero-tag::before { content:''; width:1.5rem; height:1px; background:var(--gold); }
+  .hero-h1 { font-size:clamp(2.7rem,4.9vw,5.2rem); font-weight:800; line-height:0.92; letter-spacing:-0.035em; margin-bottom:1.25rem; max-width:10ch; }
+  .hero-h1 em { font-style:normal; color:var(--gold-strong); }
+  .hero-sub { font-size:0.95rem; line-height:1.78; color:var(--text-body); max-width:53ch; margin-bottom:2rem; font-family:'DM Mono',monospace; }
+  .city-pills { display:flex; gap:0.6rem; flex-wrap:wrap; margin-bottom:2rem; }
+  .pill {
+    font-family:'DM Mono',monospace;
+    font-size:0.63rem;
+    letter-spacing:0.09em;
+    text-transform:uppercase;
+    border:1px solid var(--border);
+    border-radius:999px;
+    padding:0.38rem 0.8rem;
+    color:var(--text-body);
+    background: rgba(255,255,255,0.01);
+  }
+  .pill.active { border-color: rgba(200,169,110,0.44); background:var(--gold-soft); color: var(--gold-strong); }
+  .hero-actions { display:flex; gap:0.8rem; align-items:center; flex-wrap:wrap; }
+  .btn-p, .btn-g, .card-btn, .fs {
+    border-radius: var(--radius-sm);
+    transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease;
+  }
+  .btn-p {
+    background:var(--gold);
+    color:#111;
+    border:1px solid transparent;
+    padding:0.88rem 1.4rem;
+    font-size:0.8rem;
+    font-weight:700;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+  }
+  .btn-p:hover { background:var(--gold-strong); transform:translateY(-1px); }
+  .btn-g {
+    background:transparent;
+    color:var(--text-strong);
+    border:1px solid var(--border);
+    padding:0.88rem 1.3rem;
+    font-family:'DM Mono',monospace;
+    font-size:0.69rem;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+  }
+  .btn-g:hover { border-color:rgba(200,169,110,0.55); color:var(--gold-strong); }
 
   /* HERO CARD */
-  .hero-right { display:flex; align-items:center; justify-content:center; padding:4rem; position:relative; }
-  .hero-right::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse at center, rgba(200,169,110,0.07) 0%, transparent 70%); pointer-events:none; }
-  .card { width:340px; border:1px solid var(--border); background:rgba(255,255,255,0.03); backdrop-filter:blur(8px); padding:2rem; animation:float 6s ease-in-out infinite; }
-  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
-  .card-live { display:flex; align-items:center; gap:0.5rem; font-family:'DM Mono',monospace; font-size:0.62rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--gold); margin-bottom:1.5rem; }
-  .dot { width:6px; height:6px; border-radius:50%; background:var(--gold); animation:pulse 2s ease-in-out infinite; }
-  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.8)} }
-  .card-city { font-family:'DM Mono',monospace; font-size:0.6rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--gold); background:rgba(200,169,110,0.1); padding:0.2rem 0.5rem; display:inline-block; margin-bottom:0.75rem; }
-  .card-addr { font-size:1rem; font-weight:700; margin-bottom:0.2rem; }
-  .card-hood { font-family:'DM Mono',monospace; font-size:0.68rem; color:var(--grey); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:1.5rem; }
-  .card-price { font-size:1.9rem; font-weight:800; margin-bottom:0.5rem; }
-  .card-val { display:flex; align-items:center; gap:0.5rem; margin-bottom:1.5rem; }
-  .chip { font-family:'DM Mono',monospace; font-size:0.62rem; padding:0.2rem 0.5rem; }
-  .chip-under { background:rgba(46,213,115,0.15); color:var(--green); }
-  .chip-note { font-family:'DM Mono',monospace; font-size:0.62rem; color:var(--grey); }
-  .card-stats { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem; border-top:1px solid var(--border); border-bottom:1px solid var(--border); padding:1.25rem 0; margin-bottom:1.25rem; }
+  .hero-right { display:flex; align-items:center; justify-content:center; padding:1rem 1rem 0.5rem; position:relative; }
+  .card {
+    width:min(420px, 100%);
+    border:1px solid var(--border);
+    border-radius:var(--radius-lg);
+    background:rgba(255,255,255,0.03);
+    backdrop-filter:blur(12px);
+    padding:2.2rem;
+    box-shadow: var(--shadow-lg);
+    animation:float 6.5s ease-in-out infinite;
+  }
+  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
+  .card-live { display:flex; align-items:center; gap:0.5rem; font-family:'DM Mono',monospace; font-size:0.62rem; letter-spacing:0.13em; text-transform:uppercase; color:var(--gold-strong); margin-bottom:1.3rem; }
+  .dot { width:7px; height:7px; border-radius:50%; background:var(--gold); animation:pulse 2.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.45;transform:scale(0.85)} }
+  .card-city { font-family:'DM Mono',monospace; font-size:0.58rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold-strong); background:var(--gold-soft); border:1px solid rgba(200,169,110,0.32); border-radius:999px; padding:0.22rem 0.58rem; display:inline-block; margin-bottom:0.85rem; }
+  .card-addr { font-size:1.03rem; font-weight:700; margin-bottom:0.25rem; line-height:1.35; }
+  .card-hood { font-family:'DM Mono',monospace; font-size:0.66rem; color:var(--text-muted); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:1.25rem; }
+  .card-price { font-size:2rem; font-weight:800; margin-bottom:0.55rem; }
+  .card-val { display:flex; align-items:center; gap:0.5rem; margin-bottom:1.35rem; flex-wrap:wrap; }
+  .chip { font-family:'DM Mono',monospace; font-size:0.6rem; padding:0.23rem 0.56rem; border-radius:999px; }
+  .chip-under { background:rgba(73,202,132,0.17); color:var(--ok); border:1px solid rgba(73,202,132,0.3); }
+  .chip-note { font-family:'DM Mono',monospace; font-size:0.62rem; color:var(--text-muted); }
+  .card-stats { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem; border-top:1px solid var(--border); border-bottom:1px solid var(--border); padding:1.15rem 0; margin-bottom:1.1rem; }
   .stat { text-align:center; }
-  .stat-v { font-size:1.05rem; font-weight:700; }
-  .stat-l { font-family:'DM Mono',monospace; font-size:0.58rem; color:var(--grey); text-transform:uppercase; letter-spacing:0.08em; margin-top:0.2rem; }
-  .card-btn { width:100%; background:var(--gold); color:var(--black); border:none; padding:0.75rem; font-family:'DM Mono',monospace; font-size:0.68rem; font-weight:500; letter-spacing:0.08em; text-transform:uppercase; cursor:pointer; transition:all 0.2s; }
-  .card-btn:hover { background:var(--gold-light); }
+  .stat-v { font-size:1.03rem; font-weight:700; }
+  .stat-l { font-family:'DM Mono',monospace; font-size:0.58rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.08em; margin-top:0.25rem; }
+  .card-btn { width:100%; background:var(--gold); color:#111; border:1px solid transparent; padding:0.78rem; font-family:'DM Mono',monospace; font-size:0.66rem; font-weight:600; letter-spacing:0.09em; text-transform:uppercase; }
+  .card-btn:hover { background:var(--gold-strong); }
 
   /* STATS */
-  .stats-strip { display:grid; grid-template-columns:repeat(4,1fr); border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
-  .ss-item { padding:2.5rem 2.5rem; border-right:1px solid var(--border); }
+  .stats-strip {
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    border-top:1px solid var(--border);
+    border-bottom:1px solid var(--border);
+    background:rgba(255,255,255,0.01);
+    max-width:1240px;
+    margin:0 auto;
+  }
+  .ss-item { padding:2.15rem 2rem; border-right:1px solid var(--border); }
   .ss-item:last-child { border-right:none; }
-  .ss-num { font-size:2.8rem; font-weight:800; color:var(--gold); line-height:1; margin-bottom:0.4rem; }
-  .ss-label { font-family:'DM Mono',monospace; font-size:0.68rem; color:var(--grey); letter-spacing:0.08em; text-transform:uppercase; }
+  .ss-num { font-size:2.4rem; font-weight:800; color:var(--gold-strong); line-height:1; margin-bottom:0.5rem; }
+  .ss-label { font-family:'DM Mono',monospace; font-size:0.66rem; color:var(--text-muted); letter-spacing:0.08em; text-transform:uppercase; }
 
   /* SECTIONS */
-  .section { padding:7rem 4rem; }
-  .sec-tag { font-family:'DM Mono',monospace; font-size:0.62rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold); margin-bottom:0.75rem; }
-  .sec-h2 { font-size:clamp(1.8rem,3vw,3.2rem); font-weight:800; line-height:1.05; letter-spacing:-0.02em; margin-bottom:4rem; max-width:22ch; }
+  .section { padding:5.5rem 3rem; max-width:1240px; margin:0 auto; }
+  .sec-tag { font-family:'DM Mono',monospace; font-size:0.62rem; letter-spacing:0.19em; text-transform:uppercase; color:var(--gold-strong); margin-bottom:0.8rem; }
+  .sec-h2 { font-size:clamp(2rem,3vw,3.25rem); font-weight:800; line-height:1.04; letter-spacing:-0.02em; margin-bottom:3rem; max-width:22ch; }
 
   /* STEPS */
-  .steps { display:grid; grid-template-columns:repeat(4,1fr); gap:2px; }
-  .step { background:rgba(255,255,255,0.02); border:1px solid var(--border); padding:2.5rem 2rem; transition:background 0.3s; }
-  .step:hover { background:rgba(200,169,110,0.04); }
-  .step-n { font-family:'DM Mono',monospace; font-size:0.62rem; color:var(--gold); letter-spacing:0.18em; margin-bottom:1.25rem; }
-  .step-ico { font-size:1.4rem; margin-bottom:0.75rem; }
-  .step-t { font-size:1.05rem; font-weight:700; margin-bottom:0.6rem; }
-  .step-d { font-family:'DM Mono',monospace; font-size:0.74rem; line-height:1.7; color:var(--grey); }
+  .steps { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; }
+  .step {
+    background:rgba(255,255,255,0.02);
+    border:1px solid var(--border);
+    border-radius:var(--radius-md);
+    padding:2rem 1.6rem;
+    transition:background-color 220ms ease, border-color 220ms ease, transform 220ms ease;
+  }
+  .step:hover { background:rgba(200,169,110,0.04); border-color:rgba(200,169,110,0.45); transform:translateY(-3px); }
+  .step-n { font-family:'DM Mono',monospace; font-size:0.6rem; color:var(--gold-strong); letter-spacing:0.18em; margin-bottom:1rem; }
+  .step-ico {
+    font-family:'DM Mono',monospace;
+    font-size:0.56rem;
+    color:var(--gold-strong);
+    border:1px solid rgba(200,169,110,0.35);
+    border-radius:999px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:0 0.7rem;
+    min-width:2rem;
+    height:2rem;
+    margin-bottom:0.9rem;
+    letter-spacing:0.09em;
+    text-transform:uppercase;
+  }
+  .step-t { font-size:1.08rem; font-weight:700; margin-bottom:0.65rem; line-height:1.35; }
+  .step-d { font-size:0.87rem; line-height:1.7; color:var(--text-body); }
 
   /* FEATURES */
-  .features { padding:7rem 4rem; background:rgba(255,255,255,0.01); border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
-  .feat-grid { display:grid; grid-template-columns:1fr 1fr; gap:2px; margin-top:4rem; }
-  .feat { padding:3rem; border:1px solid var(--border); position:relative; overflow:hidden; }
-  .feat::after { content:''; position:absolute; bottom:0; left:0; right:0; height:2px; background:linear-gradient(90deg,var(--gold),transparent); transform:scaleX(0); transform-origin:left; transition:transform 0.4s; }
+  .features {
+    padding:5.5rem 3rem;
+    background:rgba(255,255,255,0.015);
+    border-top:1px solid var(--border);
+    border-bottom:1px solid var(--border);
+    max-width:1240px;
+    margin:0 auto;
+  }
+  .feat-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.95rem; margin-top:2.5rem; }
+  .feat {
+    padding:2.3rem;
+    border:1px solid var(--border);
+    border-radius:var(--radius-md);
+    background:rgba(255,255,255,0.02);
+    position:relative;
+    overflow:hidden;
+    transition:border-color 220ms ease, transform 220ms ease, background-color 220ms ease;
+  }
+  .feat:hover { border-color:rgba(200,169,110,0.45); transform:translateY(-3px); background:rgba(200,169,110,0.04); }
+  .feat::after { content:''; position:absolute; bottom:0; left:0; right:0; height:2px; background:linear-gradient(90deg,var(--gold),transparent); transform:scaleX(0); transform-origin:left; transition:transform 280ms ease; }
   .feat:hover::after { transform:scaleX(1); }
-  .feat-label { font-family:'DM Mono',monospace; font-size:0.62rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); margin-bottom:0.75rem; }
-  .feat-t { font-size:1.25rem; font-weight:700; margin-bottom:0.75rem; line-height:1.2; }
-  .feat-d { font-family:'DM Mono',monospace; font-size:0.76rem; line-height:1.75; color:var(--grey); }
+  .feat-label { font-family:'DM Mono',monospace; font-size:0.6rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--gold-strong); margin-bottom:0.8rem; }
+  .feat-t { font-size:1.3rem; font-weight:700; margin-bottom:0.85rem; line-height:1.28; }
+  .feat-d { font-size:0.9rem; line-height:1.74; color:var(--text-body); max-width:52ch; }
 
   /* ALERT FORM */
-  .alert-sec { padding:7rem 4rem; display:grid; grid-template-columns:1fr 1fr; gap:5rem; align-items:start; }
-  .form-box { border:1px solid var(--border); padding:2.5rem; background:rgba(255,255,255,0.02); }
-  .form-t { font-size:1.1rem; font-weight:700; margin-bottom:0.4rem; }
-  .form-sub { font-family:'DM Mono',monospace; font-size:0.72rem; color:var(--grey); margin-bottom:2rem; line-height:1.6; }
-  .fg { margin-bottom:1.1rem; }
-  .fl { display:block; font-family:'DM Mono',monospace; font-size:0.62rem; letter-spacing:0.13em; text-transform:uppercase; color:var(--grey); margin-bottom:0.4rem; }
-  .fi { width:100%; background:rgba(255,255,255,0.05); border:1px solid var(--border); color:var(--white); padding:0.7rem 0.9rem; font-family:'DM Mono',monospace; font-size:0.82rem; outline:none; transition:border-color 0.2s; }
-  .fi:focus { border-color:var(--gold); }
-  .fi::placeholder { color:var(--grey); }
-  .form-row { display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; }
-  .city-check { display:flex; gap:1rem; }
-  .city-check label { display:flex; align-items:center; gap:0.4rem; font-family:'DM Mono',monospace; font-size:0.72rem; color:var(--grey); cursor:pointer; }
+  .alert-sec {
+    padding:5.5rem 3rem;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:3.5rem;
+    align-items:start;
+    max-width:1240px;
+    margin:0 auto;
+  }
+  .form-box {
+    border:1px solid var(--border);
+    border-radius:var(--radius-lg);
+    padding:2.1rem;
+    background:rgba(255,255,255,0.02);
+    box-shadow: var(--shadow-md);
+  }
+  .form-t { font-size:1.2rem; font-weight:700; margin-bottom:0.35rem; }
+  .form-sub { font-size:0.87rem; color:var(--text-body); margin-bottom:1.7rem; line-height:1.6; max-width:44ch; }
+  .fg { margin-bottom:0.95rem; }
+  .fl { display:block; font-family:'DM Mono',monospace; font-size:0.62rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.48rem; }
+  .fi {
+    width:100%;
+    background:var(--surface-1);
+    border:1px solid rgba(200,169,110,0.22);
+    border-radius:var(--radius-sm);
+    color:var(--text-strong);
+    padding:0.72rem 0.84rem;
+    font-family:'DM Mono',monospace;
+    font-size:0.81rem;
+    outline:none;
+    transition:border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+  }
+  .fi:focus { border-color:var(--gold-strong); box-shadow:0 0 0 3px var(--ring); background:var(--surface-2); }
+  .fi::placeholder { color:var(--text-muted); }
+  .form-row { display:grid; grid-template-columns:1fr 1fr; gap:0.72rem; }
+  .city-check { display:flex; gap:1rem; flex-wrap:wrap; }
+  .city-check label { display:flex; align-items:center; gap:0.4rem; font-family:'DM Mono',monospace; font-size:0.72rem; color:var(--text-body); }
   .city-check input { accent-color:var(--gold); }
-  .fs { width:100%; background:var(--gold); color:var(--black); border:none; padding:0.9rem; font-family:'Syne',sans-serif; font-size:0.88rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; cursor:pointer; margin-top:0.5rem; transition:background 0.2s; }
-  .fs:hover { background:var(--gold-light); }
+  .fs {
+    width:100%;
+    background:var(--gold);
+    color:#111;
+    border:1px solid transparent;
+    padding:0.88rem;
+    font-size:0.82rem;
+    font-weight:700;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    margin-top:0.45rem;
+  }
+  .fs:hover { background:var(--gold-strong); transform:translateY(-1px); }
+  #formMsg { font-family:'DM Mono',monospace; font-size:0.66rem; margin-top:0.75rem; display:none; line-height:1.6; }
 
   /* STACK */
-  .stack-list { margin-top:2.5rem; }
-  .stack-item { display:flex; align-items:center; justify-content:space-between; padding:1.1rem 0; border-bottom:1px solid var(--border); }
+  .stack-list { margin-top:2rem; max-width:38rem; }
+  .stack-item { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:0.95rem 0; border-bottom:1px solid var(--border); }
   .stack-item:last-child { border-bottom:none; }
-  .stack-name { font-size:0.95rem; font-weight:600; }
-  .stack-role { font-family:'DM Mono',monospace; font-size:0.68rem; color:var(--grey); margin-top:0.15rem; }
-  .stack-badge { font-family:'DM Mono',monospace; font-size:0.58rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--gold); border:1px solid rgba(200,169,110,0.3); padding:0.18rem 0.5rem; }
+  .stack-name { font-size:0.96rem; font-weight:600; }
+  .stack-role { font-family:'DM Mono',monospace; font-size:0.67rem; color:var(--text-muted); margin-top:0.15rem; letter-spacing:0.03em; }
+  .stack-badge { font-family:'DM Mono',monospace; font-size:0.56rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--gold-strong); border:1px solid rgba(200,169,110,0.33); border-radius:999px; padding:0.2rem 0.55rem; }
 
   /* FOOTER */
-  footer { border-top:1px solid var(--border); padding:2.5rem 4rem; display:flex; justify-content:space-between; align-items:center; }
-  .footer-logo { font-size:1.1rem; font-weight:800; }
+  footer {
+    border-top:1px solid var(--border);
+    padding:2rem 3rem;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:1rem;
+    max-width:1240px;
+    margin:0 auto;
+  }
+  .footer-logo { font-size:1.05rem; font-weight:800; }
   .footer-logo span { color:var(--gold); }
-  .footer-copy { font-family:'DM Mono',monospace; font-size:0.62rem; color:var(--grey); }
+  .footer-copy { font-family:'DM Mono',monospace; font-size:0.6rem; color:var(--text-muted); letter-spacing:0.04em; }
 
   /* ANIMATIONS */
-  @keyframes fadeUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
-  .hero-left > * { animation:fadeUp 0.7s ease forwards; opacity:0; }
-  .hero-left > *:nth-child(1){animation-delay:0.1s}
-  .hero-left > *:nth-child(2){animation-delay:0.2s}
-  .hero-left > *:nth-child(3){animation-delay:0.3s}
-  .hero-left > *:nth-child(4){animation-delay:0.4s}
-  .hero-left > *:nth-child(5){animation-delay:0.5s}
+  @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+  .hero-left > * { animation:fadeUp 560ms ease forwards; opacity:0; }
+  .hero-left > *:nth-child(1){animation-delay:0.06s}
+  .hero-left > *:nth-child(2){animation-delay:0.12s}
+  .hero-left > *:nth-child(3){animation-delay:0.18s}
+  .hero-left > *:nth-child(4){animation-delay:0.24s}
+  .hero-left > *:nth-child(5){animation-delay:0.3s}
 
-  @media(max-width:900px){
-    nav{padding:1.25rem 1.5rem} .nav-links{display:none}
-    .hero{grid-template-columns:1fr} .hero-right{display:none} .hero-left{padding:6rem 1.5rem 3rem}
-    .stats-strip{grid-template-columns:1fr 1fr}
-    .section,.features,.alert-sec{padding:4rem 1.5rem}
-    .steps{grid-template-columns:1fr 1fr} .feat-grid{grid-template-columns:1fr}
-    .alert-sec{grid-template-columns:1fr;gap:3rem}
-    footer{flex-direction:column;gap:0.75rem;text-align:center}
+  @media(max-width:1080px){
+    nav { padding:0.9rem 1.2rem; }
+    .hero { grid-template-columns:1fr; }
+    .hero-right { padding-top:0.4rem; }
+    .hero-left { padding:2rem 1.6rem; }
+    .section,.features,.alert-sec,footer { padding-left:1.6rem; padding-right:1.6rem; }
+    .steps { grid-template-columns:1fr 1fr; }
+  }
+  @media(max-width:860px){
+    .nav-links { display:none; }
+    .ticker { top:4.5rem; }
+    .hero { padding-top:7.1rem; padding-left:1.2rem; padding-right:1.2rem; }
+    .hero-right { display:none; }
+    .stats-strip { grid-template-columns:1fr 1fr; }
+    .ss-item { padding:1.5rem; }
+    .section,.features,.alert-sec { padding:4rem 1.2rem; }
+    .feat-grid { grid-template-columns:1fr; }
+    .alert-sec { grid-template-columns:1fr; gap:2.6rem; }
+    .form-row { grid-template-columns:1fr; gap:0; }
+    footer { flex-direction:column; text-align:center; padding:1.8rem 1.2rem; }
+  }
+  @media(max-width:460px){
+    .hero-left { padding:4.9rem 1.1rem 1.1rem; }
+    .hero-h1 { font-size:clamp(2rem, 13vw, 2.5rem); }
+    .hero-sub { font-size:0.93rem; }
+    .steps { grid-template-columns:1fr; }
+    .stats-strip { grid-template-columns:1fr; }
+    .card { width:100%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation:none !important; transition:none !important; scroll-behavior:auto !important; }
+    .ticker-track { animation:none !important; }
   }
 </style>
 </head>
@@ -179,20 +426,20 @@
 
 <div class="ticker">
   <div class="ticker-track">
-    <span class="tick">🏠 King West 2BR — <span class="hi">$899K</span> → Fair Value <span class="up">+4.2% underpriced</span></span>
-    <span class="tick">🏢 Square One Condo — <span class="hi">$549K</span> → Agent contacted ✓</span>
-    <span class="tick">🏡 Port Credit Semi — <span class="hi">$1.1M</span> → Comp avg $1.08M <span class="dn">-1.8%</span></span>
-    <span class="tick">📍 Mississauga — 5 new listings matched your alert</span>
-    <span class="tick">🏠 Leslieville Detached — <span class="hi">$1.35M</span> → Fair Value <span class="up">+6.1% underpriced</span></span>
-    <span class="tick">⚡ Eglinton Crosstown corridor — avg +$42K premium in transit-adjacent listings</span>
-    <span class="tick">🏠 Erin Mills 3BR — <span class="hi">$1.05M</span> → <span class="up">5 comps pulled, showing booked</span></span>
-    <span class="tick">🏠 King West 2BR — <span class="hi">$899K</span> → Fair Value <span class="up">+4.2% underpriced</span></span>
-    <span class="tick">🏢 Square One Condo — <span class="hi">$549K</span> → Agent contacted ✓</span>
-    <span class="tick">🏡 Port Credit Semi — <span class="hi">$1.1M</span> → Comp avg $1.08M <span class="dn">-1.8%</span></span>
-    <span class="tick">📍 Mississauga — 5 new listings matched your alert</span>
-    <span class="tick">🏠 Leslieville Detached — <span class="hi">$1.35M</span> → Fair Value <span class="up">+6.1% underpriced</span></span>
-    <span class="tick">⚡ Eglinton Crosstown corridor — avg +$42K premium in transit-adjacent listings</span>
-    <span class="tick">🏠 Erin Mills 3BR — <span class="hi">$1.05M</span> → <span class="up">5 comps pulled, showing booked</span></span>
+    <span class="tick">King West 2BR - <span class="hi">$899K</span> - Fair Value <span class="up">+4.2% underpriced</span></span>
+    <span class="tick">Square One Condo - <span class="hi">$549K</span> - Agent contacted successfully</span>
+    <span class="tick">Port Credit Semi - <span class="hi">$1.1M</span> - Comp avg $1.08M <span class="dn">-1.8%</span></span>
+    <span class="tick">Mississauga - 5 new listings matched your alert</span>
+    <span class="tick">Leslieville Detached - <span class="hi">$1.35M</span> - Fair Value <span class="up">+6.1% underpriced</span></span>
+    <span class="tick">Eglinton Crosstown corridor - avg +$42K premium in transit-adjacent listings</span>
+    <span class="tick">Erin Mills 3BR - <span class="hi">$1.05M</span> - <span class="up">5 comps pulled, showing booked</span></span>
+    <span class="tick">King West 2BR - <span class="hi">$899K</span> - Fair Value <span class="up">+4.2% underpriced</span></span>
+    <span class="tick">Square One Condo - <span class="hi">$549K</span> - Agent contacted successfully</span>
+    <span class="tick">Port Credit Semi - <span class="hi">$1.1M</span> - Comp avg $1.08M <span class="dn">-1.8%</span></span>
+    <span class="tick">Mississauga - 5 new listings matched your alert</span>
+    <span class="tick">Leslieville Detached - <span class="hi">$1.35M</span> - Fair Value <span class="up">+6.1% underpriced</span></span>
+    <span class="tick">Eglinton Crosstown corridor - avg +$42K premium in transit-adjacent listings</span>
+    <span class="tick">Erin Mills 3BR - <span class="hi">$1.05M</span> - <span class="up">5 comps pulled, showing booked</span></span>
   </div>
 </div>
 
@@ -227,7 +474,7 @@
         <div class="stat"><div class="stat-v">2</div><div class="stat-l">Baths</div></div>
         <div class="stat"><div class="stat-v">11</div><div class="stat-l">DOM</div></div>
       </div>
-      <button class="card-btn" id="outreachBtn" onclick="simulateOutreach()">📨 Contact Agent</button>
+      <button class="card-btn" id="outreachBtn" onclick="simulateOutreach()">Contact Agent</button>
     </div>
   </div>
 </section>
@@ -243,10 +490,10 @@
   <div class="sec-tag">Process</div>
   <h2 class="sec-h2">Four steps while you live your life</h2>
   <div class="steps">
-    <div class="step"><div class="step-n">01 / 04</div><div class="step-ico">🔍</div><div class="step-t">You set your criteria</div><div class="step-d">Price, city (Toronto, Mississauga, or both), neighbourhood, property type, beds. Takes 90 seconds.</div></div>
-    <div class="step"><div class="step-n">02 / 04</div><div class="step-ico">🤖</div><div class="step-t">Agent scrapes nightly</div><div class="step-d">Hits Realtor.ca, HouseSigma, Zolo, and Zoocasa every night. New listings in your dashboard every morning.</div></div>
-    <div class="step"><div class="step-n">03 / 04</div><div class="step-ico">📊</div><div class="step-t">AI valuates each match</div><div class="step-d">Every listing is priced against real sold comps. Overpriced listings are filtered. Underpriced ones flagged with a delta.</div></div>
-    <div class="step"><div class="step-n">04 / 04</div><div class="step-ico">📨</div><div class="step-t">Agent contacts listing agents</div><div class="step-d">For qualified matches, 416Homes drafts and sends professional outreach requesting showings — fully autonomous.</div></div>
+    <div class="step"><div class="step-n">01 / 04</div><div class="step-ico">Find</div><div class="step-t">You set your criteria</div><div class="step-d">Price, city (Toronto, Mississauga, or both), neighbourhood, property type, beds. Takes 90 seconds.</div></div>
+    <div class="step"><div class="step-n">02 / 04</div><div class="step-ico">Scan</div><div class="step-t">Agent scrapes nightly</div><div class="step-d">Hits Realtor.ca, HouseSigma, Zolo, and Zoocasa every night. New listings in your dashboard every morning.</div></div>
+    <div class="step"><div class="step-n">03 / 04</div><div class="step-ico">Value</div><div class="step-t">AI valuates each match</div><div class="step-d">Every listing is priced against real sold comps. Overpriced listings are filtered. Underpriced ones flagged with a delta.</div></div>
+    <div class="step"><div class="step-n">04 / 04</div><div class="step-ico">Reach</div><div class="step-t">Agent contacts listing agents</div><div class="step-d">For qualified matches, 416Homes drafts and sends professional outreach requesting showings - fully autonomous.</div></div>
   </div>
 </section>
 
@@ -265,7 +512,7 @@
   <div>
     <div class="sec-tag">Early Access — Free</div>
     <h2 class="sec-h2" style="margin-bottom:1.25rem">Set your search.<br>Walk away.</h2>
-    <p style="font-family:'DM Mono',monospace;font-size:0.8rem;line-height:1.8;color:var(--grey);max-width:38ch;">Define your criteria once. 416Homes monitors Toronto and Mississauga every night and surfaces only the listings worth your attention — with AI valuation included.</p>
+    <p style="font-family:'DM Mono',monospace;font-size:0.8rem;line-height:1.8;color:var(--text-body);max-width:38ch;">Define your criteria once. 416Homes monitors Toronto and Mississauga every night and surfaces only the listings worth your attention — with AI valuation included.</p>
     <div class="stack-list">
       <div class="stack-item"><div><div class="stack-name">Gemini 2.0 Flash</div><div class="stack-role">Agent LLM + embeddings</div></div><span class="stack-badge">Free</span></div>
       <div class="stack-item"><div><div class="stack-name">Supabase + pgvector</div><div class="stack-role">Database + semantic search</div></div><span class="stack-badge">Free</span></div>
@@ -294,15 +541,15 @@
       <div class="fg"><label class="fl">Property Type</label><input type="text" class="fi" placeholder="Condo, Detached..." id="propType"></div>
     </div>
     <div class="fg"><label class="fl">Neighbourhoods (optional)</label><input type="text" class="fi" placeholder="Port Credit, King West, Erin Mills..." id="hoods"></div>
-    <button class="fs" onclick="submitAlert()">Activate My Agent →</button>
+      <button class="fs" onclick="submitAlert()">Activate My Agent</button>
     <p id="formMsg" style="font-family:'DM Mono',monospace;font-size:0.68rem;margin-top:0.75rem;display:none;"></p>
   </div>
 </section>
 
 <footer>
   <div class="footer-logo"><span>416</span>Homes</div>
-  <div class="footer-copy">Covering Toronto &amp; Mississauga · Powered by Gemini + open-source tooling</div>
-  <div class="footer-copy">© 2025 416Homes · Early Access</div>
+  <div class="footer-copy">Covering Toronto &amp; Mississauga - Powered by Gemini + open-source tooling</div>
+  <div class="footer-copy">&copy; 2025 416Homes - Early Access</div>
 </footer>
 
 <script>
@@ -312,15 +559,15 @@ function scrollTo(id) { document.getElementById(id).scrollIntoView({behavior:'sm
 
 async function simulateOutreach() {
   const btn = document.getElementById('outreachBtn');
-  btn.textContent = '⏳ Triggering agent...';
-  btn.style.cssText = 'background:#1a1a18;color:var(--gold);cursor:default;width:100%;border:none;padding:0.75rem;font-family:"DM Mono",monospace;font-size:0.68rem;';
+  btn.textContent = 'Triggering agent...';
+  btn.style.cssText = 'background:#1a1a18;color:var(--gold);cursor:default;width:100%;border:1px solid rgba(200,169,110,0.3);padding:0.78rem;border-radius:8px;font-family:"DM Mono",monospace;font-size:0.66rem;letter-spacing:0.09em;text-transform:uppercase;';
   try {
     await fetch(`${API_BASE}/run-agent`, { method: 'POST' });
-    btn.textContent = '✅ Showing requested!';
-    btn.style.cssText = 'background:rgba(46,213,115,0.12);color:#2ed573;cursor:default;width:100%;border:none;padding:0.75rem;font-family:"DM Mono",monospace;font-size:0.68rem;';
+    btn.textContent = 'Showing requested';
+    btn.style.cssText = 'background:rgba(46,213,115,0.12);color:#2ed573;cursor:default;width:100%;border:1px solid rgba(46,213,115,0.32);padding:0.78rem;border-radius:8px;font-family:"DM Mono",monospace;font-size:0.66rem;letter-spacing:0.09em;text-transform:uppercase;';
   } catch {
-    btn.textContent = '✅ Request sent!';
-    btn.style.cssText = 'background:rgba(46,213,115,0.12);color:#2ed573;cursor:default;width:100%;border:none;padding:0.75rem;font-family:"DM Mono",monospace;font-size:0.68rem;';
+    btn.textContent = 'Request sent';
+    btn.style.cssText = 'background:rgba(46,213,115,0.12);color:#2ed573;cursor:default;width:100%;border:1px solid rgba(46,213,115,0.32);padding:0.78rem;border-radius:8px;font-family:"DM Mono",monospace;font-size:0.66rem;letter-spacing:0.09em;text-transform:uppercase;';
   }
 }
 
@@ -328,9 +575,9 @@ async function submitAlert() {
   const email = document.getElementById('alertEmail').value.trim();
   const msg = document.getElementById('formMsg');
   if (!email || !email.includes('@')) {
-    msg.style.color = '#c0392b'; msg.textContent = '⚠ Please enter a valid email.'; msg.style.display = 'block'; return;
+    msg.style.color = '#c0392b'; msg.textContent = 'Please enter a valid email.'; msg.style.display = 'block'; return;
   }
-  msg.style.color = 'var(--gold)'; msg.textContent = '⏳ Setting up your alert...'; msg.style.display = 'block';
+  msg.style.color = 'var(--gold)'; msg.textContent = 'Setting up your alert...'; msg.style.display = 'block';
 
   const cities = [];
   if (document.getElementById('chkToronto').checked) cities.push('Toronto');
@@ -359,15 +606,15 @@ async function submitAlert() {
     });
     if (resp.ok) {
       msg.style.color = '#2ed573';
-      msg.textContent = '✅ Alert active. 416Homes will scan Toronto + Mississauga tonight.';
+      msg.textContent = 'Alert active. 416Homes will scan Toronto + Mississauga tonight.';
     } else {
       const err = await resp.json().catch(() => ({}));
       msg.style.color = '#c0392b';
-      msg.textContent = `⚠ ${err.detail || 'Failed to create alert. Please try again.'}`;
+      msg.textContent = err.detail || 'Failed to create alert. Please try again.';
     }
   } catch {
     msg.style.color = '#c0392b';
-    msg.textContent = '⚠ Network error. Please check your connection and try again.';
+    msg.textContent = 'Network error. Please check your connection and try again.';
   }
 }
 

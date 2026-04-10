@@ -8,13 +8,13 @@ import { fetchListings } from "@/lib/api";
 import type { Listing } from "@/types";
 
 const STATIC_TICKER = [
-  "🏠 King West 2BR — $899K → Fair Value +4.2% underpriced",
-  "🏢 Square One Condo — $549K → Agent contacted ✓",
-  "🏡 Port Credit Semi — $1.1M → Comp avg $1.08M -1.8%",
-  "📍 GTA — 5 new listings matched your alert",
-  "🏠 Leslieville Detached — $1.35M → Fair Value +6.1% underpriced",
-  "⚡ Eglinton Crosstown now open — transit-adjacent listings tracking +$38K premium",
-  "🏠 Erin Mills 3BR — $1.05M → 5 comps pulled, showing booked",
+  "King West 2BR - $899K - Fair Value +4.2% underpriced",
+  "Square One Condo - $549K - Agent contacted",
+  "Port Credit Semi - $1.1M - Comp avg $1.08M -1.8%",
+  "GTA - 5 new listings matched your alert",
+  "Leslieville Detached - $1.35M - Fair Value +6.1% underpriced",
+  "Eglinton Crosstown now open - transit-adjacent listings tracking +$38K premium",
+  "Erin Mills 3BR - $1.05M - 5 comps pulled, showing booked",
 ];
 
 function formatPrice(n: number) {
@@ -23,9 +23,14 @@ function formatPrice(n: number) {
   return `$${n}`;
 }
 
+function formatPriceFull(n: number) {
+  return `$${Math.max(0, n).toLocaleString()}`;
+}
+
 export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [tickerItems, setTickerItems] = useState<string[]>(STATIC_TICKER);
+  const [featuredListing, setFeaturedListing] = useState<Listing | null>(null);
 
   // Form state
   const [email, setEmail] = useState("");
@@ -71,9 +76,10 @@ export default function LandingPage() {
         if (listings.length > 0) {
           const items = listings.slice(0, 10).map(
             (l: Listing) =>
-              `🏠 ${l.address} — ${formatPrice(l.price)} → ${l.beds}bd/${l.baths}ba`,
+              `${l.address} - ${formatPrice(l.price)} - ${l.beds}bd/${l.baths}ba`,
           );
           setTickerItems(items);
+          setFeaturedListing(listings[0] ?? null);
         }
       })
       .catch(() => {
@@ -191,14 +197,14 @@ export default function LandingPage() {
             <li><button onClick={() => scrollToId("how")} className="hover:text-[#c8a96e]">How It Works</button></li>
             <li><button onClick={() => scrollToId("features")} className="hover:text-[#c8a96e]">Features</button></li>
             <li><button onClick={() => scrollToId("alert")} className="hover:text-[#c8a96e]">Get Started</button></li>
-            <li><Link href="/dashboard" className="text-[#c8a96e] hover:text-[#e4c98a]" onClick={() => setMenuOpen(false)}>Dashboard →</Link></li>
+            <li><Link href="/dashboard" className="text-[#c8a96e] hover:text-[#e4c98a]" onClick={() => setMenuOpen(false)}>Dashboard</Link></li>
           </ul>
         </div>
       )}
 
       {/* Ticker */}
       <div className="fixed left-0 right-0 top-[4.5rem] z-40 border-b border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.9)] py-2 max-md:hidden">
-        <div className="flex animate-[ticker_35s_linear_infinite] gap-20 whitespace-nowrap text-[0.68rem] font-['DM_Mono',monospace] text-[#6b6b60]">
+        <div className="ticker-track flex animate-[ticker_35s_linear_infinite] gap-20 whitespace-nowrap text-[0.68rem] font-['DM_Mono',monospace] text-[#6b6b60]">
           {displayTicker.map((text, idx) => (
             <span key={idx}>{text}</span>
           ))}
@@ -206,13 +212,13 @@ export default function LandingPage() {
       </div>
 
       {/* Hero */}
-      <section className="grid min-h-screen grid-cols-1 pt-[7.5rem] md:grid-cols-2">
-        <div className="flex flex-col justify-center px-16 pb-16 pt-24 max-md:px-6">
+      <section className="mx-auto grid min-h-screen max-w-[1240px] grid-cols-1 gap-10 px-12 pb-8 pt-[8.2rem] md:grid-cols-[1.05fr_0.95fr]">
+        <div className="flex flex-col justify-center rounded-[18px] border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.02)] px-10 py-12 max-md:px-6">
           <div className="mb-8 flex items-center gap-3 font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.18em] text-[#c8a96e]">
             <span className="h-px w-8 bg-[#c8a96e]" />
             Toronto &amp; Mississauga property search, done for you
           </div>
-          <h1 className="mb-8 text-[clamp(2.8rem,4.5vw,5rem)] font-extrabold leading-[0.95] tracking-[-0.03em]">
+          <h1 className="mb-6 text-[clamp(2.9rem,4.9vw,5.2rem)] font-extrabold leading-[0.92] tracking-[-0.035em]">
             Stop chasing.
             <br />
             Let listings
@@ -230,7 +236,7 @@ export default function LandingPage() {
               50+ Neighbourhoods
             </span>
           </div>
-          <p className="mb-10 max-w-[40ch] font-['DM_Mono',monospace] text-[0.88rem] leading-[1.75] text-[#6b6b60]">
+          <p className="mb-10 max-w-[53ch] font-['DM_Mono',monospace] text-[0.95rem] leading-[1.78] text-[#6b6b60]">
             416Homes watches 4 listing platforms around the clock, checks each property against what homes in that
             neighbourhood actually sold for, and reaches out to listing agents on your behalf — so you don&apos;t have to.
           </p>
@@ -245,35 +251,45 @@ export default function LandingPage() {
               className="border border-[rgba(200,169,110,0.2)] px-7 py-3 font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.08em] text-[#f5f4ef] transition-colors hover:border-[#c8a96e] hover:text-[#c8a96e]"
               onClick={() => scrollToId("how")}
             >
-              See How →
+              See How
             </button>
           </div>
         </div>
 
         {/* Hero card — illustrative example */}
-        <div className="relative hidden items-center justify-center p-16 md:flex">
+        <div className="relative hidden items-center justify-center px-4 py-6 md:flex">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(200,169,110,0.07)_0%,transparent_70%)]" />
-          <div className="w-[340px] animate-[float_6s_ease-in-out_infinite] border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.03)] p-8 backdrop-blur-md">
+          <div className="w-[420px] animate-[float_6s_ease-in-out_infinite] border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.03)] p-9 backdrop-blur-md">
             <div className="mb-6 flex items-center gap-2 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.15em] text-[#c8a96e]">
               <span className="h-[6px] w-[6px] animate-[pulse_2s_ease-in-out_infinite] rounded-full bg-[#c8a96e]" aria-hidden="true" />
               Live Update
             </div>
             <div className="mb-2 inline-block bg-[rgba(200,169,110,0.1)] px-2 py-1 font-['DM_Mono',monospace] text-[0.6rem] uppercase tracking-[0.15em] text-[#c8a96e]">
-              Mississauga
+              {featuredListing?.source ? featuredListing.source.toUpperCase() : "Mississauga"}
             </div>
-            <div className="mb-1 text-[1rem] font-bold">1480 Erin Mills Pkwy, Unit 12</div>
+            <div className="mb-1 text-[1rem] font-bold">
+              {featuredListing?.address ?? "1480 Erin Mills Pkwy, Unit 12"}
+            </div>
             <div className="mb-6 font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-[#6b6b60]">
-              Erin Mills · Example listing
+              {featuredListing ? "Live listing from your feed" : "Connecting to live listings..."}
             </div>
-            <div className="mb-2 text-[1.9rem] font-extrabold">$1,049,000</div>
+            <div className="mb-2 text-[1.9rem] font-extrabold">
+              {featuredListing ? formatPriceFull(featuredListing.price) : "$1,049,000"}
+            </div>
             <div className="mb-6 flex items-center gap-2">
               <span className="bg-[rgba(46,213,115,0.15)] px-2 py-0.5 font-['DM_Mono',monospace] text-[0.62rem] text-[#2ed573]">
-                ▲ 4.8% Underpriced
+                {featuredListing ? "Live from Supabase" : "Syncing listing data"}
               </span>
-              <span className="font-['DM_Mono',monospace] text-[0.62rem] text-[#6b6b60]">vs. 9 comps</span>
+              <span className="font-['DM_Mono',monospace] text-[0.62rem] text-[#6b6b60]">
+                {featuredListing ? "Auto-refreshed from listings API" : "Waiting for API"}
+              </span>
             </div>
             <div className="mb-5 grid grid-cols-3 gap-2 border-y border-[rgba(200,169,110,0.2)] py-5">
-              {[["3", "Beds"], ["2", "Baths"], ["11", "DOM"]].map(([v, l]) => (
+              {[
+                [featuredListing ? String(featuredListing.beds || "—") : "3", "Beds"],
+                [featuredListing ? String(featuredListing.baths || "—") : "2", "Baths"],
+                [featuredListing ? (featuredListing.sqft ? featuredListing.sqft.toLocaleString() : "—") : "11", featuredListing ? "Sq Ft" : "DOM"],
+              ].map(([v, l]) => (
                 <div key={l} className="text-center">
                   <div className="text-[1.05rem] font-bold">{v}</div>
                   <div className="mt-1 font-['DM_Mono',monospace] text-[0.58rem] uppercase tracking-[0.08em] text-[#6b6b60]">{l}</div>
@@ -284,14 +300,14 @@ export default function LandingPage() {
               href="/dashboard"
               className="block w-full bg-[#c8a96e] px-4 py-3 text-center font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-black transition-colors hover:bg-[#e4c98a]"
             >
-              View Live Listings →
+              View Live Listings
             </Link>
           </div>
         </div>
       </section>
 
       {/* Stats strip */}
-      <div className="grid border-y border-[rgba(200,169,110,0.2)] md:grid-cols-4">
+      <div className="mx-auto grid max-w-[1240px] border-y border-[rgba(200,169,110,0.2)] md:grid-cols-4">
         {[
           ["24/7", "Continuous monitoring"],
           ["50+", "GTA neighbourhoods"],
@@ -308,7 +324,7 @@ export default function LandingPage() {
       </div>
 
       {/* Process */}
-      <section id="how" className="px-16 py-28 max-md:px-6 max-md:py-16">
+      <section id="how" className="mx-auto max-w-[1240px] px-12 py-[5.5rem] max-md:px-6 max-md:py-16">
         <div className="mb-3 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.2em] text-[#c8a96e]">
           Process
         </div>
@@ -319,25 +335,25 @@ export default function LandingPage() {
           {[
             {
               n: "01 / 04",
-              icon: "🔍",
+              icon: "Find",
               t: "Tell us what you want",
               d: "Set your price range, cities, neighbourhood, property type and minimum beds. Takes about 90 seconds.",
             },
             {
               n: "02 / 04",
-              icon: "🏠",
+              icon: "Scan",
               t: "We scan every night",
               d: "Checks Realtor.ca, HouseSigma, Zolo, and Zoocasa nightly. Fresh listings appear in your dashboard every morning.",
             },
             {
               n: "03 / 04",
-              icon: "📊",
+              icon: "Value",
               t: "Every listing gets priced",
               d: "Each property is compared against what similar homes in that area actually sold for — not the asking price. Good deals get flagged with a clear number.",
             },
             {
               n: "04 / 04",
-              icon: "📨",
+              icon: "Reach",
               t: "We reach out to the agent",
               d: "When something matches your criteria, a professional note goes to the listing agent requesting a showing — so the email is already sent by the time you wake up.",
             },
@@ -349,7 +365,7 @@ export default function LandingPage() {
               <div className="mb-5 font-['DM_Mono',monospace] text-[0.62rem] tracking-[0.18em] text-[#c8a96e]">
                 {s.n}
               </div>
-              <div className="mb-3 text-[1.4rem]">{s.icon}</div>
+              <div className="mb-3 inline-flex min-h-8 min-w-8 items-center justify-center rounded-full border border-[rgba(200,169,110,0.3)] px-3 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.1em] text-[#c8a96e]">{s.icon}</div>
               <div className="mb-2 text-[1.05rem] font-bold">{s.t}</div>
               <div className="font-['DM_Mono',monospace] text-[0.74rem] leading-[1.7] text-[#6b6b60]">{s.d}</div>
             </div>
@@ -358,7 +374,7 @@ export default function LandingPage() {
       </section>
 
       {/* Intelligence */}
-      <section id="features" className="border-y border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.01)] px-16 py-28 max-md:px-6 max-md:py-16">
+      <section id="features" className="mx-auto max-w-[1240px] border-y border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.01)] px-12 py-[5.5rem] max-md:px-6 max-md:py-16">
         <div className="mb-3 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.2em] text-[#c8a96e]">
           Why it&apos;s different
         </div>
@@ -405,7 +421,7 @@ export default function LandingPage() {
       </section>
 
       {/* Alert section */}
-      <section id="alert" className="grid gap-20 px-16 py-28 md:grid-cols-2 max-md:px-6 max-md:py-16">
+      <section id="alert" className="mx-auto grid max-w-[1240px] gap-14 px-12 py-[5.5rem] md:grid-cols-2 max-md:px-6 max-md:py-16">
         <div>
           <div className="mb-3 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.2em] text-[#c8a96e]">
             Free to start
@@ -451,7 +467,7 @@ export default function LandingPage() {
               href="/dashboard"
               className="shrink-0 font-['DM_Mono',monospace] text-[0.7rem] uppercase tracking-[0.1em] text-[#c8a96e] no-underline hover:text-[#e4c98a]"
             >
-              Sign in or manage alerts →
+              Sign in or manage alerts
             </Link>
           </div>
           <p className="mb-8 font-['DM_Mono',monospace] text-[0.72rem] leading-[1.6] text-[#6b6b60]">
@@ -463,10 +479,10 @@ export default function LandingPage() {
               aria-live="polite"
               className="border border-[rgba(46,213,115,0.3)] bg-[rgba(46,213,115,0.08)] px-4 py-6 text-center font-['DM_Mono',monospace] text-[0.82rem] text-[#2ed573]"
             >
-              ✅ You&apos;re set. Check your inbox — we&apos;ll send your first matches tomorrow morning.
+              You&apos;re set. Check your inbox - we&apos;ll send your first matches tomorrow morning.
               <br />
               <Link href="/dashboard" className="mt-3 block text-[#c8a96e] hover:text-[#e4c98a]">
-                Manage your alerts in the dashboard →
+                Manage your alerts in the dashboard
               </Link>
             </div>
           ) : (
@@ -588,7 +604,7 @@ export default function LandingPage() {
                 disabled={submitting}
                 className="mt-1 w-full bg-[#c8a96e] px-4 py-3 font-['Syne',sans-serif] text-[0.88rem] font-bold uppercase tracking-[0.05em] text-black transition-colors hover:bg-[#e4c98a] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {submitting ? "Saving..." : "Activate My Alert →"}
+                {submitting ? "Saving..." : "Activate My Alert"}
               </button>
             </form>
           )}
@@ -596,7 +612,7 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="flex items-center justify-between border-t border-[rgba(200,169,110,0.2)] px-16 py-10 max-md:flex-col max-md:gap-3 max-md:px-6">
+      <footer className="mx-auto flex max-w-[1240px] items-center justify-between border-t border-[rgba(200,169,110,0.2)] px-12 py-10 max-md:flex-col max-md:gap-3 max-md:px-6">
         <div className="text-[1.1rem] font-extrabold">
           <span className="text-[#c8a96e]">416</span>Homes
         </div>

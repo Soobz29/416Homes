@@ -1,4 +1,7 @@
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
+const API_BASE = (
+  process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== "undefined" ? window.location.origin : "http://localhost:8000")
+).replace(/\/$/, "");
 
 export async function fetchListings(params?: {
   city?: string;

@@ -10,9 +10,9 @@
         rel="stylesheet">
     <style>
         :root {
-            --bg-primary: #0a0a0f;
-            --bg-card: #14141f;
-            --bg-card-hover: #1a1a2e;
+            --bg-primary: #0b0d10;
+            --bg-card: #141a23;
+            --bg-card-hover: #1a2230;
             --accent: #c8a96e;
             --accent-glow: rgba(200, 169, 110, 0.15);
             --green: #22c55e;
@@ -21,8 +21,8 @@
             --red-glow: rgba(239, 68, 68, 0.2);
             --blue: #3b82f6;
             --text-primary: #f5f4ef;
-            --text-secondary: #9ca3af;
-            --border: rgba(200, 169, 110, 0.12);
+            --text-secondary: #9b958a;
+            --border: rgba(200, 169, 110, 0.22);
             --radius: 16px;
         }
 
@@ -34,14 +34,25 @@
 
         body {
             font-family: 'Inter', sans-serif;
-            background: var(--bg-primary);
+            background: linear-gradient(180deg,#0b0d10 0%,#0d1219 100%);
             color: var(--text-primary);
             min-height: 100vh;
+        }
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: -1;
+            background:
+              radial-gradient(circle at 80% 12%, rgba(200,169,110,0.12), transparent 34%),
+              radial-gradient(circle at 16% 74%, rgba(200,169,110,0.08), transparent 46%);
         }
 
         /* ── Header ────────────────────────────────── */
         .header {
-            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
+            background: rgba(11, 13, 16, 0.84);
+            backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--border);
             padding: 24px 40px;
             display: flex;
@@ -73,6 +84,14 @@
 
         .header-nav a:hover {
             color: var(--accent);
+        }
+        .btn:focus-visible,
+        .btn-sm:focus-visible,
+        .form-group input:focus-visible,
+        .form-group select:focus-visible,
+        .header-nav a:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
         }
 
         /* ── Layout ────────────────────────────────── */
@@ -413,11 +432,6 @@
             color: var(--text-secondary);
         }
 
-        .empty-state .emoji {
-            font-size: 48px;
-            margin-bottom: 16px;
-        }
-
         .empty-state p {
             font-size: 14px;
             line-height: 1.6;
@@ -442,7 +456,7 @@
 <body>
     <header class="header">
         <div>
-            <h1>🤖 416Homes Agent</h1>
+            <h1>416Homes Agent</h1>
             <p class="subtitle">24/7 AI-Powered Canadian Real Estate Monitor</p>
         </div>
         <nav class="header-nav">
@@ -486,10 +500,10 @@
             <!-- Controls -->
             <div class="card">
                 <h3>Controls</h3>
-                <button class="btn btn-start" id="btnStart" onclick="startAgent()">▶ Start Monitoring</button>
-                <button class="btn btn-stop" id="btnStop" onclick="stopAgent()" style="display:none">■ Stop
+                <button class="btn btn-start" id="btnStart" onclick="startAgent()">Start Monitoring</button>
+                <button class="btn btn-stop" id="btnStop" onclick="stopAgent()" style="display:none">Stop
                     Agent</button>
-                <button class="btn btn-secondary" onclick="refreshAlerts()">↻ Refresh Alerts</button>
+                <button class="btn btn-secondary" onclick="refreshAlerts()">Refresh Alerts</button>
             </div>
 
             <!-- Search Criteria -->
@@ -531,12 +545,11 @@
         <!-- Main: Alert Feed -->
         <section>
             <div class="feed-header">
-                <h2>📡 Live Listing Feed</h2>
+                <h2>Live Listing Feed</h2>
                 <span class="alert-count" id="alertCount">0 alerts</span>
             </div>
             <div class="feed" id="alertFeed">
                 <div class="empty-state">
-                    <div class="emoji">🏠</div>
                     <p>No alerts yet. Start the agent to begin<br>monitoring Canadian real estate listings.</p>
                 </div>
             </div>
@@ -647,7 +660,6 @@
             if (alerts.length === 0) {
                 feed.innerHTML = `
           <div class="empty-state">
-            <div class="emoji">🏠</div>
             <p>No alerts yet. Start the agent to begin<br>monitoring Canadian real estate listings.</p>
           </div>`;
                 return;
@@ -662,7 +674,7 @@
                     tags.push(`<span class="alert-tag time">${t.toLocaleTimeString()}</span>`);
                 }
                 if (a.video_job_id) {
-                    tags.push(`<span class="alert-tag video">🎬 Video queued</span>`);
+                    tags.push(`<span class="alert-tag video">Video queued</span>`);
                 }
 
                 return `
@@ -670,18 +682,18 @@
             <div>
               <div class="alert-address">${l.address || 'Unknown Address'}</div>
               <div class="alert-details">
-                ${l.bedrooms || l.beds ? `<span class="alert-detail">🛏 ${l.bedrooms || l.beds} beds</span>` : ''}
-                ${l.bathrooms || l.baths ? `<span class="alert-detail">🚿 ${l.bathrooms || l.baths} baths</span>` : ''}
-                ${l.sqft ? `<span class="alert-detail">📐 ${l.sqft} sqft</span>` : ''}
-                ${l.property_type ? `<span class="alert-detail">🏗 ${l.property_type}</span>` : ''}
+                ${l.bedrooms || l.beds ? `<span class="alert-detail">Beds: ${l.bedrooms || l.beds}</span>` : ''}
+                ${l.bathrooms || l.baths ? `<span class="alert-detail">Baths: ${l.bathrooms || l.baths}</span>` : ''}
+                ${l.sqft ? `<span class="alert-detail">Sqft: ${l.sqft}</span>` : ''}
+                ${l.property_type ? `<span class="alert-detail">Type: ${l.property_type}</span>` : ''}
               </div>
               <div class="alert-meta">${tags.join('')}</div>
             </div>
             <div class="alert-actions">
               <div class="alert-price">${l.price ? '$' + Number(l.price).toLocaleString() : '—'}</div>
-              <button class="btn-sm video-btn" onclick="orderVideo('${l.url || ''}')">🎬 Make Video</button>
-              ${a.buyer_email ? `<button class="btn-sm" onclick="showEmails('${a.id}')" style="color: #60a5fa; border-color: #60a5fa;">✉ View Emails</button>` : ''}
-              <button class="btn-sm" onclick="markSeen('${a.id}', this)">✓ Dismiss</button>
+              <button class="btn-sm video-btn" onclick="orderVideo('${l.url || ''}')">Make Video</button>
+              ${a.buyer_email ? `<button class="btn-sm" onclick="showEmails('${a.id}')" style="color: #60a5fa; border-color: #60a5fa;">View Emails</button>` : ''}
+              <button class="btn-sm" onclick="markSeen('${a.id}', this)">Dismiss</button>
             </div>
           </div>`;
             }).join('');
