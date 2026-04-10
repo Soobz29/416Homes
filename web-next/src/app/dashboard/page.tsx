@@ -55,6 +55,9 @@ const BATH_OPTIONS = [
   { value: "3", label: "3+ Baths" },
 ];
 
+/** Listings per page (API max 200; pagination keeps first paint fast while GTA interleaving fills each slice). */
+const LISTINGS_PAGE_SIZE = 36;
+
 export default function DashboardPage() {
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
   const [emailInput, setEmailInput] = useState("");
@@ -71,6 +74,8 @@ export default function DashboardPage() {
     propertyType: "",
   });
   const [listingsError, setListingsError] = useState<string | null>(null);
+  const [listingsPage, setListingsPage] = useState(0);
+  const [totalListings, setTotalListings] = useState(0);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(false);
   const [alertsError, setAlertsError] = useState<string | null>(null);
@@ -121,10 +126,14 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
+    setListingsPage(0);
+  }, [filters]);
+
+  useEffect(() => {
     if (activeTab === "listings") {
       void loadListings();
     }
-  }, [activeTab, filters]);
+  }, [activeTab, filters, listingsPage]);
 
   async function triggerScan() {
     setScanLoading(true);
@@ -150,9 +159,11 @@ export default function DashboardPage() {
         minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
         maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
         propertyTypes: filters.propertyType ? [filters.propertyType] : undefined,
-        limit: 200,
+        limit: LISTINGS_PAGE_SIZE,
+        offset: listingsPage * LISTINGS_PAGE_SIZE,
       });
       setListings(data.listings || []);
+      setTotalListings(typeof data.total === "number" ? data.total : 0);
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Failed to load listings.";
       setListingsError(msg);
@@ -808,6 +819,32 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+            {!loading && totalListings > LISTINGS_PAGE_SIZE && (
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-4 font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.08em] text-[#6b6b60]">
+                <button
+                  type="button"
+                  disabled={listingsPage <= 0}
+                  onClick={() => setListingsPage((p) => Math.max(0, p - 1))}
+                  className="rounded border border-[rgba(200,169,110,0.35)] px-4 py-2 text-[#c8a96e] transition-colors hover:border-[#c8a96e] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                <span>
+                  Page {listingsPage + 1} of {Math.max(1, Math.ceil(totalListings / LISTINGS_PAGE_SIZE))}
+                  <span className="ml-2 normal-case tracking-normal text-[#6b6b60]">
+                    ({totalListings.toLocaleString()} listings)
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  disabled={(listingsPage + 1) * LISTINGS_PAGE_SIZE >= totalListings}
+                  onClick={() => setListingsPage((p) => p + 1)}
+                  className="rounded border border-[rgba(200,169,110,0.35)] px-4 py-2 text-[#c8a96e] transition-colors hover:border-[#c8a96e] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Next
+                </button>
               </div>
             )}
           </div>
