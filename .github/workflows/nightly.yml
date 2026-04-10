@@ -16,6 +16,7 @@ jobs:
     - uses: actions/setup-python@v4
       with: { python-version: '3.12' }
     - run: pip install -r requirements-full.txt
+    - run: playwright install chromium --with-deps
     - name: Run nightly scraper
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}

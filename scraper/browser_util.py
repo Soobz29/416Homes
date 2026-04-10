@@ -1,29 +1,30 @@
 """
-Shared DrissionPage browser utility for all scrapers.
+Shared browser utility for all scrapers.
 
-Enhanced stealth mode:
-* Uses browserforge to generate realistic browser fingerprints.
-* Rotates fingerprints every 5 browser sessions.
-* Randomizes TLS characteristics by toggling HTTP/2 usage.
-* Injects a small canvas noise shim to randomize canvas fingerprints.
+On Windows: uses DrissionPage + Edge (stealth fingerprinting).
+On Linux/CI: uses Playwright Chromium (headless, stealth args).
 """
 
 import logging
+import platform
 import random
 from typing import Optional, Tuple
-
-from DrissionPage import ChromiumPage, ChromiumOptions
-from browserforge.fingerprints import FingerprintGenerator
 
 logger = logging.getLogger(__name__)
 
 EDGE_PATH = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+_ON_LINUX = platform.system() != "Windows"
 
-_FINGERPRINT_GEN: Optional[FingerprintGenerator] = None
-_CURRENT_FP = None
-_FP_USE_COUNT = 0
+# ── Fingerprinting (shared) ────────────────────────────────────────────────────
+try:
+    from browserforge.fingerprints import FingerprintGenerator
+    _FP_GEN: Optional[object] = None
+    _CURRENT_FP = None
+    _FP_USE_COUNT = 0
+    _HAS_BROWSERFORGE = True
+except ImportError:
+    _HAS_BROWSERFORGE = False
 
-# Simple canvas noise shim inspired by common anti-fingerprinting techniques.
 CANVAS_NOISE_JS = r"""
 (function() {
   try {
@@ -40,84 +41,154 @@ CANVAS_NOISE_JS = r"""
         ctx.putImageData(imageData, 0, 0);
       } catch (e) {}
     };
-
     const toDataURL = HTMLCanvasElement.prototype.toDataURL;
     HTMLCanvasElement.prototype.toDataURL = function() {
       const ctx = this.getContext('2d');
       if (ctx) addNoise(ctx);
       return toDataURL.apply(this, arguments);
     };
-
-    const getImageData = CanvasRenderingContext2D.prototype.getImageData;
-    CanvasRenderingContext2D.prototype.getImageData = function() {
-      const res = getImageData.apply(this, arguments);
-      // Touch a pixel to make the hash slightly unstable.
-      if (res && res.data && res.data.length > 0) {
-        const idx = Math.floor(Math.random() * Math.min(10, res.data.length));
-        res.data[idx] = res.data[idx] ^ 0x01;
-      }
-      return res;
-    };
   } catch (e) {}
 })();
 """
 
 
-def _get_fingerprint() -> Tuple[Optional[object], Optional[dict]]:
-  """
-  Generate or rotate a browserforge fingerprint.
-
-  For now we mainly use the generated headers (User-Agent) to configure
-  the DrissionPage instance. A new fingerprint is generated every 5
-  create_browser() calls.
-  """
-  global _FINGERPRINT_GEN, _CURRENT_FP, _FP_USE_COUNT
-
-  if _FINGERPRINT_GEN is None:
-      _FINGERPRINT_GEN = FingerprintGenerator()
-
-  if _CURRENT_FP is None or _FP_USE_COUNT >= 5:
-      try:
-          fp = _FINGERPRINT_GEN.generate(browser="chrome", os="windows")
-          _CURRENT_FP = fp
-          _FP_USE_COUNT = 0
-      except Exception as e:  # pragma: no cover - defensive fallback
-          logger.warning(f"browserforge FingerprintGenerator failed: {e}")
-          _CURRENT_FP = None
-
-  _FP_USE_COUNT += 1
-
-  if _CURRENT_FP is not None:
-      headers = getattr(_CURRENT_FP, "headers", None)
-      return _CURRENT_FP, headers or {}
-  return None, {}
+def _get_fingerprint() -> Tuple[Optional[object], dict]:
+    global _FP_GEN, _CURRENT_FP, _FP_USE_COUNT
+    if not _HAS_BROWSERFORGE:
+        return None, {}
+    if _FP_GEN is None:
+        _FP_GEN = FingerprintGenerator()
+    if _CURRENT_FP is None or _FP_USE_COUNT >= 5:
+        try:
+            fp = _FP_GEN.generate(browser="chrome", os="windows")
+            _CURRENT_FP = fp
+            _FP_USE_COUNT = 0
+        except Exception as e:
+            logger.warning(f"browserforge HeaderGenerator failed, falling back to bare UA: {e}")
+            _CURRENT_FP = None
+    _FP_USE_COUNT += 1
+    if _CURRENT_FP is not None:
+        headers = getattr(_CURRENT_FP, "headers", None)
+        return _CURRENT_FP, headers or {}
+    return None, {}
 
 
-def create_browser(headless: bool = False) -> ChromiumPage:
-    """Create a DrissionPage browser instance using Edge and stealth settings."""
+# ── Playwright wrapper (Linux/CI path) ─────────────────────────────────────────
+
+class _PWElement:
+    """Thin wrapper making a Playwright element look like a DrissionPage element."""
+    def __init__(self, el):
+        self._el = el
+
+    def attr(self, name):
+        if self._el is None:
+            return ""
+        try:
+            return self._el.get_attribute(name) or ""
+        except Exception:
+            return ""
+
+    @property
+    def text(self):
+        if self._el is None:
+            return ""
+        try:
+            return self._el.inner_text() or ""
+        except Exception:
+            return ""
+
+
+class PlaywrightPage:
+    """Thin wrapper making a Playwright page look like a DrissionPage."""
+
+    def __init__(self, pw_page, pw_instance):
+        self._page = pw_page
+        self._pw = pw_instance  # keep reference so GC doesn't stop it
+
+    def get(self, url, retry=1, interval=1, timeout=30):
+        self._page.goto(url, timeout=timeout * 1000, wait_until="networkidle")
+
+    def eles(self, selector):
+        tag = selector[4:] if selector.startswith("tag:") else selector
+        return [_PWElement(e) for e in self._page.query_selector_all(tag)]
+
+    def ele(self, selector):
+        tag = selector[4:] if selector.startswith("tag:") else selector
+        e = self._page.query_selector(tag)
+        return _PWElement(e) if e else None
+
+    def run_js(self, js):
+        try:
+            self._page.evaluate(js)
+        except Exception:
+            pass
+
+    def quit(self):
+        try:
+            self._page.context.browser.close()
+        except Exception:
+            pass
+
+    class scroll:
+        @staticmethod
+        def down(px):
+            pass  # no-op placeholder
+
+
+def _create_playwright_browser(headless: bool = True) -> PlaywrightPage:
+    from playwright.sync_api import sync_playwright
+    pw = sync_playwright().start()
+    browser = pw.chromium.launch(
+        headless=headless,
+        args=[
+            "--disable-blink-features=AutomationControlled",
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+        ],
+    )
+    ctx = browser.new_context(
+        viewport={"width": 1280, "height": 800},
+        user_agent=(
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+    )
+    page = ctx.new_page()
+    try:
+        page.evaluate(CANVAS_NOISE_JS)
+    except Exception:
+        pass
+    return PlaywrightPage(page, pw)
+
+
+def _create_drission_browser(headless: bool = False):
+    from DrissionPage import ChromiumPage, ChromiumOptions
     _, headers = _get_fingerprint()
     ua = headers.get("User-Agent")
-
     co = ChromiumOptions()
     co.headless(headless)
     co.set_browser_path(EDGE_PATH)
     co.set_argument("--disable-blink-features", "AutomationControlled")
-
-    # Apply User-Agent from fingerprint if available.
     if ua:
         co.set_user_agent(ua)
-
-    # Crude TLS fingerprint randomization: occasionally disable HTTP/2,
-    # which changes ALPN and TLS handshake characteristics.
     if random.choice([True, False]):
         co.set_argument("--disable-http2", None)
-
     page = ChromiumPage(co)
-
-    # Inject canvas noise shim as soon as the page is ready.
     try:
         page.run_js(CANVAS_NOISE_JS)
-    except Exception as e:  # pragma: no cover - injection is best-effort
-        logger.debug(f"Canvas noise injection failed: {e}")
-
+    except Exception:
+        pass
     return page
+
+
+def create_browser(headless: bool = True):
+    """
+    Return a browser page object.
+    - Linux/CI: Playwright Chromium (headless).
+    - Windows: DrissionPage + Edge (stealth).
+    """
+    if _ON_LINUX:
+        return _create_playwright_browser(headless=True)
+    return _create_drission_browser(headless=headless)

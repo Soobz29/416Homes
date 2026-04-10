@@ -126,6 +126,16 @@ class MemoryStore:
         return "Unknown"
     
     @staticmethod
+    def _to_coord(val: Any):
+        """Return float coordinate or None — never an empty string."""
+        if val is None or val == "":
+            return None
+        try:
+            return float(val) or None
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
     def _parse_room_count(val: Any) -> str:
         """Parse room count strings like '1 + 1' (bedroom + den) into their integer sum ('2').
         Returns the value unchanged if it doesn't match that pattern."""
@@ -180,8 +190,8 @@ class MemoryStore:
             "photo": str(listing.get("photo") or "") or None,
             "listing_agent_email": listing.get("listing_agent_email"),
             "listing_agent_name": listing.get("listing_agent_name"),
-            "lat": listing.get("lat"),
-            "lng": listing.get("lng"),
+            "lat": self._to_coord(listing.get("lat")),
+            "lng": self._to_coord(listing.get("lng")),
             "raw_data": listing,
             "embedding": None,  # Will be filled later
             "scraped_at": listing.get("scraped_at", "") or "",
