@@ -147,13 +147,22 @@ class MemoryStore:
         return str(val) if val not in (None, "") else ""
 
     @staticmethod
+    def _fix_zoocasa_wrapped_photo_url(url: str) -> str:
+        if not url or "cdn.zoocasa.com/https://" not in url:
+            return url
+        inner = url.split("cdn.zoocasa.com/", 1)[1]
+        if inner.startswith("https://") and inner.endswith("-1.jpg"):
+            return inner[: -len("-1.jpg")]
+        return inner
+
+    @staticmethod
     def _extract_photo_url(listing: Dict[str, Any]) -> Optional[str]:
         """Extract a canonical photo URL from top-level or raw_data candidate keys."""
         def _from_value(value: Any) -> Optional[str]:
             if not value:
                 return None
             if isinstance(value, str):
-                v = value.strip()
+                v = MemoryStore._fix_zoocasa_wrapped_photo_url(value.strip())
                 if v.startswith("http://") or v.startswith("https://"):
                     return v
                 return None
@@ -175,6 +184,7 @@ class MemoryStore:
         candidates = [
             listing.get("photo"),
             listing.get("photos"),
+            raw_data.get("image_root_storage_key"),
             raw_data.get("photo"),
             raw_data.get("photos"),
             raw_data.get("image"),

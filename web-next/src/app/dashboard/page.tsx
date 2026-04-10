@@ -60,6 +60,9 @@ const BATH_OPTIONS = [
   { value: "3", label: "3+ Baths" },
 ];
 
+/** Listings per page (API max 200; pagination keeps first paint fast while GTA interleaving fills each slice). */
+const LISTINGS_PAGE_SIZE = 36;
+
 export default function DashboardPage() {
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
   const [emailInput, setEmailInput] = useState("");
@@ -79,7 +82,6 @@ export default function DashboardPage() {
   const [addressSearch, setAddressSearch] = useState("");
   const [page, setPage] = useState(0);
   const [totalListings, setTotalListings] = useState(0);
-  const PAGE_SIZE = 20;
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(false);
   const [alertsError, setAlertsError] = useState<string | null>(null);
@@ -130,17 +132,14 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === "listings") {
-      setPage(0);
-      void loadListings(0);
-    }
-  }, [activeTab, filters]);
+    setPage(0);
+  }, [filters]);
 
   useEffect(() => {
     if (activeTab === "listings") {
       void loadListings(page);
     }
-  }, [page]);
+  }, [activeTab, filters, page]);
 
   async function triggerScan() {
     setScanLoading(true);
@@ -166,11 +165,11 @@ export default function DashboardPage() {
         minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
         maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
         propertyTypes: filters.propertyType ? [filters.propertyType] : undefined,
-        limit: PAGE_SIZE,
-        offset: pg * PAGE_SIZE,
+        limit: LISTINGS_PAGE_SIZE,
+        offset: pg * LISTINGS_PAGE_SIZE,
       });
       setListings(data.listings || []);
-      setTotalListings(data.total || 0);
+      setTotalListings(typeof data.total === "number" ? data.total : 0);
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Failed to load listings.";
       setListingsError(msg);
@@ -790,11 +789,10 @@ export default function DashboardPage() {
                 ))}
               </div>
             )}
-
-            {/* Pagination */}
-            {!loading && totalListings > PAGE_SIZE && (
-              <div className="mt-8 flex items-center justify-center gap-4">
+            {!loading && totalListings > LISTINGS_PAGE_SIZE && (
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
                 <button
+                  type="button"
                   disabled={page === 0}
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
                   className="rounded border border-[rgba(212,175,55,0.4)] px-4 py-2 font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.08em] text-[#D4AF37] transition-colors hover:bg-[rgba(212,175,55,0.1)] disabled:cursor-not-allowed disabled:opacity-30"
@@ -802,11 +800,14 @@ export default function DashboardPage() {
                   ← Prev
                 </button>
                 <span className="font-['DM_Mono',monospace] text-[0.7rem] text-[#6b6b60]">
-                  {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalListings)}{" "}
+                  Page {page + 1} of {Math.max(1, Math.ceil(totalListings / LISTINGS_PAGE_SIZE))}
+                  {" · "}
+                  {page * LISTINGS_PAGE_SIZE + 1}–{Math.min((page + 1) * LISTINGS_PAGE_SIZE, totalListings)}{" "}
                   <span className="text-[#D4AF37]">of {totalListings.toLocaleString()}</span>
                 </span>
                 <button
-                  disabled={(page + 1) * PAGE_SIZE >= totalListings}
+                  type="button"
+                  disabled={(page + 1) * LISTINGS_PAGE_SIZE >= totalListings}
                   onClick={() => setPage((p) => p + 1)}
                   className="rounded border border-[rgba(212,175,55,0.4)] px-4 py-2 font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.08em] text-[#D4AF37] transition-colors hover:bg-[rgba(212,175,55,0.1)] disabled:cursor-not-allowed disabled:opacity-30"
                 >
