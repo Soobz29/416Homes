@@ -200,6 +200,11 @@ class MemoryStore:
     
     def _normalise_for_sold_comps(self, comp: Dict[str, Any]) -> Dict[str, Any]:
         """Translate scraper dict to exact Supabase sold_comps column names"""
+        dom_raw = comp.get("days_on_market", 0)
+        try:
+            dom = int(dom_raw) if dom_raw not in (None, "") else 0
+        except (TypeError, ValueError):
+            dom = 0
         return {
             "id": comp.get("id", ""),
             "address": comp.get("address", ""),
@@ -212,9 +217,9 @@ class MemoryStore:
             "area": comp.get("area", comp.get("sqft", "0")),
             "property_type": comp.get("property_type", "Unknown"),
             "sold_date": comp.get("sold_date"),
-            "days_on_market": comp.get("days_on_market", 0),
-            "lat": comp.get("lat"),
-            "lng": comp.get("lng"),
+            "days_on_market": dom,
+            "lat": self._to_coord(comp.get("lat")),
+            "lng": self._to_coord(comp.get("lng")),
             "scraped_at": comp.get("scraped_at", "")
         }
     
@@ -299,7 +304,20 @@ class MemoryStore:
                 return False
                 
         except Exception as e:
-            logger.error(f"Error storing listing {listing.get('id', 'unknown')}: {e}")
+            err_str = str(e)
+            logger.error(f"Error storing listing {listing.get('id', 'unknown')}: {err_str}")
+            if "numeric" in err_str or "integer" in err_str or "invalid input" in err_str:
+                # Log each numeric field to find the culprit
+                try:
+                    n = self._normalise_for_listings(listing)
+                    logger.error(
+                        f"Numeric fields dump for {listing.get('id')}: "
+                        f"price={n.get('price')!r} area={n.get('area')!r} "
+                        f"days_on_market={n.get('days_on_market')!r} "
+                        f"lat={n.get('lat')!r} lng={n.get('lng')!r}"
+                    )
+                except Exception:
+                    pass
             return False
     
     async def embed_and_store_listings(self, listings: List[Dict[str, Any]]) -> int:
