@@ -780,12 +780,16 @@ export default function VideoPage() {
         {/* Video preview */}
         <div className="video-preview relative aspect-[16/9] overflow-hidden border border-[rgba(200,169,110,0.2)] bg-black">
           <div className="video-preview-inner relative h-full w-full overflow-hidden bg-black">
-            <iframe
-              className="absolute left-0 top-0 h-full w-full"
-              src="https://player.vimeo.com/video/1172407404?badge=0&autopause=0&player_id=0&app_id=58479&autoplay=1&loop=1"
-              allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
-              referrerPolicy="strict-origin-when-cross-origin"
-              title="416Homes sample video"
+            <video
+              className="absolute left-0 top-0 h-full w-full object-cover"
+              src={process.env.NEXT_PUBLIC_HERO_VIDEO_URL || "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"}
+              controls
+              playsInline
+              loop
+              muted
+              autoPlay
+              preload="metadata"
+              title="416Homes sample listing video"
             />
             <div className="vp-caption absolute bottom-[8%] left-0 right-0 px-6">
               <div className="vp-headline mb-1 text-[1.1rem] font-bold">

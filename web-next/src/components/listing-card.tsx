@@ -8,7 +8,7 @@ import { HoverCardWrapper } from "@/components/ui/hover-card-wrapper";
 interface ListingCardProps {
   listing: Listing;
   index?: number;
-  onValuate?: () => void;
+  onValuate?: (listing: Listing) => void;
 }
 
 const SOURCE_COLORS: Record<string, string> = {
@@ -117,7 +117,7 @@ export function ListingCard({ listing, index = 0, onValuate }: ListingCardProps)
             {onValuate && (
               <button
                 className="flex-1 gold-gradient gold-glow py-2 font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-black transition-opacity hover:opacity-90"
-                onClick={onValuate}
+                onClick={() => onValuate(listing)}
               >
                 Valuate
               </button>
