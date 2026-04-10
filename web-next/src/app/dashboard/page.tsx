@@ -935,10 +935,10 @@ export default function DashboardPage() {
       </main>
 
       <footer className="flex items-center justify-between border-t border-[rgba(212,175,55,0.2)] bg-[rgba(10,10,8,0.8)] px-16 py-10 max-md:flex-col max-md:gap-3 max-md:px-6">
-        <div className="footer-logo text-[1.1rem] font-extrabold">
+        <Link href="/" className="footer-logo text-[1.1rem] font-extrabold transition-colors hover:text-[#D4AF37]">
           <span className="text-[#D4AF37]">416</span>
           Homes Dashboard
-        </div>
+        </Link>
         <div className="footer-copy font-['DM_Mono',monospace] text-[0.62rem] text-[#6b6b60]">
           Toronto Real Estate Intelligence Platform
         </div>

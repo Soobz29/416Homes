@@ -1022,10 +1022,10 @@ export default function VideoPage() {
       </section>
 
       <footer className="flex items-center justify-between border-t border-[rgba(200,169,110,0.2)] px-16 py-8 max-md:flex-col max-md:gap-3 max-md:px-6">
-        <div className="footer-logo text-[1rem] font-extrabold">
+        <Link href="/" className="footer-logo text-[1rem] font-extrabold transition-colors hover:text-[#c8a96e]">
           <span className="text-[#c8a96e]">416</span>
           Homes Video
-        </div>
+        </Link>
         <div className="footer-copy font-['DM Mono',monospace] text-[0.6rem] text-[#6b6b60]">
           Cinematic listing videos · Toronto + Mississauga · From $199
         </div>
