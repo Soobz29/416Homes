@@ -52,6 +52,21 @@ def _detect_region(location_str: str) -> str:
             return region
     return "Toronto"
 
+
+def _zoocasa_listing_photo(item: Dict[str, Any]) -> str:
+    """
+    Zoocasa __NEXT_DATA__ historically used a storage key with cdn.zoocasa.com;
+    newer payloads use a full https://images.expcloud.com/... URL in the same field.
+    """
+    key = item.get("image_root_storage_key")
+    if not key:
+        return ""
+    key = str(key).strip()
+    if key.startswith("http://") or key.startswith("https://"):
+        return key
+    return f"https://cdn.zoocasa.com/{key}-1.jpg"
+
+
 async def _scrape_zoocasa_page(client, url: str) -> list:
     """Scrapes a single Zoocasa city page using __NEXT_DATA__."""
     try:
@@ -90,9 +105,7 @@ async def _scrape_zoocasa_page(client, url: str) -> list:
                 item.get("display_address"),
                 item.get("formatted_address"),
             )
-            photo = ""
-            if item.get("image_root_storage_key"):
-                photo = f"https://cdn.zoocasa.com/{item['image_root_storage_key']}-1.jpg"
+            photo = _zoocasa_listing_photo(item)
             
             region = _detect_region(
                 (item.get("neighbourhood") or "") + " " + (item.get("address") or "")

@@ -474,6 +474,41 @@ def _generate_link_code(length: int = 6) -> str:
     suffix = "".join(secrets.choice(chars) for _ in range(length))
     return f"TG-{suffix}"
 
+def _fix_zoocasa_wrapped_cdn_photo(url: str) -> str:
+    """
+    Older scrapes built https://cdn.zoocasa.com/{image_root_storage_key}-1.jpg
+    but Zoocasa now stores a full https://images.expcloud.com/... URL in that field,
+    producing a broken double URL. Strip the bogus prefix and stray -1.jpg suffix.
+    """
+    if not url or "cdn.zoocasa.com/https://" not in url:
+        return url
+    inner = url.split("cdn.zoocasa.com/", 1)[1]
+    if inner.startswith("https://") and inner.endswith("-1.jpg"):
+        return inner[: -len("-1.jpg")]
+    return inner
+
+
+def _interleave_listings_by_city(rows: list[dict]) -> list[dict]:
+    """Round-robin by city so GTA-wide first pages mix municipalities (not one city only)."""
+    from collections import defaultdict, deque
+
+    buckets: dict[str, deque] = defaultdict(deque)
+    for r in rows:
+        c = str(r.get("city") or "").strip() or "Other"
+        buckets[c].append(r)
+    keys = sorted(buckets.keys(), key=lambda k: (k == "Other", k.lower()))
+    out: list[dict] = []
+    while True:
+        moved = False
+        for k in keys:
+            if buckets[k]:
+                out.append(buckets[k].popleft())
+                moved = True
+        if not moved:
+            break
+    return out
+
+
 # Listings endpoints
 @app.get("/api/listings")
 async def get_listings(
@@ -581,6 +616,9 @@ async def get_listings(
                         continue
 
             filtered.append(r)
+
+        if city_filter is None and cities_filter is None and len(filtered) > 1:
+            filtered = _interleave_listings_by_city(filtered)
 
         total = len(filtered)
         limited = filtered[offset : offset + limit]
@@ -1253,21 +1291,21 @@ def _normalise_listing(row: dict) -> dict:
         if not value:
             return urls
         if isinstance(value, str):
-            v = value.strip()
+            v = _fix_zoocasa_wrapped_cdn_photo(value.strip())
             if v.startswith("http://") or v.startswith("https://"):
                 return [v]
             return []
         if isinstance(value, list):
             for item in value:
                 if isinstance(item, str):
-                    v = item.strip()
+                    v = _fix_zoocasa_wrapped_cdn_photo(item.strip())
                     if v.startswith("http://") or v.startswith("https://"):
                         urls.append(v)
                 elif isinstance(item, dict):
                     for key in ("url", "href", "src", "highResPath", "HighResPath"):
                         cand = item.get(key)
                         if isinstance(cand, str):
-                            c = cand.strip()
+                            c = _fix_zoocasa_wrapped_cdn_photo(cand.strip())
                             if c.startswith("http://") or c.startswith("https://"):
                                 urls.append(c)
             return urls
@@ -1275,7 +1313,7 @@ def _normalise_listing(row: dict) -> dict:
             for key in ("url", "href", "src", "highResPath", "HighResPath"):
                 cand = value.get(key)
                 if isinstance(cand, str):
-                    c = cand.strip()
+                    c = _fix_zoocasa_wrapped_cdn_photo(cand.strip())
                     if c.startswith("http://") or c.startswith("https://"):
                         urls.append(c)
             return urls
@@ -1286,6 +1324,7 @@ def _normalise_listing(row: dict) -> dict:
         candidates = [
             record.get("photos"),
             record.get("photo"),
+            raw_data.get("image_root_storage_key") if isinstance(raw_data, dict) else None,
             raw_data.get("photos") if isinstance(raw_data, dict) else None,
             raw_data.get("photo") if isinstance(raw_data, dict) else None,
             raw_data.get("image") if isinstance(raw_data, dict) else None,

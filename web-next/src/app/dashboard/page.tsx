@@ -150,6 +150,7 @@ export default function DashboardPage() {
         minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
         maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
         propertyTypes: filters.propertyType ? [filters.propertyType] : undefined,
+        limit: 200,
       });
       setListings(data.listings || []);
     } catch (error) {

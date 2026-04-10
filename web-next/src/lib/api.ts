@@ -3,23 +3,35 @@ const API_BASE = (
   (typeof window !== "undefined" ? window.location.origin : "http://localhost:8000")
 ).replace(/\/$/, "");
 
+/** Undo bad https://cdn.zoocasa.com/https://images.expcloud.com/...-1.jpg URLs from older scrapes. */
+function fixZoocasaWrappedPhotoUrl(url: string): string {
+  if (!url || !url.includes("cdn.zoocasa.com/https://")) return url;
+  const inner = url.split("cdn.zoocasa.com/").pop() ?? url;
+  if (inner.startsWith("https://") && inner.endsWith("-1.jpg")) {
+    return inner.slice(0, -"-1.jpg".length);
+  }
+  return inner.startsWith("https://") ? inner : url;
+}
+
 function coercePhotoUrls(value: unknown): string[] {
   if (!value) return [];
   if (typeof value === "string") {
-    const v = value.trim();
+    const v = fixZoocasaWrappedPhotoUrl(value.trim());
     return /^https?:\/\//i.test(v) ? [v] : [];
   }
   if (Array.isArray(value)) {
     const out: string[] = [];
     for (const item of value) {
-      if (typeof item === "string" && /^https?:\/\//i.test(item.trim())) {
-        out.push(item.trim());
+      if (typeof item === "string") {
+        const u = fixZoocasaWrappedPhotoUrl(item.trim());
+        if (/^https?:\/\//i.test(u)) out.push(u);
       } else if (item && typeof item === "object") {
         const obj = item as Record<string, unknown>;
         const candidates = [obj.url, obj.href, obj.src, obj.highResPath, obj.HighResPath];
         for (const cand of candidates) {
-          if (typeof cand === "string" && /^https?:\/\//i.test(cand.trim())) {
-            out.push(cand.trim());
+          if (typeof cand === "string") {
+            const u = fixZoocasaWrappedPhotoUrl(cand.trim());
+            if (/^https?:\/\//i.test(u)) out.push(u);
           }
         }
       }
@@ -31,7 +43,7 @@ function coercePhotoUrls(value: unknown): string[] {
     const candidates = [obj.url, obj.href, obj.src, obj.highResPath, obj.HighResPath];
     return candidates
       .filter((v): v is string => typeof v === "string")
-      .map((v) => v.trim())
+      .map((v) => fixZoocasaWrappedPhotoUrl(v.trim()))
       .filter((v) => /^https?:\/\//i.test(v));
   }
   return [];
@@ -42,6 +54,7 @@ function extractListingPhotos(listing: any): string[] {
   const candidates = [
     listing?.photos,
     listing?.photo,
+    (raw as { image_root_storage_key?: string }).image_root_storage_key,
     (raw as any).photos,
     (raw as any).photo,
     (raw as any).image,
