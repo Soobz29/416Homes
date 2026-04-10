@@ -182,8 +182,8 @@ class MemoryStore:
             "neighbourhood": str(listing.get("neighbourhood") or self._extract_neighbourhood(listing.get("address", "") or "")),
             "city": str(listing.get("city", "Toronto") or "Toronto"),
             "price": price,
-            "bedrooms": bedrooms if not isinstance(bedrooms, dict) else "",
-            "bathrooms": bathrooms if not isinstance(bathrooms, dict) else "",
+            "bedrooms": (bedrooms if not isinstance(bedrooms, dict) else None) or None,
+            "bathrooms": (bathrooms if not isinstance(bathrooms, dict) else None) or None,
             "area": sqft,
             "property_type": str(listing.get("property_type", "Unknown") or "Unknown"),
             "days_on_market": days_on_market,
@@ -314,7 +314,8 @@ class MemoryStore:
                         f"Numeric fields dump for {listing.get('id')}: "
                         f"price={n.get('price')!r} area={n.get('area')!r} "
                         f"days_on_market={n.get('days_on_market')!r} "
-                        f"lat={n.get('lat')!r} lng={n.get('lng')!r}"
+                        f"lat={n.get('lat')!r} lng={n.get('lng')!r} "
+                        f"bedrooms={n.get('bedrooms')!r} bathrooms={n.get('bathrooms')!r}"
                     )
                 except Exception:
                     pass
