@@ -65,11 +65,11 @@ export function PricingSection() {
               key={tier.name}
               className={cn(
                 "relative rounded-2xl border border-slate-800 bg-slate-900/40 p-6",
-                tier.featured && "border-[#d4af37] border-2 shadow-lg scale-105"
+                tier.featured && "border-[#D4AF37] border-2 shadow-[0_0_24px_rgba(212,175,55,0.25)] scale-105"
               )}
             >
               {tier.featured && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-[#d4af37] to-[#b8941f] text-black px-4 py-1 rounded-full text-sm font-semibold">
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-[#D4AF37] to-[#8E651E] text-black px-4 py-1 rounded-full text-sm font-semibold shadow-[0_0_18px_rgba(212,175,55,0.35)]">
                   Most Popular
                 </div>
               )}

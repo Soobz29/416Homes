@@ -80,7 +80,7 @@ export function ListingCard({ listing, index = 0, onValuate }: ListingCardProps)
         {/* Info panel */}
         <div className="glass-panel p-5">
           <div className="mb-3">
-            <div className="font-display text-[1.8rem] font-bold text-[#D4AF37]">
+            <div className="font-display text-[1.8rem] font-bold text-gold-gradient">
               {formatPrice(listing.price)}
             </div>
             <div className="mt-0.5 font-['DM_Mono',monospace] text-[0.72rem] leading-snug text-[#6b6b60]">
@@ -116,7 +116,7 @@ export function ListingCard({ listing, index = 0, onValuate }: ListingCardProps)
             </a>
             {onValuate && (
               <button
-                className="flex-1 gold-gradient gold-glow py-2 font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-black transition-opacity hover:opacity-90"
+                className="flex-1 rounded-none gold-gradient gold-glow py-2 font-['DM_Mono',monospace] text-[0.68rem] font-bold uppercase tracking-[0.12em] text-black transition-opacity hover:opacity-95"
                 onClick={onValuate}
               >
                 Valuate

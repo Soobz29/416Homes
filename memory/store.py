@@ -146,6 +146,52 @@ class MemoryStore:
                 pass
         return str(val) if val not in (None, "") else ""
 
+    @staticmethod
+    def _extract_photo_url(listing: Dict[str, Any]) -> Optional[str]:
+        """Extract a canonical photo URL from top-level or raw_data candidate keys."""
+        def _from_value(value: Any) -> Optional[str]:
+            if not value:
+                return None
+            if isinstance(value, str):
+                v = value.strip()
+                if v.startswith("http://") or v.startswith("https://"):
+                    return v
+                return None
+            if isinstance(value, list):
+                for item in value:
+                    got = _from_value(item)
+                    if got:
+                        return got
+                return None
+            if isinstance(value, dict):
+                for key in ("url", "href", "src", "highResPath", "HighResPath"):
+                    got = _from_value(value.get(key))
+                    if got:
+                        return got
+                return None
+            return None
+
+        raw_data = listing.get("raw_data") if isinstance(listing.get("raw_data"), dict) else {}
+        candidates = [
+            listing.get("photo"),
+            listing.get("photos"),
+            raw_data.get("photo"),
+            raw_data.get("photos"),
+            raw_data.get("image"),
+            raw_data.get("images"),
+            raw_data.get("image_url"),
+            raw_data.get("image_urls"),
+            raw_data.get("photo_url"),
+            raw_data.get("photo_urls"),
+            raw_data.get("thumbnail"),
+            raw_data.get("thumbnails"),
+        ]
+        for candidate in candidates:
+            out = _from_value(candidate)
+            if out:
+                return out
+        return None
+
     def _normalise_for_listings(self, listing: Dict[str, Any]) -> Dict[str, Any]:
         """Translate scraper dict to exact Supabase listings column names. Coerce scalars so no dicts hit DB."""
         price = self._safe_scalar(listing.get("price"), 0, prefer_int=True)
@@ -187,7 +233,7 @@ class MemoryStore:
             "area": sqft,
             "property_type": str(listing.get("property_type", "Unknown") or "Unknown"),
             "days_on_market": days_on_market,
-            "photo": str(listing.get("photo") or "") or None,
+            "photo": self._extract_photo_url(listing),
             "listing_agent_email": listing.get("listing_agent_email"),
             "listing_agent_name": listing.get("listing_agent_name"),
             "lat": self._to_coord(listing.get("lat")),
@@ -197,6 +243,38 @@ class MemoryStore:
             "scraped_at": listing.get("scraped_at", "") or "",
             "is_active": True
         }
+
+    async def backfill_missing_listing_photos(self, limit: int = 1000) -> int:
+        """Backfill listings.photo from raw_data candidate image fields."""
+        try:
+            if not self.supabase:
+                logger.warning("Supabase not configured; skip photo backfill")
+                return 0
+            # Pull recent rows and update only those with missing/blank photo.
+            rows = (
+                self.supabase.table("listings")
+                .select("id,photo,raw_data")
+                .order("scraped_at", desc=True)
+                .limit(limit)
+                .execute()
+                .data
+                or []
+            )
+            updated = 0
+            for row in rows:
+                existing = (row.get("photo") or "").strip()
+                if existing:
+                    continue
+                recovered = self._extract_photo_url(row)
+                if not recovered:
+                    continue
+                self.supabase.table("listings").update({"photo": recovered}).eq("id", row["id"]).execute()
+                updated += 1
+            logger.info("Backfilled listing photos for %d rows", updated)
+            return updated
+        except Exception as e:
+            logger.error("Failed to backfill listing photos: %s", e)
+            return 0
     
     def _normalise_for_sold_comps(self, comp: Dict[str, Any]) -> Dict[str, Any]:
         """Translate scraper dict to exact Supabase sold_comps column names"""
@@ -489,3 +567,7 @@ async def store_sold_comps(comps: List[Dict[str, Any]]) -> int:
 async def search_listings(query: str, limit: int = 10) -> List[Dict[str, Any]]:
     """Search listings using vector similarity"""
     return await memory_store.search_similar_listings(query, limit)
+
+async def backfill_missing_listing_photos(limit: int = 1000) -> int:
+    """Backfill missing listings.photo values from raw_data fields."""
+    return await memory_store.backfill_missing_listing_photos(limit=limit)

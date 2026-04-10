@@ -4,9 +4,14 @@
   --background: #0B0B0B;
   --foreground: #f5f4ef;
   --color-obsidian: #0B0B0B;
+  /* Primary accent — metallic gold (light → bronze), matches SEARCH CTA reference */
   --color-gold: #D4AF37;
   --color-gold-light: #F3E5AB;
-  --color-gold-dark: #996515;
+  --color-gold-bronze: #8E651E;
+  --color-gold-dark: #8E651E;
+  --accent-gradient: linear-gradient(90deg, #D4AF37 0%, #8E651E 100%);
+  --accent-gradient-hover: linear-gradient(90deg, #F3E5AB 0%, #D4AF37 42%, #8E651E 100%);
+  --accent-glow: 0 0 22px rgba(212, 175, 55, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
 @theme inline {
@@ -39,8 +44,42 @@ body {
 [class*="text-[#c8a96e]"] { color: #D4AF37 !important; }
 [class*="hover:text-[#e4c98a]"]:hover { color: #F3E5AB !important; }
 [class*="hover:text-[#c8a96e]"]:hover { color: #D4AF37 !important; }
-[class*="bg-[#c8a96e]"] { background-color: #D4AF37 !important; }
-[class*="hover:bg-[#e4c98a]"]:hover { background-color: #F3E5AB !important; }
+/* Solid gold fills → horizontal metallic gradient (matches SEARCH CTA) */
+[class*="bg-[#c8a96e]"] {
+  background-color: transparent !important;
+  background-image: var(--accent-gradient) !important;
+  /* Inset highlight only here so 1px rules / tiny dots don’t get a huge halo */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+[class*="hover:bg-[#e4c98a]"]:hover {
+  background-color: transparent !important;
+  background-image: var(--accent-gradient-hover) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+/* Primary CTAs: add outer gold bloom (SEARCH-style) */
+.nav-cta[class*="bg-[#c8a96e]"],
+.btn[class*="bg-[#c8a96e]"],
+.submit-btn[class*="bg-[#c8a96e]"],
+button[type="submit"][class*="bg-[#c8a96e]"] {
+  box-shadow: var(--accent-glow);
+}
+.nav-cta[class*="bg-[#c8a96e]"]:hover,
+.btn[class*="bg-[#c8a96e]"]:hover,
+.submit-btn[class*="bg-[#c8a96e]"]:hover,
+button[type="submit"][class*="bg-[#c8a96e]"]:hover {
+  box-shadow: 0 0 28px rgba(212, 175, 55, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Syne / full-width CTAs often omit .btn — still get SEARCH-style bloom */
+[class*="Syne"][class*="bg-[#c8a96e]"],
+[class*="w-full"][class*="bg-[#c8a96e]"][class*="uppercase"] {
+  box-shadow: var(--accent-glow);
+}
+[class*="Syne"][class*="bg-[#c8a96e]"]:hover,
+[class*="w-full"][class*="bg-[#c8a96e]"][class*="uppercase"]:hover {
+  box-shadow: 0 0 28px rgba(212, 175, 55, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
 [class*="border-[#c8a96e]"] { border-color: #D4AF37 !important; }
 [class*="hover:border-[#e4c98a]"]:hover { border-color: #F3E5AB !important; }
 [class*="hover:border-[#c8a96e]"]:hover { border-color: #D4AF37 !important; }
@@ -76,14 +115,23 @@ body {
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
-/* Gold gradient utility */
+/* Gold gradient utility — horizontal metallic bar (SEARCH / VALUATE style) */
 .gold-gradient {
-  background: linear-gradient(135deg, #D4AF37 0%, #996515 100%);
+  background: var(--accent-gradient);
 }
 
-/* Gold glow utility */
+/* Gold glow utility — soft outer bloom + top highlight */
 .gold-glow {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 0 20px rgba(212, 175, 55, 0.25);
+  box-shadow: var(--accent-glow);
+}
+
+/* Optional: gradient text for large prices / headlines */
+.text-gold-gradient {
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
 }
 
 /* Dropdown options: dark text on light background so they're visible when the list opens */

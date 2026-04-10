@@ -1248,6 +1248,64 @@ async def api_root():
     return JSONResponse(content={"message": "416Homes API is running", "dashboard": "/dashboard"})
 
 def _normalise_listing(row: dict) -> dict:
+    def _coerce_photo_urls(value: Any) -> List[str]:
+        urls: List[str] = []
+        if not value:
+            return urls
+        if isinstance(value, str):
+            v = value.strip()
+            if v.startswith("http://") or v.startswith("https://"):
+                return [v]
+            return []
+        if isinstance(value, list):
+            for item in value:
+                if isinstance(item, str):
+                    v = item.strip()
+                    if v.startswith("http://") or v.startswith("https://"):
+                        urls.append(v)
+                elif isinstance(item, dict):
+                    for key in ("url", "href", "src", "highResPath", "HighResPath"):
+                        cand = item.get(key)
+                        if isinstance(cand, str):
+                            c = cand.strip()
+                            if c.startswith("http://") or c.startswith("https://"):
+                                urls.append(c)
+            return urls
+        if isinstance(value, dict):
+            for key in ("url", "href", "src", "highResPath", "HighResPath"):
+                cand = value.get(key)
+                if isinstance(cand, str):
+                    c = cand.strip()
+                    if c.startswith("http://") or c.startswith("https://"):
+                        urls.append(c)
+            return urls
+        return urls
+
+    def _extract_listing_photos(record: dict) -> List[str]:
+        raw_data = record.get("raw_data") or {}
+        candidates = [
+            record.get("photos"),
+            record.get("photo"),
+            raw_data.get("photos") if isinstance(raw_data, dict) else None,
+            raw_data.get("photo") if isinstance(raw_data, dict) else None,
+            raw_data.get("image") if isinstance(raw_data, dict) else None,
+            raw_data.get("images") if isinstance(raw_data, dict) else None,
+            raw_data.get("image_url") if isinstance(raw_data, dict) else None,
+            raw_data.get("image_urls") if isinstance(raw_data, dict) else None,
+            raw_data.get("photo_url") if isinstance(raw_data, dict) else None,
+            raw_data.get("photo_urls") if isinstance(raw_data, dict) else None,
+            raw_data.get("thumbnail") if isinstance(raw_data, dict) else None,
+            raw_data.get("thumbnails") if isinstance(raw_data, dict) else None,
+        ]
+        seen = set()
+        photos: List[str] = []
+        for candidate in candidates:
+            for url in _coerce_photo_urls(candidate):
+                if url not in seen:
+                    seen.add(url)
+                    photos.append(url)
+        return photos
+
     # Normalise area / sqft; some sources may store complex objects or zeros.
     raw_area = row.get("sqft", row.get("area"))
     if isinstance(raw_area, dict):
@@ -1274,11 +1332,7 @@ def _normalise_listing(row: dict) -> dict:
         "url":         row.get("url", ""),
         "scraped_at":  str(row.get("scraped_at") or ""),
         "strategy":    row.get("strategy", "unknown"),
-        "photos":      (
-            row.get("photos")
-            or ([row["photo"]] if row.get("photo") else [])
-            or ([p] if (p := (row.get("raw_data") or {}).get("photo")) else [])
-        ),
+        "photos":      _extract_listing_photos(row),
     }
 
 def _get_comps(neighbourhood: str, limit: int = 5) -> list:
