@@ -78,7 +78,9 @@ const FAQ_ITEMS = [
 function parseBedsBaths(raw: string): { beds: string; baths: string } {
   const bedsMatch = raw.match(/(\d+)\s*(?:bed|br)/i);
   const bathsMatch = raw.match(/(\d+(?:\.\d)?)\s*(?:bath|ba)/i);
-  const beds = bedsMatch ? bedsMatch[1] : raw.replace(/\D/g, "").trim();
+  // Only use numeric fallback for beds when there is no baths keyword either,
+  // otherwise the bath number (e.g. "1" in "Studio, 1 Bath") would be stolen.
+  const beds = bedsMatch ? bedsMatch[1] : (bathsMatch ? "" : raw.replace(/\D/g, "").trim());
   const baths = bathsMatch ? bathsMatch[1] : "";
   return { beds, baths };
 }

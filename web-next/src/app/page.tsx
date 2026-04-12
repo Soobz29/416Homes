@@ -437,7 +437,7 @@ export default function LandingPage() {
           </p>
           <div className="mt-10">
             {[
-              ["Listing search", "Realtor.ca, HouseSigma, Zolo, Zoocasa", "Free"],
+              ["Listing search", "Realtor.ca, HouseSigma, Kijiji, Zoocasa", "Free"],
               ["Price checks", "Compared against real sold comps", "Free"],
               ["Agent outreach", "Professional email sent on your behalf", "Free"],
               ["Morning digest", "New matches delivered daily", "Free"],
