@@ -112,4 +112,23 @@ export async function fetchMe(email: string): Promise<MeResponse> {
   });
 }
 
+export interface AgentMatchesResponse {
+  matches: Array<{
+    id: string;
+    listing_id: string | null;
+    alert_id: string | null;
+    match_score: number | null;
+    email_sent: boolean;
+    created_at: string | null;
+  }>;
+  total_emails_sent: number;
+}
+
+export async function fetchAgentMatches(email: string): Promise<AgentMatchesResponse> {
+  return requestAlerts<AgentMatchesResponse>("/api/agent-matches", {
+    method: "GET",
+    email,
+  });
+}
+
 

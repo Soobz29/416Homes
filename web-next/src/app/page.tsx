@@ -343,7 +343,7 @@ export default function LandingPage() {
               n: "02 / 04",
               icon: "Scan",
               t: "We scan every night",
-              d: "Checks Realtor.ca, HouseSigma, Zolo, and Zoocasa nightly. Fresh listings appear in your dashboard every morning.",
+              d: "Checks Realtor.ca, HouseSigma, Kijiji, and Zoocasa nightly. Fresh listings appear in your dashboard every morning.",
             },
             {
               n: "03 / 04",
@@ -437,7 +437,7 @@ export default function LandingPage() {
           </p>
           <div className="mt-10">
             {[
-              ["Listing search", "Realtor.ca, HouseSigma, Zolo, Zoocasa", "Free"],
+              ["Listing search", "Realtor.ca, HouseSigma, Kijiji, Zoocasa", "Free"],
               ["Price checks", "Compared against real sold comps", "Free"],
               ["Agent outreach", "Professional email sent on your behalf", "Free"],
               ["Morning digest", "New matches delivered daily", "Free"],

@@ -75,6 +75,17 @@ export function ListingCard({ listing, index = 0, onValuate }: ListingCardProps)
           >
             {(listing.source || "").toUpperCase()}
           </span>
+
+          {/* Transit score badge */}
+          {listing.transit_score != null && (
+            <span
+              className="absolute bottom-3 left-3 rounded-full px-2.5 py-1 font-['DM_Mono',monospace] text-[0.58rem] uppercase tracking-[0.12em] text-white backdrop-blur-sm"
+              style={{ backgroundColor: "rgba(22,120,76,0.85)" }}
+              title="Transit proximity score: Ontario Line / Eglinton Crosstown"
+            >
+              Transit {listing.transit_score}/10
+            </span>
+          )}
         </div>
 
         {/* Info panel */}

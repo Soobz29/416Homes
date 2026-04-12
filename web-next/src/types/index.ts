@@ -12,6 +12,8 @@ export interface Listing {
   url: string;
   photos?: string[];
   created_at: string;
+  transit_score?: number | null;
+  is_assignment?: boolean | null;
 }
 
 export interface VideoJob {
