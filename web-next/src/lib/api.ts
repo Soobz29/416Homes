@@ -86,6 +86,7 @@ export async function fetchListings(params?: {
   propertyTypes?: string[];
   limit?: number;
   offset?: number;
+  isAssignment?: boolean;
 }) {
   const queryParams = new URLSearchParams();
   if (params?.city) queryParams.append("city", params.city);
@@ -94,6 +95,7 @@ export async function fetchListings(params?: {
   if (params?.propertyTypes?.length) queryParams.append("property_types", params.propertyTypes.join(","));
   queryParams.append("limit", String(params?.limit ?? 20));
   queryParams.append("offset", String(params?.offset ?? 0));
+  if (params?.isAssignment === true) queryParams.append("is_assignment", "true");
 
   const url = `${API_BASE}/api/listings?${queryParams.toString()}`;
 
@@ -121,6 +123,8 @@ export async function fetchListings(params?: {
       url: l.url,
       photos: extractListingPhotos(l),
       created_at: l.scraped_at,
+      transit_score: typeof l.transit_score === "number" ? l.transit_score : null,
+      is_assignment: l.is_assignment === true,
     })),
     total: typeof data?.total === "number" ? data.total : rawListings.length,
     scan_time: data?.scan_time ?? null,

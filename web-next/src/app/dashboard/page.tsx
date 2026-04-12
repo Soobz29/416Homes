@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Listing } from "@/types";
 import { fetchListings, fetchValuation } from "@/lib/api";
 import { getSession, signInWithEmail, signOut } from "@/lib/supabase";
-import { Alert, fetchAlerts, createAlert, updateAlert, deleteAlert, generateLinkCode, fetchMe } from "@/lib/alerts";
+import { Alert, fetchAlerts, createAlert, updateAlert, deleteAlert, generateLinkCode, fetchMe, fetchAgentMatches } from "@/lib/alerts";
 import { DropdownSelect } from "@/components/DropdownSelect";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { SmoothToggle } from "@/components/ui/smooth-toggle";
@@ -77,6 +77,7 @@ export default function DashboardPage() {
     bedrooms: "",
     bathrooms: "",
     propertyType: "",
+    isAssignment: false,
   });
   const [listingsError, setListingsError] = useState<string | null>(null);
   const [addressSearch, setAddressSearch] = useState("");
@@ -109,6 +110,7 @@ export default function DashboardPage() {
   const [valuationResult, setValuationResult] = useState<null | { estimated_value: number; confidence: number; price_per_sqft?: number; market_analysis: string }>(null);
   const [valuationLoading, setValuationLoading] = useState(false);
   const [valuationError, setValuationError] = useState<string | null>(null);
+  const [agentMatchCount, setAgentMatchCount] = useState<number | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -124,6 +126,9 @@ export default function DashboardPage() {
         if (email) {
           void loadAlerts(email);
           void loadMe(email);
+          void fetchAgentMatches(email)
+            .then((r) => setAgentMatchCount(r.total_emails_sent))
+            .catch(() => {});
         }
       } catch (e) {
         console.error("Failed to load Supabase session", e);
@@ -167,6 +172,7 @@ export default function DashboardPage() {
         propertyTypes: filters.propertyType ? [filters.propertyType] : undefined,
         limit: LISTINGS_PAGE_SIZE,
         offset: pg * LISTINGS_PAGE_SIZE,
+        isAssignment: filters.isAssignment || undefined,
       });
       setListings(data.listings || []);
       setTotalListings(typeof data.total === "number" ? data.total : 0);
@@ -561,6 +567,15 @@ export default function DashboardPage() {
                   onChange={(propertyType) => setFilters({ ...filters, propertyType })}
                   placeholder="Any type"
                 />
+                <label className="flex cursor-pointer items-center gap-2 font-['DM_Mono',monospace] text-[0.78rem] text-[#f5f4ef]">
+                  <input
+                    type="checkbox"
+                    checked={filters.isAssignment}
+                    onChange={(e) => setFilters({ ...filters, isAssignment: e.target.checked })}
+                    className="h-4 w-4 rounded border border-[rgba(212,175,55,0.4)] accent-[#D4AF37]"
+                  />
+                  Assignment Sales only
+                </label>
                 <button
                   onClick={() => loadListings(0)}
                   className="btn gold-gradient gold-glow w-full px-4 py-3 font-['DM_Mono',monospace] text-[0.82rem] font-bold uppercase tracking-[0.08em] text-black transition-opacity hover:opacity-90"
@@ -691,6 +706,11 @@ export default function DashboardPage() {
                       <span className="font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.1em] text-[#6b6b60]">Active Alerts</span>
                       <PulseBell count={alerts.filter(a => a.is_active).length} animate={alerts.some(a => a.is_active)} />
                     </div>
+                    {agentMatchCount !== null && agentMatchCount > 0 && (
+                      <p className="mb-3 font-['DM_Mono',monospace] text-[0.72rem] text-[#c8a96e]">
+                        {agentMatchCount} email{agentMatchCount !== 1 ? "s" : ""} sent to listing agents on your behalf
+                      </p>
+                    )}
                     {(alertsError || alertActionError) && (
                       <div className="mb-3">
                         <ErrorBanner

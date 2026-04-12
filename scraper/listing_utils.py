@@ -76,3 +76,31 @@ def pick_display_address(*candidates: Optional[str]) -> str:
         if not is_badge_or_headline_only(s):
             return s
     return "Unknown"
+
+
+# Assignment / pre-construction keywords.
+_ASSIGNMENT_PATTERN = re.compile(
+    r"\b(assignment\s*sale|assignment\b|pre[- ]?construction|preconstruction|"
+    r"transfer\s+of\s+(purchase\s+)?contract)\b",
+    re.IGNORECASE,
+)
+
+
+def detect_is_assignment(listing: dict) -> bool:
+    """
+    True if a listing appears to be an assignment sale or pre-construction unit.
+    Checks title, description, address, status, and listing_type fields.
+    Catches all exceptions and returns False — never disrupts the listing loop.
+    """
+    try:
+        fields = (
+            listing.get("title") or "",
+            listing.get("description") or "",
+            listing.get("address") or "",
+            listing.get("status") or "",
+            listing.get("listing_type") or "",
+        )
+        combined = " ".join(str(f) for f in fields)
+        return bool(_ASSIGNMENT_PATTERN.search(combined))
+    except Exception:
+        return False

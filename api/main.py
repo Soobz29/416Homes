@@ -327,10 +327,18 @@ except ImportError:
         return None, 0, []
 
 try:
-    from scraper.listing_utils import is_badge_or_headline_only
+    from scraper.listing_utils import is_badge_or_headline_only, detect_is_assignment as _detect_is_assignment
 except ImportError:
     def is_badge_or_headline_only(listing: dict) -> bool:  # type: ignore[misc]
         return False
+    def _detect_is_assignment(listing: dict) -> bool:  # type: ignore[misc]
+        return False
+
+try:
+    from scraper.transit_data import get_transit_score as _get_transit_score
+except ImportError:
+    def _get_transit_score(area, city, address):  # type: ignore[misc]
+        return None
 
 try:
     from scraper.crawler import (
@@ -520,6 +528,7 @@ async def get_listings(
     bedrooms: Optional[str] = None,
     bathrooms: Optional[str] = None,
     property_types: Optional[str] = None,
+    is_assignment: Optional[bool] = None,
 ):
     """
     Get property listings with optional filters.
@@ -614,6 +623,10 @@ async def get_listings(
                     row_type = row_type.replace("-", " ").replace("_", " ")
                     if not any(t in row_type or row_type in t for t in types_set):
                         continue
+
+            if is_assignment is not None:
+                if bool(_detect_is_assignment(r)) != is_assignment:
+                    continue
 
             filtered.append(r)
 
@@ -835,17 +848,75 @@ async def delete_alert(
     return None
 
 
+@app.get("/api/agent-matches")
+async def get_agent_matches(
+    x_user_email: Optional[str] = Header(None, alias="x-user-email"),
+):
+    """
+    Return agent_matches rows for the current user's alerts.
+    Used by the dashboard to show how many emails have been sent on the user's behalf.
+    """
+    user_id = _get_user_id_from_header(x_user_email)
+    client = _ensure_supabase()
+    try:
+        alerts_resp = (
+            client.table("alerts")
+            .select("id")
+            .eq("user_id", user_id)
+            .execute()
+        )
+        alert_ids = [r["id"] for r in (getattr(alerts_resp, "data", None) or [])]
+        if not alert_ids:
+            return {"matches": [], "total_emails_sent": 0}
+
+        matches_resp = (
+            client.table("agent_matches")
+            .select("id,listing_id,alert_id,match_score,email_sent,created_at")
+            .in_("alert_id", alert_ids)
+            .order("created_at", desc=True)
+            .execute()
+        )
+        rows = getattr(matches_resp, "data", None) or []
+        total_emails_sent = sum(1 for r in rows if r.get("email_sent"))
+        return {"matches": rows, "total_emails_sent": total_emails_sent}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching agent matches: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch agent matches")
+
+
+async def _text_search_listings_fallback(q: str, limit: int) -> list:
+    """ILIKE address fallback when vector search is unavailable."""
+    if not supabase_client:
+        return []
+    try:
+        term = q.strip()
+        resp = (
+            supabase_client.table("listings")
+            .select("*")
+            .ilike("address", f"%{term}%")
+            .limit(limit)
+            .execute()
+        )
+        rows = getattr(resp, "data", None) or []
+        return [_normalise_listing(r) for r in rows]
+    except Exception as e:
+        logger.error(f"Text search fallback also failed: {e}")
+        return []
+
+
 @app.get("/api/listings/search")
 async def search_listings_endpoint(q: str, limit: int = 10):
-    """Search listings using vector similarity"""
-    
+    """Search listings using vector similarity, with ILIKE address fallback."""
     try:
         results = await search_listings(q, limit)
-        return results
+        if results:
+            return results
+        return await _text_search_listings_fallback(q, limit)
     except Exception as e:
-        logger.error(f"Error searching listings: {e}")
-        # Return mock results for demo
-        return []
+        logger.error(f"Vector search failed, falling back to text search: {e}")
+        return await _text_search_listings_fallback(q, limit)
 
 # Valuation endpoint
 @app.post("/api/valuate")
@@ -1367,11 +1438,17 @@ def _normalise_listing(row: dict) -> dict:
         "city":        str(row.get("city") or ""),
         "lat":         row.get("lat"),
         "lng":         row.get("lng"),
-        "source":      row.get("source", "unknown"),
-        "url":         row.get("url", ""),
-        "scraped_at":  str(row.get("scraped_at") or ""),
-        "strategy":    row.get("strategy", "unknown"),
-        "photos":      _extract_listing_photos(row),
+        "source":        row.get("source", "unknown"),
+        "url":           row.get("url", ""),
+        "scraped_at":    str(row.get("scraped_at") or ""),
+        "strategy":      row.get("strategy", "unknown"),
+        "photos":        _extract_listing_photos(row),
+        "transit_score": _get_transit_score(
+                             row.get("neighbourhood") or row.get("area_name"),
+                             row.get("city"),
+                             addr,
+                         ),
+        "is_assignment": _detect_is_assignment(row),
     }
 
 def _get_comps(neighbourhood: str, limit: int = 5) -> list:
