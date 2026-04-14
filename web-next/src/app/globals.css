@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
 :root {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-serif: 'Cormorant Garamond', Georgia, serif;
   --background: #0B0B0B;
   --foreground: #f5f4ef;
   --color-obsidian: #0B0B0B;
@@ -157,3 +159,5 @@ select option {
     transition-duration: 0.01ms !important;
   }
 }
+
+body.modal-open { overflow: hidden; }

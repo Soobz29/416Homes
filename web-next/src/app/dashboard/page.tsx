@@ -13,6 +13,7 @@ import { PulseBell } from "@/components/ui/pulse-bell";
 import { BouncingDots } from "@/components/ui/bouncing-dots";
 import { ExpandSearch } from "@/components/ui/expand-search";
 import { ListingCard } from "@/components/listing-card";
+import { FloorPlanViewer } from "@/components/FloorPlanViewer";
 
 const CITIES = [
   { value: "GTA", label: "All GTA" },
@@ -111,9 +112,23 @@ export default function DashboardPage() {
   const [valuationLoading, setValuationLoading] = useState(false);
   const [valuationError, setValuationError] = useState<string | null>(null);
   const [agentMatchCount, setAgentMatchCount] = useState<number | null>(null);
+  const [viewer3DListing, setViewer3DListing] = useState<Listing | null>(null);
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  // Body scroll lock when 3D modal is open
+  useEffect(() => {
+    document.body.classList.toggle("modal-open", !!viewer3DListing);
+    return () => document.body.classList.remove("modal-open");
+  }, [viewer3DListing]);
+
+  // Escape key dismisses 3D modal
+  useEffect(() => {
+    const fn = (e: KeyboardEvent) => { if (e.key === "Escape") setViewer3DListing(null); };
+    window.addEventListener("keydown", fn);
+    return () => window.removeEventListener("keydown", fn);
   }, []);
 
   useEffect(() => {
@@ -792,6 +807,7 @@ export default function DashboardPage() {
                     key={l.id}
                     listing={l}
                     index={i}
+                    onView3D={(listing) => setViewer3DListing(listing)}
                     onValuate={(listing) => {
                       setValuationForm({
                         neighbourhood: "",
@@ -967,6 +983,77 @@ export default function DashboardPage() {
           © 2026 416Homes · All rights reserved
         </div>
       </footer>
+
+      {/* ── 3D Floor Plan Modal ── */}
+      {viewer3DListing && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(10,10,8,0.92)", backdropFilter: "blur(8px)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setViewer3DListing(null); }}
+        >
+          <div
+            className="relative flex flex-col overflow-hidden rounded-2xl"
+            style={{
+              width: "min(1100px, 95vw)",
+              height: "min(720px, 90vh)",
+              background: "#0f0f0b",
+              boxShadow: "0 0 0 1px rgba(212,175,55,0.3), 0 32px 80px rgba(0,0,0,0.7)",
+            }}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-[rgba(212,175,55,0.2)] px-6 py-4">
+              <div>
+                <p
+                  style={{
+                    fontFamily: "DM Mono, monospace",
+                    fontSize: "0.6rem",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.15em",
+                    color: "#D4AF37",
+                  }}
+                >
+                  3D Floor Plan
+                </p>
+                <p
+                  style={{
+                    fontFamily: "DM Mono, monospace",
+                    fontSize: "0.75rem",
+                    color: "#6b6b60",
+                    marginTop: "2px",
+                  }}
+                >
+                  {viewer3DListing.address}
+                </p>
+              </div>
+              <button
+                onClick={() => setViewer3DListing(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[rgba(212,175,55,0.2)] text-[#6b6b60] transition-colors hover:border-[#D4AF37] hover:text-[#D4AF37]"
+                aria-label="Close 3D viewer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Canvas area */}
+            <div className="relative flex-1">
+              <FloorPlanViewer listing={viewer3DListing} />
+            </div>
+
+            {/* Footer hint */}
+            <div className="border-t border-[rgba(212,175,55,0.1)] px-6 py-3">
+              <p
+                style={{
+                  fontFamily: "DM Mono, monospace",
+                  fontSize: "0.6rem",
+                  color: "#6b6b60",
+                }}
+              >
+                Orbit: left-drag · Zoom: scroll · Pan: right-drag · No floor plan data yet — build it out.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

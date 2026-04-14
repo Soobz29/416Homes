@@ -9,6 +9,7 @@ interface ListingCardProps {
   listing: Listing;
   index?: number;
   onValuate?: (listing: Listing) => void;
+  onView3D?: (listing: Listing) => void;
 }
 
 const SOURCE_COLORS: Record<string, string> = {
@@ -26,7 +27,7 @@ function getInitials(address: string): string {
     : address.slice(0, 2).toUpperCase();
 }
 
-export function ListingCard({ listing, index = 0, onValuate }: ListingCardProps) {
+export function ListingCard({ listing, index = 0, onValuate, onView3D }: ListingCardProps) {
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
 
@@ -125,6 +126,27 @@ export function ListingCard({ listing, index = 0, onValuate }: ListingCardProps)
             >
               View Listing →
             </a>
+            {onView3D && (
+              <button
+                onClick={() => onView3D(listing)}
+                className="border border-[rgba(212,175,55,0.3)] px-3 py-2 font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-[#D4AF37] transition-colors hover:border-[#D4AF37] hover:bg-[rgba(212,175,55,0.08)]"
+                title="Open 3D floor plan viewer"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ display: "block" }}
+                >
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                </svg>
+              </button>
+            )}
             {onValuate && (
               <button
                 className="flex-1 rounded-none gold-gradient gold-glow py-2 font-['DM_Mono',monospace] text-[0.68rem] font-bold uppercase tracking-[0.12em] text-black transition-opacity hover:opacity-95"

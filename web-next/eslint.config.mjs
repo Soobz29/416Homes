@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored third-party source — not subject to project lint rules
+    "src/lib/pascal-core/**",
+    "src/lib/pascal-viewer/**",
   ]),
 ]);
 
