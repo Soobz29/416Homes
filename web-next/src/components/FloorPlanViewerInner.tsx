@@ -42,13 +42,15 @@ function WebGPUUnsupported() {
   );
 }
 
-export default function FloorPlanViewerInner({ listing }: Props) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export default function FloorPlanViewerInner({ listing: _listing }: Props) {
   const [gpuSupported, setGpuSupported] = useState<boolean | null>(null);
 
   useEffect(() => {
-    setGpuSupported(
-      typeof navigator !== "undefined" && "gpu" in navigator
-    );
+    // Must run client-side — navigator is not available during SSR.
+    // Intentional setState-in-effect: this is a one-time capability probe.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setGpuSupported(typeof navigator !== "undefined" && "gpu" in navigator);
   }, []);
 
   // Still probing — avoid flash

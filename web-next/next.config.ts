@@ -1,8 +1,10 @@
 import type { NextConfig } from "next";
-import path from "path";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Turbopack (default in Next.js 16) reads tsconfig.json `paths` automatically.
+  // The @pascal-app/* aliases are already declared there.
+  turbopack: {},
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "images.expcloud.com" },
@@ -25,17 +27,6 @@ const nextConfig: NextConfig = {
         ],
       },
     ];
-  },
-  webpack(config) {
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      "@pascal-app/viewer": path.resolve(
-        __dirname,
-        "src/lib/pascal-viewer/index"
-      ),
-      "@pascal-app/core": path.resolve(__dirname, "src/lib/pascal-core/index"),
-    };
-    return config;
   },
 };
 
