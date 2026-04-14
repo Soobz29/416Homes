@@ -157,3 +157,5 @@ select option {
     transition-duration: 0.01ms !important;
   }
 }
+
+body.modal-open { overflow: hidden; }
