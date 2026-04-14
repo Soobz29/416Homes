@@ -1422,6 +1422,29 @@ def _normalise_listing(row: dict) -> dict:
         raw_area = None
     if isinstance(raw_area, (int, float)) and raw_area <= 0:
         raw_area = None
+    if isinstance(raw_area, str) and not raw_area.strip():
+        raw_area = None
+
+    # Fallback: recover sqft from raw_data when the top-level area column is empty.
+    # Scrapers store their full payload in raw_data so fields like `sqft`
+    # (realtor.ca) and `square_footage` (zoocasa) are available even when the
+    # denormalised area column was not populated at scrape time.
+    if raw_area is None:
+        _rd = row.get("raw_data") or {}
+        if isinstance(_rd, dict):
+            for _key in ("sqft", "square_footage", "area"):
+                _val = _rd.get(_key)
+                if _val and isinstance(_val, (int, float)) and _val > 0:
+                    raw_area = _val
+                    break
+                if _val and isinstance(_val, str) and _val.strip():
+                    try:
+                        _v = float(str(_val).replace(",", "").strip())
+                        if _v > 0:
+                            raw_area = _v
+                            break
+                    except (ValueError, TypeError):
+                        pass
 
     addr = (row.get("address") or "").strip()
     if is_badge_or_headline_only(addr):

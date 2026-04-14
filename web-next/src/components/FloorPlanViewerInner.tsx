@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Viewer } from "@pascal-app/viewer";
+import { Viewer, useViewer } from "@pascal-app/viewer";
 import type { Listing } from "@/types";
 
 interface Props {
@@ -18,6 +18,7 @@ function WebGPUUnsupported() {
         alignItems: "center",
         justifyContent: "center",
         gap: "12px",
+        background: "#0f0f0b",
       }}
     >
       <p
@@ -45,6 +46,12 @@ function WebGPUUnsupported() {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function FloorPlanViewerInner({ listing: _listing }: Props) {
   const [gpuSupported, setGpuSupported] = useState<boolean | null>(null);
+  const setTheme = useViewer((state) => state.setTheme);
+
+  // Force dark theme to match 416Homes UI
+  useEffect(() => {
+    setTheme("dark");
+  }, [setTheme]);
 
   useEffect(() => {
     // Must run client-side — navigator is not available during SSR.
@@ -53,8 +60,10 @@ export default function FloorPlanViewerInner({ listing: _listing }: Props) {
     setGpuSupported(typeof navigator !== "undefined" && "gpu" in navigator);
   }, []);
 
-  // Still probing — avoid flash
-  if (gpuSupported === null) return null;
+  // Still probing — show dark placeholder to avoid white flash
+  if (gpuSupported === null) {
+    return <div style={{ width: "100%", height: "100%", background: "#1f2433" }} />;
+  }
 
   if (!gpuSupported) return <WebGPUUnsupported />;
 
