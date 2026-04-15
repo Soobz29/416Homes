@@ -5,7 +5,7 @@ import re
 import json
 import uuid
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import shutil
 from telegram import Bot, BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -359,7 +359,7 @@ class TelegramBot:
             f"• *Restart Count:* `{metrics['restart_count']}`\n"
             f"• *Scans Today:* `{metrics.get('total_scans', 0)}`\n"
             f"• *Alerts Today:* `{metrics.get('alerts_today', 0)}`\n"
-            f"• *Emails Sent:* `{metrics.get('emails_sent_today', 0)} / 50`"
+            f"• *Emails Sent:* `{metrics.get('emails_sent_today', 0)} / 50`\n"
             f"• *Total Known:* `{status['known_listings']}`\n"
             f"• *Regions:* `{regions_str}`\n"
             f"• *Criteria:* `${status['criteria']['max_price']:,}`"
@@ -502,8 +502,11 @@ class TelegramBot:
                     expires = prefs.get("link_expires_at")
                     if expires:
                         try:
-                            expiry_dt = datetime.fromisoformat(expires.replace("Z", "+00:00"))
-                            if expiry_dt < datetime.utcnow():
+                            s = str(expires).strip().replace("Z", "+00:00").rstrip(".")
+                            expiry_dt = datetime.fromisoformat(s)
+                            if expiry_dt.tzinfo is None:
+                                expiry_dt = expiry_dt.replace(tzinfo=timezone.utc)
+                            if expiry_dt < datetime.now(timezone.utc):
                                 continue
                         except Exception:
                             # If parsing fails, treat as expired.
