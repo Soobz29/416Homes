@@ -40,6 +40,9 @@ CREATE TABLE IF NOT EXISTS listings (
 -- Migration: add photo column if not present (safe to run multiple times)
 ALTER TABLE listings ADD COLUMN IF NOT EXISTS photo TEXT;
 
+-- Migration: add floor_plan_url column (safe to run multiple times)
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS floor_plan_url TEXT;
+
 -- Sold comparable properties
 CREATE TABLE IF NOT EXISTS sold_comps (
     id TEXT PRIMARY KEY,

@@ -309,9 +309,12 @@ async def send_user_alert(chat_id: int, listing: dict) -> None:
             f"🛏 {beds} beds · 🛁 {baths} baths\n"
         )
         if listing.get("area") or listing.get("sqft"):
-            message += f"📏 {listing.get('area') or listing.get('sqft')} sqft\n"
+            message += f"📐 {listing.get('area') or listing.get('sqft')} sqft\n"
+        floor_plan = listing.get("floor_plan_url") or ""
+        if floor_plan:
+            message += f"🏠 <a href=\"{floor_plan}\">3D Tour / Floor Plan</a>\n"
         if url:
             message += f"\n🔗 {url}"
-        await bot.send_message(chat_id=chat_id, text=message)
+        await bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
     except Exception as e:
         logger.exception("send_user_alert failed: %s", e)

@@ -85,13 +85,22 @@ async def scrape_with_scrapling(area: str) -> List[Dict[str, Any]]:
                     continue
                 photo = _extract_photo_from_card(card)
                 lid = hashlib.md5(full_url.encode()).hexdigest()[:12]
+                # Extract sqft from card text (e.g. "1,234 sq. ft." / "1234sqft")
+                all_text = card.get_all_text() or ""
+                sqft = ""
+                sqft_m = re.search(r'([\d,]+)\s*sq\.?\s*ft', all_text, re.IGNORECASE)
+                if sqft_m:
+                    try:
+                        sqft = str(int(sqft_m.group(1).replace(",", "")))
+                    except ValueError:
+                        pass
                 listings.append({
                     "id": f"kijiji_{lid}",
                     "address": title or "Unknown",
                     "price": price,
                     "bedrooms": "",
                     "bathrooms": "",
-                    "area": "",
+                    "area": sqft,
                     "city": "Toronto" if area.lower() in ("gta", "toronto") else area.title(),
                     "lat": None,
                     "lng": None,

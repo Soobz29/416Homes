@@ -119,6 +119,12 @@ async def _scrape_zoocasa_page(client, url: str) -> list:
                 "bedrooms": item.get("bedrooms", ""),
                 "bathrooms": item.get("bathrooms", ""),
                 "sqft": item.get("square_footage", ""),
+                "floor_plan_url": (
+                    item.get("virtual_tour_url", "")
+                    or item.get("floor_plan_url", "")
+                    or item.get("tour_url", "")
+                    or ""
+                ),
                 "neighbourhood": item.get("neighbourhood", ""),
                 "url": f"https://www.zoocasa.com{item.get('listing_url_absolute_path', '')}",
                 "photo": photo,

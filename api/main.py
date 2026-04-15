@@ -208,6 +208,7 @@ class ListingResponse(BaseModel):
     url: str
     scraped_at: str
     strategy: str
+    floor_plan_url: Optional[str] = None
 
 class ValuationRequest(BaseModel):
     neighbourhood: str
@@ -1450,28 +1451,39 @@ def _normalise_listing(row: dict) -> dict:
     if is_badge_or_headline_only(addr):
         addr = "Address not available"
 
+    # Extract floor_plan_url: direct column first, then fall back to raw_data
+    raw_data = row.get("raw_data") or {}
+    floor_plan_url = (
+        row.get("floor_plan_url")
+        or (raw_data.get("floor_plan_url") if isinstance(raw_data, dict) else None)
+        or (raw_data.get("VirtualTourUrl") if isinstance(raw_data, dict) else None)
+        or (raw_data.get("virtual_tour_url") if isinstance(raw_data, dict) else None)
+        or ""
+    )
+
     return {
-        "id":          row.get("id", ""),
-        "address":     addr,
-        "price":       row.get("price") or 0,
-        "bedrooms":    str(row.get("bedrooms") or ""),
-        "bathrooms":   str(row.get("bathrooms") or ""),
+        "id":             row.get("id", ""),
+        "address":        addr,
+        "price":          row.get("price") or 0,
+        "bedrooms":       str(row.get("bedrooms") or ""),
+        "bathrooms":      str(row.get("bathrooms") or ""),
         # Dashboard expects 'area'; source data may use 'sqft' (Supabase) or 'area' (last_scan JSON).
-        "area":        ("" if raw_area is None else str(raw_area)),
-        "city":        str(row.get("city") or ""),
-        "lat":         row.get("lat"),
-        "lng":         row.get("lng"),
-        "source":        row.get("source", "unknown"),
-        "url":           row.get("url", ""),
-        "scraped_at":    str(row.get("scraped_at") or ""),
-        "strategy":      row.get("strategy", "unknown"),
-        "photos":        _extract_listing_photos(row),
-        "transit_score": _get_transit_score(
-                             row.get("neighbourhood") or row.get("area_name"),
-                             row.get("city"),
-                             addr,
-                         ),
-        "is_assignment": _detect_is_assignment(row),
+        "area":           ("" if raw_area is None else str(raw_area)),
+        "city":           str(row.get("city") or ""),
+        "lat":            row.get("lat"),
+        "lng":            row.get("lng"),
+        "source":         row.get("source", "unknown"),
+        "url":            row.get("url", ""),
+        "scraped_at":     str(row.get("scraped_at") or ""),
+        "strategy":       row.get("strategy", "unknown"),
+        "photos":         _extract_listing_photos(row),
+        "transit_score":  _get_transit_score(
+                              row.get("neighbourhood") or row.get("area_name"),
+                              row.get("city"),
+                              addr,
+                          ),
+        "is_assignment":  _detect_is_assignment(row),
+        "floor_plan_url": floor_plan_url or None,
     }
 
 def _get_comps(neighbourhood: str, limit: int = 5) -> list:
