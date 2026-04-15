@@ -691,8 +691,8 @@ export default function VideoPage() {
     const jobId = "demo-" + Math.random().toString(36).slice(2, 8);
     showProgress(jobId, formListingUrl || formCustomAddress || "Demo listing");
     const steps = [
-      { step: "scrape", msg: "Found 6 photos · 218 Broadview Ave", delay: 1500 },
-      { step: "script", msg: 'Script complete · "Where Heritage Meets Modern Luxury"', delay: 3500 },
+      { step: "scrape", msg: "Found 6 photos · GTA listing", delay: 1500 },
+      { step: "script", msg: "Script complete · Cinematic narration ready", delay: 3500 },
       { step: "audio", msg: "Voiceover recorded · Cinematic music generated", delay: 6000 },
       { step: "animate", msg: "All 6 clips animated with dolly shots", delay: 10000 },
       { step: "assemble", msg: "Final video assembled · 1920×1080 MP4", delay: 13000 },
@@ -788,12 +788,8 @@ export default function VideoPage() {
               title="416Homes sample video"
             />
             <div className="vp-caption absolute bottom-[8%] left-0 right-0 px-6">
-              <div className="vp-headline mb-1 text-[1.1rem] font-bold">
-                Where Heritage Meets Modern Luxury
-              </div>
-              <div className="vp-address font-['DM Mono',monospace] text-[0.65rem] text-[#6b6b60]">
-                218 Broadview Ave, Leslieville ·{" "}
-                <span className="vp-price-tag font-bold text-[#c8a96e]">$1,149,000</span>
+              <div className="vp-headline mb-1 font-['DM_Mono',monospace] text-[0.65rem] uppercase tracking-[0.15em] text-[#c8a96e]">
+                416Homes · Cinematic listing video
               </div>
             </div>
             <div className="vp-badge absolute right-[5%] top-[10%] border border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.7)] px-2 py-1 font-['DM Mono',monospace] text-[0.6rem] uppercase tracking-[0.1em] text-[#c8a96e]">

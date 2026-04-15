@@ -271,18 +271,18 @@ export default function LandingPage() {
               {featuredListing?.address ?? "1480 Erin Mills Pkwy, Unit 12"}
             </div>
             <div className="mb-6 font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-[#6b6b60]">
-              {featuredListing ? "Live listing from your feed" : "Connecting to live listings..."}
+              GTA&apos;s sharpest deals, found first
             </div>
             <div className="mb-2 text-[1.9rem] font-extrabold">
               {featuredListing ? formatPriceFull(featuredListing.price) : "$1,049,000"}
             </div>
             <div className="mb-6 flex items-center gap-2">
-              <span className="bg-[rgba(46,213,115,0.15)] px-2 py-0.5 font-['DM_Mono',monospace] text-[0.62rem] text-[#2ed573]">
-                {featuredListing ? "Live from Supabase" : "Syncing listing data"}
-              </span>
-              <span className="font-['DM_Mono',monospace] text-[0.62rem] text-[#6b6b60]">
-                {featuredListing ? "Auto-refreshed from listings API" : "Waiting for API"}
-              </span>
+              <Link
+                href="/video"
+                className="bg-[rgba(200,169,110,0.12)] px-2 py-0.5 font-['DM_Mono',monospace] text-[0.62rem] text-[#c8a96e] no-underline hover:bg-[rgba(200,169,110,0.22)] transition-colors"
+              >
+                Get a cinematic video →
+              </Link>
             </div>
             <div className="mb-5 grid grid-cols-3 gap-2 border-y border-[rgba(200,169,110,0.2)] py-5">
               {[
