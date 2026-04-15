@@ -125,6 +125,7 @@ export async function fetchListings(params?: {
       created_at: l.scraped_at,
       transit_score: typeof l.transit_score === "number" ? l.transit_score : null,
       is_assignment: l.is_assignment === true,
+      floor_plan_url: l.floor_plan_url || null,
     })),
     total: typeof data?.total === "number" ? data.total : rawListings.length,
     scan_time: data?.scan_time ?? null,

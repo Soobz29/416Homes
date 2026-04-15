@@ -341,6 +341,31 @@ except ImportError:
     def _get_transit_score(area, city, address):  # type: ignore[misc]
         return None
 
+
+def _resolve_transit_score(area: Optional[str], city: Optional[str], address: Optional[str]) -> int:
+    """
+    Always returns an integer transit score (never None).
+    Tries keyword matching first; if no match, falls back to city-level baseline:
+      Toronto / North York / East York / Etobicoke / Scarborough → 4
+      Mississauga / Brampton / Vaughan / Markham / Richmond Hill   → 3
+      Other GTA / unknown                                           → 2
+    """
+    score = _get_transit_score(area, city, address)
+    if score is not None:
+        return score
+    city_lower = (city or "").lower()
+    address_lower = (address or "").lower()
+    toronto_terms = ("toronto", "north york", "east york", "etobicoke", "scarborough", "york")
+    mississauga_terms = ("mississauga", "brampton", "vaughan", "markham", "richmond hill", "oakville", "burlington", "ajax", "pickering", "oshawa", "whitby")
+    for term in toronto_terms:
+        if term in city_lower or term in address_lower:
+            return 4
+    for term in mississauga_terms:
+        if term in city_lower or term in address_lower:
+            return 3
+    return 2
+
+
 try:
     from scraper.crawler import (
         CrawlRequest,
@@ -1477,7 +1502,7 @@ def _normalise_listing(row: dict) -> dict:
         "scraped_at":     str(row.get("scraped_at") or ""),
         "strategy":       row.get("strategy", "unknown"),
         "photos":         _extract_listing_photos(row),
-        "transit_score":  _get_transit_score(
+        "transit_score":  _resolve_transit_score(
                               row.get("neighbourhood") or row.get("area_name"),
                               row.get("city"),
                               addr,

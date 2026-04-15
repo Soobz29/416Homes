@@ -77,16 +77,23 @@ export function ListingCard({ listing, index = 0, onValuate, onView3D }: Listing
             {(listing.source || "").toUpperCase()}
           </span>
 
-          {/* Transit score badge */}
-          {listing.transit_score != null && (
-            <span
-              className="absolute bottom-3 left-3 rounded-full px-2.5 py-1 font-['DM_Mono',monospace] text-[0.58rem] uppercase tracking-[0.12em] text-white backdrop-blur-sm"
-              style={{ backgroundColor: "rgba(22,120,76,0.85)" }}
-              title="Transit proximity score: Ontario Line / Eglinton Crosstown"
-            >
-              Transit {listing.transit_score}/10
-            </span>
-          )}
+          {/* Transit score badge — color + label by tier */}
+          {listing.transit_score != null && (() => {
+            const s = listing.transit_score;
+            const label = s >= 9 ? "Elite"    : s >= 7 ? "Excellent" : s >= 5 ? "Good" : s >= 3 ? "Fair" : "Limited";
+            const bg    = s >= 9 ? "rgba(22,120,76,0.92)"  : s >= 7 ? "rgba(34,165,94,0.88)"
+                        : s >= 5 ? "rgba(200,169,110,0.88)" : s >= 3 ? "rgba(138,122,80,0.85)"
+                        : "rgba(107,107,96,0.85)";
+            return (
+              <span
+                className="absolute bottom-3 left-3 rounded-full px-2.5 py-1 font-['DM_Mono',monospace] text-[0.55rem] uppercase tracking-[0.1em] text-white backdrop-blur-sm"
+                style={{ backgroundColor: bg }}
+                title={"Transit score (Ontario Line · Eglinton Crosstown · TTC subway)\n9-10 Elite  7-8 Excellent  5-6 Good  3-4 Fair  1-2 Limited"}
+              >
+                🚇 {s}/10 · {label}
+              </span>
+            );
+          })()}
         </div>
 
         {/* Info panel */}

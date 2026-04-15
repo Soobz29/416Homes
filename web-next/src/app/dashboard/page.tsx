@@ -383,12 +383,10 @@ export default function DashboardPage() {
             </button>
           </li>
         </ul>
-        <button className="nav-cta flex items-center gap-2 bg-[#D4AF37] px-6 py-2 font-['DM Mono',monospace] text-[0.72rem] font-medium uppercase tracking-[0.08em] text-black transition-colors hover:bg-[#F3E5AB]">
+        <Link href="/" className="nav-cta flex items-center gap-2 bg-[#D4AF37] px-6 py-2 font-['DM Mono',monospace] text-[0.72rem] font-medium uppercase tracking-[0.08em] text-black transition-colors hover:bg-[#F3E5AB] no-underline">
           <span className="hidden md:inline">Back to 416Homes</span>
-          <Link href="/" className="md:hidden">
-            Home
-          </Link>
-        </button>
+          <span className="md:hidden">Home</span>
+        </Link>
       </nav>
 
       {/* Hero */}
