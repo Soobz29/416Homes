@@ -1,121 +1,136 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Viewer, useViewer } from "@pascal-app/viewer";
-import { useScene, SlabNode, WallNode } from "@pascal-app/core";
 import type { Listing } from "@/types";
 
 interface Props {
   listing: Listing;
 }
 
-function WebGPUUnsupported() {
+export default function FloorPlanViewerInner({ listing }: Props) {
+  const tourUrl = listing.floor_plan_url;
+
+  /* ── Virtual tour available → embed it ── */
+  if (tourUrl) {
+    return (
+      <div style={{ width: "100%", height: "100%", position: "relative" }}>
+        <iframe
+          src={tourUrl}
+          title="Virtual Tour"
+          allow="fullscreen; vr; xr-spatial-tracking"
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            border: "none",
+            background: "#0a0a08",
+          }}
+        />
+      </div>
+    );
+  }
+
+  /* ── No tour URL → clean fallback ── */
   return (
     <div
       style={{
         display: "flex",
-        height: "100%",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: "12px",
+        height: "100%",
+        gap: "20px",
         background: "#0f0f0b",
+        padding: "32px",
+        textAlign: "center",
       }}
     >
-      <p
+      {/* Icon */}
+      <div
         style={{
-          fontFamily: "DM Mono, monospace",
-          fontSize: "0.8rem",
-          color: "#e07060",
+          width: "56px",
+          height: "56px",
+          borderRadius: "50%",
+          border: "1px solid rgba(200,169,110,0.25)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "1.5rem",
         }}
       >
-        WebGPU is not supported in this browser.
-      </p>
-      <p
-        style={{
-          fontFamily: "DM Mono, monospace",
-          fontSize: "0.7rem",
-          color: "#6b6b60",
-        }}
-      >
-        Use Chrome 113+ or Edge 113+ for the 3D viewer.
-      </p>
-    </div>
-  );
-}
+        🏠
+      </div>
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export default function FloorPlanViewerInner({ listing: _listing }: Props) {
-  const [gpuSupported, setGpuSupported] = useState<boolean | null>(null);
-  const setTheme = useViewer((state) => state.setTheme);
+      <div>
+        <p
+          style={{
+            fontFamily: "DM Mono, monospace",
+            fontSize: "0.72rem",
+            color: "#c8a96e",
+            textTransform: "uppercase",
+            letterSpacing: "0.12em",
+            marginBottom: "8px",
+          }}
+        >
+          No virtual tour available
+        </p>
+        <p
+          style={{
+            fontFamily: "DM Mono, monospace",
+            fontSize: "0.65rem",
+            color: "#6b6b60",
+            lineHeight: "1.6",
+            maxWidth: "280px",
+          }}
+        >
+          This listing doesn&apos;t have a virtual tour yet. View it directly on
+          the source site, or order a cinematic video.
+        </p>
+      </div>
 
-  // Force dark theme to match 416Homes UI
-  useEffect(() => {
-    setTheme("dark");
-  }, [setTheme]);
-
-  useEffect(() => {
-    // Must run client-side — navigator is not available during SSR.
-    // Intentional setState-in-effect: this is a one-time capability probe.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setGpuSupported(typeof navigator !== "undefined" && "gpu" in navigator);
-  }, []);
-
-  // Seed a default 8×6m room once WebGPU is confirmed available.
-  useEffect(() => {
-    if (!gpuSupported) return;
-
-    const { loadScene, createNodes, nodes } = useScene.getState();
-
-    // Creates Site → Building → Level hierarchy (no-op if already exists)
-    loadScene();
-
-    // Find the level node so we can parent geometry to it
-    const allNodes = useScene.getState().nodes;
-    const levelNode = Object.values(allNodes).find((n) => n.type === "level");
-    if (!levelNode) return;
-
-    // Only seed if the level has no geometry children yet
-    const levelChildren = "children" in levelNode ? (levelNode as { children: string[] }).children : [];
-    const hasGeometry = levelChildren.some((id) => {
-      const child = allNodes[id as keyof typeof allNodes];
-      return child && (child.type === "slab" || child.type === "wall");
-    });
-    if (hasGeometry) return;
-
-    // 8m wide × 6m deep room (coordinates in metres, X/Z plane)
-    const slab = SlabNode.parse({
-      polygon: [[-4, -3], [4, -3], [4, 3], [-4, 3]],
-      elevation: 0.05,
-    });
-    const wallSouth = WallNode.parse({ start: [-4, -3] as [number, number], end: [4, -3] as [number, number] });
-    const wallEast  = WallNode.parse({ start: [4, -3]  as [number, number], end: [4, 3]  as [number, number] });
-    const wallNorth = WallNode.parse({ start: [4, 3]   as [number, number], end: [-4, 3] as [number, number] });
-    const wallWest  = WallNode.parse({ start: [-4, 3]  as [number, number], end: [-4, -3] as [number, number] });
-
-    createNodes([
-      { node: slab,      parentId: levelNode.id },
-      { node: wallSouth, parentId: levelNode.id },
-      { node: wallEast,  parentId: levelNode.id },
-      { node: wallNorth, parentId: levelNode.id },
-      { node: wallWest,  parentId: levelNode.id },
-    ]);
-  // `nodes` from destructure is intentionally not listed — we re-read via getState() after loadScene()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gpuSupported]);
-
-  // Still probing — show dark placeholder to avoid white flash
-  if (gpuSupported === null) {
-    return <div style={{ width: "100%", height: "100%", background: "#1f2433" }} />;
-  }
-
-  if (!gpuSupported) return <WebGPUUnsupported />;
-
-  // Viewer manages its own Canvas + WebGPU renderer internally.
-  // Scene is pre-seeded with a default 8×6m room above.
-  return (
-    <div style={{ width: "100%", height: "100%" }}>
-      <Viewer />
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px", width: "100%", maxWidth: "260px" }}>
+        {listing.url && (
+          <a
+            href={listing.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "block",
+              padding: "10px 16px",
+              background: "rgba(200,169,110,0.1)",
+              border: "1px solid rgba(200,169,110,0.25)",
+              color: "#c8a96e",
+              fontFamily: "DM Mono, monospace",
+              fontSize: "0.62rem",
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+              textDecoration: "none",
+              textAlign: "center",
+              transition: "background 0.2s",
+            }}
+          >
+            View on {listing.source || "listing site"} →
+          </a>
+        )}
+        <a
+          href="/video"
+          style={{
+            display: "block",
+            padding: "10px 16px",
+            background: "#c8a96e",
+            color: "#0a0a08",
+            fontFamily: "DM Mono, monospace",
+            fontSize: "0.62rem",
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: "0.1em",
+            textDecoration: "none",
+            textAlign: "center",
+          }}
+        >
+          Order a cinematic video — from $99
+        </a>
+      </div>
     </div>
   );
 }

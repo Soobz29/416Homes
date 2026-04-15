@@ -1048,7 +1048,9 @@ export default function DashboardPage() {
                   color: "#6b6b60",
                 }}
               >
-                Orbit: left-drag · Zoom: scroll · Pan: right-drag · No floor plan data yet — build it out.
+                {viewer3DListing.floor_plan_url
+                  ? "Virtual tour embedded from listing source · Use mouse to navigate"
+                  : "No virtual tour available for this listing · Order a cinematic video below"}
               </p>
             </div>
           </div>

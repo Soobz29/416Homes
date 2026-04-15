@@ -25,7 +25,7 @@ const Inner = dynamic(() => import("@/components/FloorPlanViewerInner"), {
           color: "#6b6b60",
         }}
       >
-        Loading 3D viewer…
+        Loading viewer…
       </span>
     </div>
   ),

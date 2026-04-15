@@ -14,6 +14,7 @@ export interface Listing {
   created_at: string;
   transit_score?: number | null;
   is_assignment?: boolean | null;
+  floor_plan_url?: string | null;
 }
 
 export interface VideoJob {
