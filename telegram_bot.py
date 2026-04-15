@@ -635,10 +635,26 @@ class TelegramBot:
                     lines.append("")
                 last_group = group
 
+            beds = L.get("bedrooms") or L.get("beds") or ""
+            baths = L.get("bathrooms") or L.get("baths") or ""
+            sqft = L.get("area") or L.get("sqft") or ""
+            floor_plan = L.get("floor_plan_url") or ""
+
             lines.append(f"<b>{i}.</b> {self._escape_html(addr)}")
             lines.append(f"   💰 {price_str} • {src}")
+            detail_parts = []
+            if beds:
+                detail_parts.append(f"🛏 {beds} bd")
+            if baths:
+                detail_parts.append(f"🛁 {baths} ba")
+            if sqft:
+                detail_parts.append(f"📐 {sqft} sqft")
+            if detail_parts:
+                lines.append(f"   {' · '.join(detail_parts)}")
             if url:
                 lines.append(f"   🔗 <a href=\"{url}\">View listing</a>")
+            if floor_plan:
+                lines.append(f"   🏠 <a href=\"{floor_plan}\">3D Tour / Floor Plan</a>")
             lines.append("")
         text = "\n".join(lines).strip()
 

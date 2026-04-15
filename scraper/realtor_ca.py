@@ -170,6 +170,12 @@ def _parse_listing_item(item: dict, region_name: str) -> dict | None:
         "bathrooms": item.get("Building", {}).get("BathroomTotal", ""),
         "sqft": _parse_sqft(item.get("Building", {}).get("SizeInterior", "")),
         "photo": (item.get("Property", {}).get("Photo") or [{}])[0].get("HighResPath", ""),
+        "floor_plan_url": (
+            item.get("Property", {}).get("VirtualTourUrl", "")
+            or item.get("VirtualTourUrl", "")
+            or item.get("Property", {}).get("FloorPlanUrl", "")
+            or ""
+        ),
         "scraped_at": datetime.now(timezone.utc).isoformat(),
     }
 

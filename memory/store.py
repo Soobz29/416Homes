@@ -248,6 +248,7 @@ class MemoryStore:
             "listing_agent_name": listing.get("listing_agent_name"),
             "lat": self._to_coord(listing.get("lat")),
             "lng": self._to_coord(listing.get("lng")),
+            "floor_plan_url": str(listing.get("floor_plan_url") or ""),
             "raw_data": listing,
             "embedding": None,  # Will be filled later
             "scraped_at": listing.get("scraped_at", "") or "",
