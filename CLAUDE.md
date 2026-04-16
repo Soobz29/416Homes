@@ -107,7 +107,7 @@ web-next/
 
 ## Current State (as of 2026-04-15)
 
-### ✅ Recently shipped (this session)
+### ✅ Fully shipped & working (as of 2026-04-15 end of session)
 
 **Dashboard UX fixes:**
 - "Back to 416Homes" button now navigates correctly (`<Link href="/">`)
@@ -130,12 +130,14 @@ web-next/
 - Gold `⬡ 3D Tour` badge shown when `listing.floor_plan_url` is set
 - Transit badge with tier label + color scale
 
-**Virtual Tour product ($49 CAD) — NEW:**
+**Virtual Tour product ($49 CAD):**
 - `tour_pipeline/pipeline.py`: fetch photos → Gemini Vision classify by room → build manifest → Supabase → email delivery link
 - `api/main.py`: `POST /api/tour-jobs`, `GET /api/tour-jobs/{id}`, `POST /tour/create-checkout` (Stripe $49), `POST /tour/stripe-webhook`
 - `web-next/src/app/tours/page.tsx`: product order page with progress polling + completion panel (shareable link + embed code)
 - `web-next/src/app/tours/[id]/page.tsx`: interactive room-by-room viewer with lightbox + keyboard nav
-- Nav links added to homepage + dashboard
+- Nav links added to homepage desktop + mobile + dashboard nav
+- `tour_jobs` Supabase table migrated and live in production
+- Demo mode: when API unavailable, client generates `demo-XXXXX` ID → viewer serves 7-room hardcoded manifest with Unsplash photos + gold "Demo Tour" banner
 
 **Telegram bots:**
 - Fixed `API_BASE_URL` env var on DigitalOcean (was causing "unable to fetch listings")
@@ -148,22 +150,7 @@ web-next/
 
 ### ⚠️ Manual steps still needed
 
-1. **Supabase SQL migration** — run this in Supabase SQL editor to enable tour jobs:
-```sql
-CREATE TABLE IF NOT EXISTS tour_jobs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  listing_url TEXT,
-  customer_email TEXT NOT NULL,
-  customer_name TEXT,
-  status TEXT DEFAULT 'pending',
-  progress INTEGER DEFAULT 0,
-  tour_url TEXT,
-  photo_manifest JSONB,
-  error_message TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
+1. **~~Supabase tour_jobs migration~~** ✅ DONE — table exists in production Supabase.
 
 2. **Valuation model** — not yet trained. Run once with sold_comps in Supabase:
 ```bash
@@ -171,7 +158,19 @@ python valuation/model.py
 ```
 Then trigger GitHub Actions → "416Homes Model Retraining" → Run workflow (commits `valuation_model.pkl` back to main).
 
-3. **Stripe webhook for tours** — add `/tour/stripe-webhook` URL in Stripe dashboard pointing to the DO backend.
+3. **Stripe webhook for tours** — add `/tour/stripe-webhook` URL in Stripe dashboard pointing to the DO backend URL.
+
+---
+
+### 🐛 Known bugs fixed this session (do not re-introduce)
+
+- `tours/page.tsx` was sending `agent_email`/`agent_name` — FastAPI model expects `customer_email`/`customer_name`. Fixed.
+- `tours/[id]/page.tsx` was calling the API with `demo-XXXXX` IDs (client-generated fallback) and getting 404. Fixed: `demo-*` IDs now skip the API and load a hardcoded 7-room manifest with Unsplash photos.
+- `TourStatus` TypeScript union was missing `"failed"` — caused Vercel build error. Fixed.
+- Matterport demo models `SxQL3iGyvQk` and `aSx1MpRRqif` are dead. Current working model: `jm5WwEA3HUN` (used by Matterport on their own real-estate page).
+- `_resolve_transit_score()` in `api/main.py` wraps `_get_transit_score()` to ensure transit score is never null. City fallback: Toronto=4, Mississauga/905=3, other=2.
+- Dashboard "Back to 416Homes" was a `<button>` with no href — fixed to `<Link href="/">`.
+- `floor_plan_url` was not mapped in `web-next/src/lib/api.ts` fetchListings — added.
 
 ---
 
