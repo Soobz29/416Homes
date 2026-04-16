@@ -116,20 +116,13 @@ async def _fetch_listing_photos(listing_url: str) -> list[str]:
         return []
     if "realtor.ca" in listing_url:
         return await _fetch_realtor_ca_photos(listing_url)
-    # Generic: look for expcloud image URLs
     try:
         async with httpx.AsyncClient(follow_redirects=True, timeout=20) as client:
             resp = await client.get(listing_url)
             resp.raise_for_status()
-            html = resp.text
-        import re as _re
-        found = _re.findall(r"https://images\.expcloud\.com/[^\s\"'<>)]+\.(?:jpg|jpeg|webp|png)", html, _re.IGNORECASE)
-        found += _re.findall(r"https://cdn\.zoocasa\.com/[^\s\"'<>)]+\.(?:jpg|jpeg|webp|png)", html, _re.IGNORECASE)
-        seen, urls = set(), []
-        for u in found:
-            if u not in seen:
-                seen.add(u); urls.append(u)
-        return urls[:15]
+        # Use the proven extractor — handles no-extension expcloud URLs, BeautifulSoup fallback
+        from video_pipeline.listing_photos import extract_expcloud_photo_urls_from_html
+        return extract_expcloud_photo_urls_from_html(resp.text, max_urls=15)
     except Exception as e:
         logger.error("Generic photo fetch failed for %s: %s", listing_url, e)
         return []
@@ -143,17 +136,18 @@ async def _fetch_photos_from_db(listing_url: str) -> list[str]:
         db = _supabase_client()
         if not db:
             return []
-        # Try exact URL match first, then partial match on the core path
-        rows = db.table("listings").select("raw_data, url").eq("url", listing_url).limit(1).execute()
+        # Also select top-level photo column (written by all scrapers via memory/store.py)
+        rows = db.table("listings").select("raw_data, photo, url").eq("url", listing_url).limit(1).execute()
         if not rows.data:
-            # Try ILIKE partial match
             import re as _re
             slug = _re.sub(r"https?://[^/]+", "", listing_url).strip("/")[:80]
-            rows = db.table("listings").select("raw_data, url").ilike("url", f"%{slug}%").limit(1).execute()
+            rows = db.table("listings").select("raw_data, photo, url").ilike("url", f"%{slug}%").limit(1).execute()
         if not rows.data:
             return []
-        raw = rows.data[0].get("raw_data") or {}
-        # Try common photo fields stored by our scrapers
+        row = rows.data[0]
+        raw = row.get("raw_data") or {}
+
+        # 1. Photo arrays in raw_data (populated by enriched Zoocasa scraper)
         for key in ("photos", "photo_urls", "images", "media", "Photo"):
             val = raw.get(key)
             if isinstance(val, list):
@@ -167,8 +161,22 @@ async def _fetch_photos_from_db(listing_url: str) -> list[str]:
                                 urls.append(item[fk])
                                 break
                 if urls:
-                    logger.info("Found %d photos from listings DB for %s", len(urls), listing_url)
+                    logger.info("Found %d photos from raw_data.%s for %s", len(urls), key, listing_url)
                     return urls[:15]
+
+        # 2. Single photo URL in raw_data string fields
+        for key in ("photo", "image", "thumbnail", "photo_url", "image_url"):
+            val = raw.get(key)
+            if isinstance(val, str) and val.startswith("http"):
+                logger.info("Found single photo from raw_data.%s for %s", key, listing_url)
+                return [val]
+
+        # 3. Top-level photo column (thumbnail — last resort before stock)
+        top_photo = row.get("photo")
+        if isinstance(top_photo, str) and top_photo.startswith("http"):
+            logger.info("Found single photo from listings.photo for %s", listing_url)
+            return [top_photo]
+
         return []
     except Exception as e:
         logger.warning("DB photo lookup failed for %s: %s", listing_url, e)

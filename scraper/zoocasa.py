@@ -12,6 +12,29 @@ from scraper.listing_utils import is_sold_or_inactive, pick_display_address
 logger = logging.getLogger(__name__)
 HEADER_GEN = get_stealth_header_generator()
 
+# Limit concurrent detail-page fetches so we don't hammer Zoocasa
+_GALLERY_SEM = asyncio.Semaphore(5)
+
+
+async def _fetch_zoocasa_gallery(client: httpx.AsyncClient, listing_url: str) -> List[str]:
+    """Fetch a listing detail page and extract the full photo gallery."""
+    if not listing_url:
+        return []
+    try:
+        async with _GALLERY_SEM:
+            resp = await client.get(listing_url, timeout=15)
+        if resp.status_code != 200:
+            logger.debug("Gallery fetch %s returned %d", listing_url, resp.status_code)
+            return []
+        from video_pipeline.listing_photos import extract_expcloud_photo_urls_from_html
+        photos = extract_expcloud_photo_urls_from_html(resp.text, max_urls=15)
+        if photos:
+            logger.info("Gallery: %d photos from %s", len(photos), listing_url)
+        return photos
+    except Exception as e:
+        logger.warning("Gallery fetch failed for %s: %s", listing_url, e)
+        return []
+
 ZOOCASA_URLS = [
     # Core GTA cities we care about
     "https://www.zoocasa.com/toronto-on-real-estate",
@@ -133,6 +156,14 @@ async def _scrape_zoocasa_page(client, url: str) -> list:
                 "region": region,
                 "city": city,
             })
+        # Enrich each listing with the full photo gallery from its detail page
+        if listings:
+            gallery_tasks = [_fetch_zoocasa_gallery(client, item["url"]) for item in listings]
+            galleries = await asyncio.gather(*gallery_tasks, return_exceptions=True)
+            for item, gallery in zip(listings, galleries):
+                if isinstance(gallery, list) and gallery:
+                    item["photos"] = gallery
+
         return listings
     except Exception as e:
         logger.error(f"Error scraping Zoocasa page {url}: {e}")
