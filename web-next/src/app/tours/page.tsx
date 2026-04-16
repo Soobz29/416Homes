@@ -8,7 +8,7 @@ const API_BASE = (
   (typeof window !== "undefined" ? window.location.origin : "http://localhost:8000")
 ).replace(/\/$/, "");
 
-const TOUR_STEPS = ["pending", "processing", "classifying", "building", "completed"] as const;
+const TOUR_STEPS = ["pending", "processing", "classifying", "building", "completed", "failed"] as const;
 type TourStatus = (typeof TOUR_STEPS)[number];
 
 const STEP_LABELS: Record<string, string> = {
@@ -44,6 +44,7 @@ function stepIndex(status: TourStatus): number {
     classifying: 2,
     building: 3,
     completed: 4,
+    failed: -1,
   };
   return map[status] ?? 0;
 }
