@@ -7,7 +7,7 @@ interface Props {
   listing: Listing;
 }
 
-const DEMO_TOUR_URL = "https://my.matterport.com/show/?m=aSx1MpRRqif";
+const DEMO_TOUR_URL = "https://my.matterport.com/show/?m=jm5WwEA3HUN";
 
 export default function FloorPlanViewerInner({ listing }: Props) {
   const tourUrl = listing.floor_plan_url;
