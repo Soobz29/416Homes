@@ -382,6 +382,11 @@ export default function DashboardPage() {
               Videos
             </button>
           </li>
+          <li>
+            <Link href="/tours" className="transition-colors hover:text-[#D4AF37]">
+              Virtual Tours
+            </Link>
+          </li>
         </ul>
         <Link href="/" className="nav-cta flex items-center gap-2 bg-[#D4AF37] px-6 py-2 font-['DM Mono',monospace] text-[0.72rem] font-medium uppercase tracking-[0.08em] text-black transition-colors hover:bg-[#F3E5AB] no-underline">
           <span className="hidden md:inline">Back to 416Homes</span>

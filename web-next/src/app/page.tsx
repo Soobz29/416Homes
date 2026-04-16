@@ -168,6 +168,16 @@ export default function LandingPage() {
               Get Started
             </button>
           </li>
+          <li>
+            <Link href="/video" className="transition-colors hover:text-[#c8a96e]">
+              Videos
+            </Link>
+          </li>
+          <li>
+            <Link href="/tours" className="transition-colors hover:text-[#c8a96e]">
+              Virtual Tours
+            </Link>
+          </li>
         </ul>
         <div className="flex items-center gap-3">
           <button
@@ -197,6 +207,8 @@ export default function LandingPage() {
             <li><button onClick={() => scrollToId("how")} className="hover:text-[#c8a96e]">How It Works</button></li>
             <li><button onClick={() => scrollToId("features")} className="hover:text-[#c8a96e]">Features</button></li>
             <li><button onClick={() => scrollToId("alert")} className="hover:text-[#c8a96e]">Get Started</button></li>
+            <li><Link href="/video" className="hover:text-[#c8a96e]" onClick={() => setMenuOpen(false)}>Videos</Link></li>
+            <li><Link href="/tours" className="hover:text-[#c8a96e]" onClick={() => setMenuOpen(false)}>Virtual Tours</Link></li>
             <li><Link href="/dashboard" className="text-[#c8a96e] hover:text-[#e4c98a]" onClick={() => setMenuOpen(false)}>Dashboard</Link></li>
           </ul>
         </div>
