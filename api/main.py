@@ -1117,6 +1117,156 @@ async def _handle_stripe_webhook(body: bytes, sig_header: str) -> None:
                 logger.error("Failed to queue video job after payment: %s", e)
 
 
+# ── Virtual Tour Jobs ──────────────────────────────────────────────────────
+
+_TOUR_PRICE_CAD = 49
+
+class TourJobRequest(BaseModel):
+    listing_url: str
+    customer_email: str
+    customer_name: Optional[str] = ""
+
+class TourCheckoutRequest(BaseModel):
+    listing_url: str
+    agent_email: str
+    agent_name: Optional[str] = ""
+
+class TourJobResponse(BaseModel):
+    id: str
+    status: str
+    progress: int = 0
+    tour_url: Optional[str] = None
+    photo_manifest: Optional[Dict[str, Any]] = None
+    error_message: Optional[str] = None
+
+@app.post("/api/tour-jobs")
+async def create_tour_job(request: TourJobRequest, background_tasks: BackgroundTasks):
+    """Create a tour job directly (dev/internal use — bypasses Stripe)."""
+    if not supabase_client:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    jid = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        supabase_client.table("tour_jobs").insert({
+            "id": jid,
+            "listing_url": request.listing_url,
+            "customer_email": request.customer_email,
+            "customer_name": request.customer_name or request.customer_email.split("@")[0],
+            "status": "pending",
+            "progress": 0,
+            "created_at": now,
+            "updated_at": now,
+        }).execute()
+    except Exception as e:
+        logger.error("Failed to create tour job: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to create tour job")
+    background_tasks.add_task(_run_tour_job, jid)
+    return {"id": jid, "status": "pending"}
+
+@app.get("/api/tour-jobs/{job_id}", response_model=TourJobResponse)
+async def get_tour_job(job_id: str):
+    if not supabase_client:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    try:
+        row = supabase_client.table("tour_jobs").select("*").eq("id", job_id).single().execute()
+        job = row.data
+        return TourJobResponse(
+            id=job["id"],
+            status=job.get("status", "pending"),
+            progress=job.get("progress", 0),
+            tour_url=job.get("tour_url"),
+            photo_manifest=job.get("photo_manifest"),
+            error_message=job.get("error_message"),
+        )
+    except Exception:
+        raise HTTPException(status_code=404, detail="Tour job not found")
+
+async def _run_tour_job(job_id: str) -> None:
+    try:
+        from tour_pipeline.pipeline import process_tour_job
+        await process_tour_job(job_id)
+    except Exception as e:
+        logger.error("Tour job %s crashed: %s", job_id, e)
+
+@app.post("/tour/create-checkout")
+async def create_tour_checkout(request: TourCheckoutRequest):
+    """Create Stripe checkout for $49 CAD virtual tour."""
+    if not _STRIPE_AVAILABLE or _stripe is None:
+        raise HTTPException(status_code=503, detail="Payment processing not configured")
+    app_url = os.getenv("APP_URL", "https://416-homes.vercel.app").rstrip("/")
+    try:
+        session = _stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            line_items=[{
+                "price_data": {
+                    "currency": "cad",
+                    "unit_amount": _TOUR_PRICE_CAD * 100,
+                    "product_data": {
+                        "name": "416Homes Virtual Tour",
+                        "description": f"Interactive room-by-room virtual tour for {request.listing_url}",
+                    },
+                },
+                "quantity": 1,
+            }],
+            mode="payment",
+            customer_email=request.agent_email,
+            success_url=f"{app_url}/tours?session_id={{CHECKOUT_SESSION_ID}}&status=success",
+            cancel_url=f"{app_url}/tours?status=cancelled",
+            metadata={
+                "product": "tour",
+                "listing_url": request.listing_url,
+                "agent_email": request.agent_email,
+                "agent_name": request.agent_name or "",
+            },
+        )
+        return {"checkout_url": session.url, "session_id": session.id}
+    except Exception as e:
+        logger.error("Tour Stripe checkout failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to create checkout session")
+
+@app.post("/tour/stripe-webhook")
+async def tour_stripe_webhook(request: Request, background_tasks: BackgroundTasks):
+    body = await request.body()
+    sig = request.headers.get("stripe-signature", "")
+    background_tasks.add_task(_handle_tour_stripe_webhook, body, sig)
+    return JSONResponse({"received": True})
+
+async def _handle_tour_stripe_webhook(body: bytes, sig_header: str) -> None:
+    if not _STRIPE_AVAILABLE or _stripe is None or not STRIPE_WEBHOOK_SECRET:
+        return
+    try:
+        event = _stripe.Webhook.construct_event(body, sig_header, STRIPE_WEBHOOK_SECRET)
+    except Exception as e:
+        logger.error("Tour webhook sig verification failed: %s", e)
+        return
+    if event["type"] == "checkout.session.completed":
+        session = event["data"]["object"]
+        meta = session.get("metadata", {})
+        if meta.get("product") != "tour":
+            return  # not our event
+        listing_url = meta.get("listing_url", "")
+        email = meta.get("agent_email", "")
+        name = meta.get("agent_name", "")
+        if listing_url and email and supabase_client:
+            try:
+                jid = str(uuid.uuid4())
+                now = datetime.now(timezone.utc).isoformat()
+                supabase_client.table("tour_jobs").insert({
+                    "id": jid,
+                    "listing_url": listing_url,
+                    "customer_email": email,
+                    "customer_name": name or email.split("@")[0],
+                    "status": "pending",
+                    "progress": 0,
+                    "created_at": now,
+                    "updated_at": now,
+                }).execute()
+                asyncio.create_task(_run_tour_job(jid))
+                logger.info("Tour job %s queued after Stripe payment for %s", jid, email)
+            except Exception as e:
+                logger.error("Failed to queue tour job after payment: %s", e)
+
+
 # Video job endpoints
 @app.post("/api/video-jobs", response_model=VideoJobResponse)
 async def create_video_job_endpoint(request: VideoJobRequest):

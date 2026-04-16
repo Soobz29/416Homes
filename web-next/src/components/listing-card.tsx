@@ -77,6 +77,22 @@ export function ListingCard({ listing, index = 0, onValuate, onView3D }: Listing
             {(listing.source || "").toUpperCase()}
           </span>
 
+          {/* 3D Tour badge — only shown when a real virtual tour URL exists */}
+          {listing.floor_plan_url && (
+            <span
+              className="absolute left-3 top-3 flex items-center gap-1 rounded-full px-2.5 py-1 font-['DM_Mono',monospace] text-[0.58rem] uppercase tracking-[0.12em] backdrop-blur-sm"
+              style={{
+                background: "rgba(200,169,110,0.82)",
+                border: "1px solid rgba(200,169,110,0.5)",
+                color: "#0a0a08",
+                fontWeight: 700,
+              }}
+              title="This listing has a 3D virtual tour"
+            >
+              ⬡ 3D Tour
+            </span>
+          )}
+
           {/* Transit score badge — color + label by tier */}
           {listing.transit_score != null && (() => {
             const s = listing.transit_score;

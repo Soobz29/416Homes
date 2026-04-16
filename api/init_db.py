@@ -85,6 +85,21 @@ CREATE TABLE IF NOT EXISTS video_jobs (
 -- Add listing_data column if upgrading an existing database
 ALTER TABLE video_jobs ADD COLUMN IF NOT EXISTS listing_data JSONB DEFAULT '{}';
 
+-- Virtual tour jobs
+CREATE TABLE IF NOT EXISTS tour_jobs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  listing_url TEXT,
+  customer_email TEXT NOT NULL,
+  customer_name TEXT,
+  status TEXT DEFAULT 'pending',
+  progress INTEGER DEFAULT 0,
+  tour_url TEXT,
+  photo_manifest JSONB,
+  error_message TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Buyer alerts table
 CREATE TABLE IF NOT EXISTS buyer_alerts (
     id TEXT PRIMARY KEY,
