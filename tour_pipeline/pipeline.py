@@ -23,6 +23,19 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 APP_URL = os.getenv("APP_URL", "https://416-homes.vercel.app").rstrip("/")
 
+STOCK_PHOTOS: list[str] = [
+    "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=900&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=900&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1484154218962-a197022b5858?w=900&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1505691938895-1758d7feb511?w=900&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=900&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1507089947368-19c1da9775ae?w=900&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=900&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?w=900&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1588854337221-4cf9fa96059c?w=900&auto=format&fit=crop",
+    "https://images.unsplash.com/photo-1560448204-603b3fc33ddc?w=900&auto=format&fit=crop",
+]
+
 ROOM_LABELS: dict[str, str] = {
     "exterior": "Exterior",
     "living_room": "Living Room",
@@ -119,6 +132,46 @@ async def _fetch_listing_photos(listing_url: str) -> list[str]:
         return urls[:15]
     except Exception as e:
         logger.error("Generic photo fetch failed for %s: %s", listing_url, e)
+        return []
+
+
+async def _fetch_photos_from_db(listing_url: str) -> list[str]:
+    """Look up already-scraped photos from the Supabase listings table."""
+    if not listing_url:
+        return []
+    try:
+        db = _supabase_client()
+        if not db:
+            return []
+        # Try exact URL match first, then partial match on the core path
+        rows = db.table("listings").select("raw_data, url").eq("url", listing_url).limit(1).execute()
+        if not rows.data:
+            # Try ILIKE partial match
+            import re as _re
+            slug = _re.sub(r"https?://[^/]+", "", listing_url).strip("/")[:80]
+            rows = db.table("listings").select("raw_data, url").ilike("url", f"%{slug}%").limit(1).execute()
+        if not rows.data:
+            return []
+        raw = rows.data[0].get("raw_data") or {}
+        # Try common photo fields stored by our scrapers
+        for key in ("photos", "photo_urls", "images", "media", "Photo"):
+            val = raw.get(key)
+            if isinstance(val, list):
+                urls = []
+                for item in val:
+                    if isinstance(item, str) and item.startswith("http"):
+                        urls.append(item)
+                    elif isinstance(item, dict):
+                        for fk in ("url", "HighResPath", "MedResPath", "LargePhotoUrl", "src"):
+                            if isinstance(item.get(fk), str) and item[fk].startswith("http"):
+                                urls.append(item[fk])
+                                break
+                if urls:
+                    logger.info("Found %d photos from listings DB for %s", len(urls), listing_url)
+                    return urls[:15]
+        return []
+    except Exception as e:
+        logger.warning("DB photo lookup failed for %s: %s", listing_url, e)
         return []
 
 
@@ -240,11 +293,17 @@ async def process_tour_job(job_id: str) -> None:
 
         _update(status="processing")
 
-        # Step 1: Fetch photos
+        # Step 1: Fetch photos (3-tier fallback: scrape → DB lookup → stock)
         logger.info("Tour job %s: fetching photos from %s", job_id, listing_url)
         photo_urls = await _fetch_listing_photos(listing_url)
+        used_stock = False
         if not photo_urls:
-            raise RuntimeError("No photos found for listing")
+            logger.info("Tour job %s: direct scrape empty, trying DB lookup", job_id)
+            photo_urls = await _fetch_photos_from_db(listing_url)
+        if not photo_urls:
+            logger.warning("Tour job %s: no photos found anywhere — using stock photos", job_id)
+            photo_urls = STOCK_PHOTOS
+            used_stock = True
         _update(status="classifying", progress=30)
 
         # Step 2: Classify with Gemini
@@ -255,6 +314,8 @@ async def process_tour_job(job_id: str) -> None:
         # Step 3: Build manifest
         manifest = _build_manifest(classified)
         manifest["listing_url"] = listing_url
+        if used_stock:
+            manifest["stock_photos"] = True  # viewer can show a "sample photos" notice
         tour_url = f"{APP_URL}/tours/{job_id}"
 
         _update(

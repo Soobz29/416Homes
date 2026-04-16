@@ -18,6 +18,7 @@ interface Manifest {
   rooms: Room[];
   listing_url: string;
   address?: string;
+  stock_photos?: boolean;
 }
 
 // ---- Demo manifest (shown for any demo-* ID so users see a real working tour) ----
@@ -243,6 +244,7 @@ export default function TourViewerPage() {
   }
 
   const isDemo = id?.startsWith("demo-") ?? false;
+  const isStockPhotos = !isDemo && (manifest as Manifest & { stock_photos?: boolean }).stock_photos === true;
   const displayAddress = manifest.address || (manifest.listing_url ? "View Listing" : "416Homes Virtual Tour");
 
   return (
@@ -325,6 +327,25 @@ export default function TourViewerPage() {
           ← Back
         </a>
       </header>
+
+      {/* Stock photos notice */}
+      {isStockPhotos && (
+        <div
+          style={{
+            background: "rgba(90,90,80,0.15)",
+            borderBottom: `1px solid rgba(150,150,120,0.25)`,
+            padding: "0.6rem 2.5rem",
+            fontFamily: FONT_MONO,
+            fontSize: "0.62rem",
+            textTransform: "uppercase",
+            letterSpacing: "0.12em",
+            color: "#9a9a8a",
+            textAlign: "center",
+          }}
+        >
+          ℹ Sample photos shown — listing photos could not be fetched automatically for this source.
+        </div>
+      )}
 
       {/* Demo banner */}
       {isDemo && (
