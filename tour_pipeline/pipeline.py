@@ -301,6 +301,18 @@ async def process_tour_job(job_id: str) -> None:
 
         _update(status="processing")
 
+        # Look up floor_plan_url (Matterport / 3D tour embed) for this listing
+        embed_url: str = ""
+        try:
+            lr = db.table("listings").select("floor_plan_url").eq("url", listing_url).limit(1).execute()
+            if lr.data:
+                fp = (lr.data[0].get("floor_plan_url") or "").strip()
+                if fp.startswith("http"):
+                    embed_url = fp
+                    logger.info("Tour job %s: found embed URL %s", job_id, embed_url)
+        except Exception as e:
+            logger.warning("Tour job %s: floor_plan_url lookup failed: %s", job_id, e)
+
         # Step 1: Fetch photos (3-tier fallback: scrape → DB lookup → stock)
         logger.info("Tour job %s: fetching photos from %s", job_id, listing_url)
         photo_urls = await _fetch_listing_photos(listing_url)
@@ -322,6 +334,8 @@ async def process_tour_job(job_id: str) -> None:
         # Step 3: Build manifest
         manifest = _build_manifest(classified)
         manifest["listing_url"] = listing_url
+        if embed_url:
+            manifest["embed_url"] = embed_url
         if used_stock:
             manifest["stock_photos"] = True  # viewer can show a "sample photos" notice
         tour_url = f"{APP_URL}/tours/{job_id}"

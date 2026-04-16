@@ -19,6 +19,7 @@ interface Manifest {
   listing_url: string;
   address?: string;
   stock_photos?: boolean;
+  embed_url?: string;
 }
 
 // ---- Demo manifest (shown for any demo-* ID so users see a real working tour) ----
@@ -246,6 +247,51 @@ export default function TourViewerPage() {
   const isDemo = id?.startsWith("demo-") ?? false;
   const isStockPhotos = !isDemo && (manifest as Manifest & { stock_photos?: boolean }).stock_photos === true;
   const displayAddress = manifest.address || (manifest.listing_url ? "View Listing" : "416Homes Virtual Tour");
+
+  // --- Matterport / 3D tour embed ---
+  if (manifest.embed_url) {
+    return (
+      <div style={{ minHeight: "100vh", background: BG, color: TEXT, fontFamily: FONT_MONO }}>
+        <header
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "1rem 2.5rem",
+            borderBottom: `1px solid ${GOLD_DIM}`,
+            background: "rgba(10,10,8,0.95)",
+            position: "sticky",
+            top: 0,
+            zIndex: 40,
+            height: "56px",
+            boxSizing: "border-box",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <span style={{ fontFamily: FONT_DISPLAY, fontWeight: 900, fontSize: "1rem" }}>
+              <span style={{ color: GOLD }}>416</span>Homes
+            </span>
+            <span style={{ fontFamily: FONT_MONO, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.1em", color: SUBTEXT }}>
+              3D Tour
+            </span>
+            {manifest.listing_url && (
+              <a href={manifest.listing_url} target="_blank" rel="noreferrer"
+                style={{ fontFamily: FONT_MONO, fontSize: "0.68rem", color: GOLD, textDecoration: "none", borderBottom: `1px solid ${GOLD_DIM}` }}>
+                View Listing ↗
+              </a>
+            )}
+          </div>
+          <a href="/tours" style={{ fontFamily: FONT_MONO, fontSize: "0.7rem", color: SUBTEXT, textDecoration: "none" }}>← Back</a>
+        </header>
+        <iframe
+          src={manifest.embed_url}
+          style={{ width: "100%", height: "calc(100vh - 56px)", border: "none", display: "block" }}
+          allow="fullscreen; vr; xr-spatial-tracking"
+          title="3D Virtual Tour"
+        />
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: BG, color: TEXT }}>
