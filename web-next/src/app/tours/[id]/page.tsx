@@ -20,6 +20,69 @@ interface Manifest {
   address?: string;
 }
 
+// ---- Demo manifest (shown for any demo-* ID so users see a real working tour) ----
+const DEMO_MANIFEST: Manifest = {
+  listing_url: "https://416-homes.vercel.app/tours",
+  address: "Sample GTA Listing",
+  rooms: [
+    {
+      slug: "exterior",
+      name: "Exterior",
+      photos: [
+        "https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1605146769289-440113cc3d00?w=900&auto=format&fit=crop",
+      ],
+    },
+    {
+      slug: "living_room",
+      name: "Living Room",
+      photos: [
+        "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=900&auto=format&fit=crop",
+      ],
+    },
+    {
+      slug: "kitchen",
+      name: "Kitchen",
+      photos: [
+        "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1556909172-54557c7e4fb7?w=900&auto=format&fit=crop",
+      ],
+    },
+    {
+      slug: "bedroom",
+      name: "Primary Bedroom",
+      photos: [
+        "https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1540518614846-7eded433c457?w=900&auto=format&fit=crop",
+      ],
+    },
+    {
+      slug: "bathroom",
+      name: "Bathroom",
+      photos: [
+        "https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=900&auto=format&fit=crop",
+      ],
+    },
+    {
+      slug: "dining_room",
+      name: "Dining Room",
+      photos: [
+        "https://images.unsplash.com/photo-1556742393-d75f468bfcb0?w=900&auto=format&fit=crop",
+      ],
+    },
+    {
+      slug: "backyard",
+      name: "Backyard",
+      photos: [
+        "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=900&auto=format&fit=crop",
+      ],
+    },
+  ],
+};
+
 // ---- Inline style constants ----
 const BG = "#0a0a08";
 const GOLD = "#c8a96e";
@@ -42,6 +105,12 @@ export default function TourViewerPage() {
   // Fetch manifest on mount
   useEffect(() => {
     if (!id) return;
+    // Demo IDs (generated client-side when API is unavailable) use hardcoded sample data
+    if (id.startsWith("demo-")) {
+      setManifest(DEMO_MANIFEST);
+      setLoading(false);
+      return;
+    }
     (async () => {
       try {
         const res = await fetch(`${API_BASE}/api/tour-jobs/${id}`);
@@ -173,6 +242,7 @@ export default function TourViewerPage() {
     );
   }
 
+  const isDemo = id?.startsWith("demo-") ?? false;
   const displayAddress = manifest.address || (manifest.listing_url ? "View Listing" : "416Homes Virtual Tour");
 
   return (
@@ -255,6 +325,28 @@ export default function TourViewerPage() {
           ← Back
         </a>
       </header>
+
+      {/* Demo banner */}
+      {isDemo && (
+        <div
+          style={{
+            background: "rgba(200,169,110,0.1)",
+            borderBottom: `1px solid rgba(200,169,110,0.25)`,
+            padding: "0.6rem 2.5rem",
+            fontFamily: FONT_MONO,
+            fontSize: "0.62rem",
+            textTransform: "uppercase",
+            letterSpacing: "0.12em",
+            color: GOLD,
+            textAlign: "center",
+          }}
+        >
+          ⬡ Demo Tour — This is a sample. Real tours are generated from your listing photos.{" "}
+          <a href="/tours" style={{ color: GOLD, textDecoration: "underline" }}>
+            Generate yours →
+          </a>
+        </div>
+      )}
 
       {/* Room grid */}
       <main style={{ padding: "3rem 2.5rem 4rem", maxWidth: 1280, margin: "0 auto" }}>

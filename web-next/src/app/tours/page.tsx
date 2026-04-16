@@ -138,8 +138,8 @@ export default function ToursPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           listing_url: fullUrl,
-          agent_email: trimmedEmail,
-          agent_name: agentName.trim() || undefined,
+          customer_email: trimmedEmail,
+          customer_name: agentName.trim() || undefined,
         }),
       });
 
