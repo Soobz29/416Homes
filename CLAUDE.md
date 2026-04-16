@@ -139,6 +139,18 @@ web-next/
 - `tour_jobs` Supabase table migrated and live in production
 - Demo mode: when API unavailable, client generates `demo-XXXXX` ID → viewer serves 7-room hardcoded manifest with Unsplash photos + gold "Demo Tour" banner
 
+**Tour pipeline — photo fallback chain (3 tiers):**
+- Tier 1: direct HTML scrape (works for realtor.ca via curl_cffi)
+- Tier 2: Supabase `listings` table lookup by URL — uses already-scraped `raw_data` photos
+- Tier 3: `STOCK_PHOTOS` — 10 curated Unsplash house photos (guarantees job always reaches `completed`, never `failed` just because photos can't be fetched)
+- When tier 3 fires, `manifest.stock_photos = true` is stored; viewer shows a subtle grey "Sample photos shown" notice
+- Zoocasa / JS SPA listings no longer fail — they reach tier 2 or 3 and complete
+
+**`tour_url` fix — APP_URL comma split:**
+- `APP_URL` on DigitalOcean can be comma-separated (e.g. `https://416-homes.vercel.app,https://416homes.ca`) for CORS
+- `tour_pipeline/pipeline.py` and `api/main.py` now call `.split(",")[0].strip()` before using it
+- Before fix: `tour_url` in Supabase was storing the full comma-joined string as a URL → viewer 404
+
 **Telegram bots:**
 - Fixed `API_BASE_URL` env var on DigitalOcean (was causing "unable to fetch listings")
 - Both bots now show beds/baths/sqft + floor plan link per listing card
@@ -162,7 +174,7 @@ Then trigger GitHub Actions → "416Homes Model Retraining" → Run workflow (co
 
 ---
 
-### 🐛 Known bugs fixed this session (do not re-introduce)
+### 🐛 Known bugs fixed (do not re-introduce)
 
 - `tours/page.tsx` was sending `agent_email`/`agent_name` — FastAPI model expects `customer_email`/`customer_name`. Fixed.
 - `tours/[id]/page.tsx` was calling the API with `demo-XXXXX` IDs (client-generated fallback) and getting 404. Fixed: `demo-*` IDs now skip the API and load a hardcoded 7-room manifest with Unsplash photos.
@@ -171,6 +183,8 @@ Then trigger GitHub Actions → "416Homes Model Retraining" → Run workflow (co
 - `_resolve_transit_score()` in `api/main.py` wraps `_get_transit_score()` to ensure transit score is never null. City fallback: Toronto=4, Mississauga/905=3, other=2.
 - Dashboard "Back to 416Homes" was a `<button>` with no href — fixed to `<Link href="/">`.
 - `floor_plan_url` was not mapped in `web-next/src/lib/api.ts` fetchListings — added.
+- Tour pipeline raised `RuntimeError("No photos found")` for Zoocasa/SPA URLs → `status=failed`. Fixed with 3-tier photo fallback.
+- `tour_url` stored in Supabase was the full comma-joined `APP_URL` env var string. Fixed with `.split(",")[0]` in `tour_pipeline/pipeline.py` and `api/main.py`.
 
 ---
 
