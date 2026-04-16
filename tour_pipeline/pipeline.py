@@ -21,7 +21,7 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
-APP_URL = os.getenv("APP_URL", "https://416-homes.vercel.app").rstrip("/")
+APP_URL = os.getenv("APP_URL", "https://416-homes.vercel.app").split(",")[0].strip().rstrip("/")
 
 STOCK_PHOTOS: list[str] = [
     "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=900&auto=format&fit=crop",

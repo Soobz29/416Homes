@@ -1193,7 +1193,7 @@ async def create_tour_checkout(request: TourCheckoutRequest):
     """Create Stripe checkout for $49 CAD virtual tour."""
     if not _STRIPE_AVAILABLE or _stripe is None:
         raise HTTPException(status_code=503, detail="Payment processing not configured")
-    app_url = os.getenv("APP_URL", "https://416-homes.vercel.app").rstrip("/")
+    app_url = os.getenv("APP_URL", "https://416-homes.vercel.app").split(",")[0].strip().rstrip("/")
     try:
         session = _stripe.checkout.Session.create(
             payment_method_types=["card"],
