@@ -22,7 +22,7 @@ interface Manifest {
   embed_url?: string;
 }
 
-// ---- Demo manifest (shown for any demo-* ID so users see a real working tour) ----
+// ---- Demo manifest ----
 const DEMO_MANIFEST: Manifest = {
   listing_url: "https://416-homes.vercel.app/tours",
   address: "Sample GTA Listing",
@@ -31,61 +31,60 @@ const DEMO_MANIFEST: Manifest = {
       slug: "exterior",
       name: "Exterior",
       photos: [
-        "https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=900&auto=format&fit=crop",
-        "https://images.unsplash.com/photo-1605146769289-440113cc3d00?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=1600&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1605146769289-440113cc3d00?w=1600&auto=format&fit=crop",
       ],
     },
     {
       slug: "living_room",
       name: "Living Room",
       photos: [
-        "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=900&auto=format&fit=crop",
-        "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=1600&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=1600&auto=format&fit=crop",
       ],
     },
     {
       slug: "kitchen",
       name: "Kitchen",
       photos: [
-        "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=900&auto=format&fit=crop",
-        "https://images.unsplash.com/photo-1556909172-54557c7e4fb7?w=900&auto=format&fit=crop",
-      ],
-    },
-    {
-      slug: "bedroom",
-      name: "Primary Bedroom",
-      photos: [
-        "https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?w=900&auto=format&fit=crop",
-        "https://images.unsplash.com/photo-1540518614846-7eded433c457?w=900&auto=format&fit=crop",
-      ],
-    },
-    {
-      slug: "bathroom",
-      name: "Bathroom",
-      photos: [
-        "https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=900&auto=format&fit=crop",
-        "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=1600&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1556909172-54557c7e4fb7?w=1600&auto=format&fit=crop",
       ],
     },
     {
       slug: "dining_room",
       name: "Dining Room",
       photos: [
-        "https://images.unsplash.com/photo-1556742393-d75f468bfcb0?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1617806118233-18e1de247200?w=1600&auto=format&fit=crop",
+      ],
+    },
+    {
+      slug: "bedroom",
+      name: "Bedroom",
+      photos: [
+        "https://images.unsplash.com/photo-1505693314120-0d443867891c?w=1600&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=1600&auto=format&fit=crop",
+      ],
+    },
+    {
+      slug: "bathroom",
+      name: "Bathroom",
+      photos: [
+        "https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=1600&auto=format&fit=crop",
       ],
     },
     {
       slug: "backyard",
       name: "Backyard",
       photos: [
-        "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=900&auto=format&fit=crop",
-        "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=900&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1600&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1588854337221-4cf9fa96059c?w=1600&auto=format&fit=crop",
       ],
     },
   ],
 };
 
-// ---- Inline style constants ----
+// ---- Style constants ----
 const BG = "#0a0a08";
 const GOLD = "#c8a96e";
 const GOLD_DIM = "rgba(200,169,110,0.2)";
@@ -93,21 +92,24 @@ const TEXT = "#f5f4ef";
 const SUBTEXT = "#6b6b60";
 const FONT_MONO = "'DM Mono', monospace";
 const FONT_DISPLAY = "'Syne', sans-serif";
+const SIDEBAR_W = 220;
+const HEADER_H = 56;
+const THUMB_H = 72;
 
 export default function TourViewerPage() {
   const params = useParams();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
   const [manifest, setManifest] = useState<Manifest | null>(null);
-  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
-  const [photoIndex, setPhotoIndex] = useState(0);
+  const [roomIdx, setRoomIdx] = useState(0);
+  const [photoIdx, setPhotoIdx] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [imgKey, setImgKey] = useState(0); // forces Ken Burns reset on photo change
 
   // Fetch manifest on mount
   useEffect(() => {
     if (!id) return;
-    // Demo IDs (generated client-side when API is unavailable) use hardcoded sample data
     if (id.startsWith("demo-")) {
       setManifest(DEMO_MANIFEST);
       setLoading(false);
@@ -119,9 +121,7 @@ export default function TourViewerPage() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         const m: Manifest = data.photo_manifest ?? data;
-        if (!m.rooms || !Array.isArray(m.rooms)) {
-          throw new Error("Tour manifest missing rooms");
-        }
+        if (!m.rooms || !Array.isArray(m.rooms)) throw new Error("Tour manifest missing rooms");
         setManifest(m);
       } catch (err) {
         console.error("Tour fetch error:", err);
@@ -132,703 +132,285 @@ export default function TourViewerPage() {
     })();
   }, [id]);
 
-  // Keyboard navigation
-  useEffect(() => {
-    if (!selectedRoom) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight") {
-        setPhotoIndex((prev) => (prev + 1) % selectedRoom.photos.length);
-      } else if (e.key === "ArrowLeft") {
-        setPhotoIndex((prev) => (prev - 1 + selectedRoom.photos.length) % selectedRoom.photos.length);
-      } else if (e.key === "Escape") {
-        setSelectedRoom(null);
-      }
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [selectedRoom]);
-
-  const openRoom = useCallback((room: Room) => {
-    setSelectedRoom(room);
-    setPhotoIndex(0);
+  const goToRoom = useCallback((ri: number) => {
+    setRoomIdx(ri);
+    setPhotoIdx(0);
+    setImgKey((k) => k + 1);
   }, []);
 
-  const closeRoom = useCallback(() => {
-    setSelectedRoom(null);
+  const goToPhoto = useCallback((pi: number) => {
+    setPhotoIdx(pi);
+    setImgKey((k) => k + 1);
   }, []);
 
   const prevPhoto = useCallback(() => {
-    if (!selectedRoom) return;
-    setPhotoIndex((prev) => (prev - 1 + selectedRoom.photos.length) % selectedRoom.photos.length);
-  }, [selectedRoom]);
+    if (!manifest) return;
+    if (photoIdx > 0) {
+      setPhotoIdx((p) => p - 1);
+      setImgKey((k) => k + 1);
+    } else if (roomIdx > 0) {
+      const prevRoom = manifest.rooms[roomIdx - 1];
+      setRoomIdx((r) => r - 1);
+      setPhotoIdx(prevRoom.photos.length - 1);
+      setImgKey((k) => k + 1);
+    }
+  }, [manifest, roomIdx, photoIdx]);
 
   const nextPhoto = useCallback(() => {
-    if (!selectedRoom) return;
-    setPhotoIndex((prev) => (prev + 1) % selectedRoom.photos.length);
-  }, [selectedRoom]);
+    if (!manifest) return;
+    const room = manifest.rooms[roomIdx];
+    if (photoIdx < room.photos.length - 1) {
+      setPhotoIdx((p) => p + 1);
+      setImgKey((k) => k + 1);
+    } else if (roomIdx < manifest.rooms.length - 1) {
+      setRoomIdx((r) => r + 1);
+      setPhotoIdx(0);
+      setImgKey((k) => k + 1);
+    }
+  }, [manifest, roomIdx, photoIdx]);
 
-  // --- Loading state ---
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") nextPhoto();
+      else if (e.key === "ArrowLeft" || e.key === "ArrowUp") prevPhoto();
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [nextPhoto, prevPhoto]);
+
+  // ── Loading ──
   if (loading) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: BG,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "1rem",
-          color: TEXT,
-          fontFamily: FONT_MONO,
-        }}
-      >
-        <div
-          style={{
-            width: 40,
-            height: 40,
-            border: `2px solid ${GOLD_DIM}`,
-            borderTopColor: GOLD,
-            borderRadius: "50%",
-            animation: "spin 0.8s linear infinite",
-          }}
-        />
+      <div style={{ minHeight: "100vh", background: BG, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1rem", color: TEXT, fontFamily: FONT_MONO }}>
+        <div style={{ width: 40, height: 40, border: `2px solid ${GOLD_DIM}`, borderTopColor: GOLD, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        <span style={{ fontSize: "0.8rem", color: SUBTEXT, letterSpacing: "0.1em" }}>
-          Loading your tour...
-        </span>
+        <span style={{ fontSize: "0.8rem", color: SUBTEXT, letterSpacing: "0.1em" }}>Loading your tour...</span>
       </div>
     );
   }
 
-  // --- Error state ---
+  // ── Error ──
   if (error || !manifest) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: BG,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "1.5rem",
-          color: TEXT,
-          fontFamily: FONT_MONO,
-          padding: "2rem",
-          textAlign: "center",
-        }}
-      >
+      <div style={{ minHeight: "100vh", background: BG, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1.5rem", color: TEXT, fontFamily: FONT_MONO, padding: "2rem", textAlign: "center" }}>
         <div style={{ fontSize: "1.2rem", fontWeight: 700 }}>Tour not found</div>
-        <p style={{ fontSize: "0.78rem", color: SUBTEXT, maxWidth: "36ch", lineHeight: 1.7 }}>
-          {error ?? "This tour link may have expired or the tour is still being generated."}
-        </p>
-        <a
-          href="/tours"
-          style={{
-            display: "inline-block",
-            background: GOLD,
-            color: BG,
-            fontFamily: FONT_DISPLAY,
-            fontWeight: 800,
-            fontSize: "0.85rem",
-            padding: "0.75rem 2rem",
-            textDecoration: "none",
-            letterSpacing: "0.05em",
-            textTransform: "uppercase",
-          }}
-        >
-          ← Back to Tour Builder
-        </a>
+        <p style={{ fontSize: "0.78rem", color: SUBTEXT, maxWidth: "36ch", lineHeight: 1.7 }}>{error ?? "This tour link may have expired or the tour is still being generated."}</p>
+        <a href="/tours" style={{ display: "inline-block", background: GOLD, color: BG, fontFamily: FONT_DISPLAY, fontWeight: 800, fontSize: "0.85rem", padding: "0.75rem 2rem", textDecoration: "none", letterSpacing: "0.05em", textTransform: "uppercase" }}>← Back to Tour Builder</a>
       </div>
     );
   }
 
   const isDemo = id?.startsWith("demo-") ?? false;
-  const isStockPhotos = !isDemo && (manifest as Manifest & { stock_photos?: boolean }).stock_photos === true;
-  const displayAddress = manifest.address || (manifest.listing_url ? "View Listing" : "416Homes Virtual Tour");
+  const isStockPhotos = !isDemo && manifest.stock_photos === true;
+  const displayAddress = manifest.address || "Virtual Tour";
 
-  // --- Matterport / 3D tour embed ---
+  // ── Matterport / real 3D embed ──
   if (manifest.embed_url) {
     return (
       <div style={{ minHeight: "100vh", background: BG, color: TEXT, fontFamily: FONT_MONO }}>
-        <header
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "1rem 2.5rem",
-            borderBottom: `1px solid ${GOLD_DIM}`,
-            background: "rgba(10,10,8,0.95)",
-            position: "sticky",
-            top: 0,
-            zIndex: 40,
-            height: "56px",
-            boxSizing: "border-box",
-          }}
-        >
+        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1rem 2.5rem", borderBottom: `1px solid ${GOLD_DIM}`, background: "rgba(10,10,8,0.95)", position: "sticky", top: 0, zIndex: 40, height: HEADER_H, boxSizing: "border-box" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            <span style={{ fontFamily: FONT_DISPLAY, fontWeight: 900, fontSize: "1rem" }}>
-              <span style={{ color: GOLD }}>416</span>Homes
-            </span>
-            <span style={{ fontFamily: FONT_MONO, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.1em", color: SUBTEXT }}>
-              3D Tour
-            </span>
+            <span style={{ fontFamily: FONT_DISPLAY, fontWeight: 900, fontSize: "1rem" }}><span style={{ color: GOLD }}>416</span>Homes</span>
+            <span style={{ fontFamily: FONT_MONO, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.1em", color: SUBTEXT }}>3D Tour</span>
             {manifest.listing_url && (
-              <a href={manifest.listing_url} target="_blank" rel="noreferrer"
-                style={{ fontFamily: FONT_MONO, fontSize: "0.68rem", color: GOLD, textDecoration: "none", borderBottom: `1px solid ${GOLD_DIM}` }}>
-                View Listing ↗
-              </a>
+              <a href={manifest.listing_url} target="_blank" rel="noreferrer" style={{ fontFamily: FONT_MONO, fontSize: "0.68rem", color: GOLD, textDecoration: "none", borderBottom: `1px solid ${GOLD_DIM}` }}>View Listing ↗</a>
             )}
           </div>
           <a href="/tours" style={{ fontFamily: FONT_MONO, fontSize: "0.7rem", color: SUBTEXT, textDecoration: "none" }}>← Back</a>
         </header>
-        <iframe
-          src={manifest.embed_url}
-          style={{ width: "100%", height: "calc(100vh - 56px)", border: "none", display: "block" }}
-          allow="fullscreen; vr; xr-spatial-tracking"
-          title="3D Virtual Tour"
-        />
+        <iframe src={manifest.embed_url} style={{ width: "100%", height: `calc(100vh - ${HEADER_H}px)`, border: "none", display: "block" }} allow="fullscreen; vr; xr-spatial-tracking" title="3D Virtual Tour" />
       </div>
     );
   }
 
+  // ── Immersive photo tour ──
+  const rooms = manifest.rooms;
+  const currentRoom = rooms[roomIdx] ?? rooms[0];
+  const currentPhoto = currentRoom?.photos[photoIdx] ?? currentRoom?.photos[0];
+  const totalPhotos = rooms.reduce((s, r) => s + r.photos.length, 0);
+  const globalPhotoIdx = rooms.slice(0, roomIdx).reduce((s, r) => s + r.photos.length, 0) + photoIdx;
+
+  const hasPrev = roomIdx > 0 || photoIdx > 0;
+  const hasNext = roomIdx < rooms.length - 1 || photoIdx < currentRoom.photos.length - 1;
+
   return (
-    <div style={{ minHeight: "100vh", background: BG, color: TEXT }}>
-      {/* Top bar */}
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "1rem 2.5rem",
-          borderBottom: `1px solid ${GOLD_DIM}`,
-          background: "rgba(10,10,8,0.85)",
-          backdropFilter: "blur(12px)",
-          position: "sticky",
-          top: 0,
-          zIndex: 40,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "1rem", minWidth: 0 }}>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden", background: BG, color: TEXT, fontFamily: FONT_MONO }}>
+      <style>{`
+        @keyframes kenBurns {
+          0%   { transform: scale(1)    translate(0%,   0%); }
+          100% { transform: scale(1.08) translate(-1%, -0.5%); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: ${GOLD_DIM}; border-radius: 2px; }
+      `}</style>
+
+      {/* ── Header ── */}
+      <header style={{ height: HEADER_H, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 2rem", borderBottom: `1px solid ${GOLD_DIM}`, background: "rgba(10,10,8,0.92)", backdropFilter: "blur(12px)", zIndex: 40 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.9rem", minWidth: 0 }}>
           <span style={{ fontFamily: FONT_DISPLAY, fontWeight: 900, fontSize: "1rem", flexShrink: 0 }}>
             <span style={{ color: GOLD }}>416</span>Homes
           </span>
-          <span
-            style={{
-              fontFamily: FONT_MONO,
-              fontSize: "0.6rem",
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
-              color: SUBTEXT,
-              flexShrink: 0,
-            }}
-          >
-            Virtual Tour
-          </span>
+          <span style={{ fontFamily: FONT_MONO, fontSize: "0.55rem", textTransform: "uppercase", letterSpacing: "0.12em", color: SUBTEXT, flexShrink: 0 }}>Virtual Tour</span>
           {manifest.listing_url && (
-            <a
-              href={manifest.listing_url}
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                fontFamily: FONT_MONO,
-                fontSize: "0.68rem",
-                color: GOLD,
-                textDecoration: "none",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-                maxWidth: "30ch",
-                borderBottom: `1px solid ${GOLD_DIM}`,
-              }}
-            >
+            <a href={manifest.listing_url} target="_blank" rel="noreferrer" style={{ fontFamily: FONT_MONO, fontSize: "0.65rem", color: GOLD, textDecoration: "none", borderBottom: `1px solid ${GOLD_DIM}`, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "28ch" }}>
               {displayAddress} ↗
             </a>
           )}
         </div>
-
-        <a
-          href="/tours"
-          style={{
-            fontFamily: FONT_MONO,
-            fontSize: "0.65rem",
-            textTransform: "uppercase",
-            letterSpacing: "0.1em",
-            color: SUBTEXT,
-            textDecoration: "none",
-            border: `1px solid ${GOLD_DIM}`,
-            padding: "0.4rem 0.9rem",
-            transition: "color 0.2s, border-color 0.2s",
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLAnchorElement).style.color = GOLD;
-            (e.currentTarget as HTMLAnchorElement).style.borderColor = GOLD;
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLAnchorElement).style.color = SUBTEXT;
-            (e.currentTarget as HTMLAnchorElement).style.borderColor = GOLD_DIM;
-          }}
-        >
-          ← Back
-        </a>
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexShrink: 0 }}>
+          <span style={{ fontFamily: FONT_MONO, fontSize: "0.6rem", color: SUBTEXT }}>
+            {globalPhotoIdx + 1} / {totalPhotos}
+          </span>
+          <a href="/tours" style={{ fontFamily: FONT_MONO, fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.1em", color: SUBTEXT, textDecoration: "none", border: `1px solid ${GOLD_DIM}`, padding: "0.35rem 0.8rem" }}>← Back</a>
+        </div>
       </header>
 
-      {/* Stock photos notice */}
+      {/* ── Banners ── */}
       {isStockPhotos && (
-        <div
-          style={{
-            background: "rgba(90,90,80,0.15)",
-            borderBottom: `1px solid rgba(150,150,120,0.25)`,
-            padding: "0.6rem 2.5rem",
-            fontFamily: FONT_MONO,
-            fontSize: "0.62rem",
-            textTransform: "uppercase",
-            letterSpacing: "0.12em",
-            color: "#9a9a8a",
-            textAlign: "center",
-          }}
-        >
-          ℹ Sample photos shown — listing photos could not be fetched automatically for this source.
+        <div style={{ flexShrink: 0, background: "rgba(90,90,80,0.15)", borderBottom: `1px solid rgba(150,150,120,0.25)`, padding: "0.45rem 2rem", fontFamily: FONT_MONO, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "#9a9a8a", textAlign: "center" }}>
+          ℹ Sample photos shown — listing photos could not be fetched for this source.
         </div>
       )}
-
-      {/* Demo banner */}
       {isDemo && (
-        <div
-          style={{
-            background: "rgba(200,169,110,0.1)",
-            borderBottom: `1px solid rgba(200,169,110,0.25)`,
-            padding: "0.6rem 2.5rem",
-            fontFamily: FONT_MONO,
-            fontSize: "0.62rem",
-            textTransform: "uppercase",
-            letterSpacing: "0.12em",
-            color: GOLD,
-            textAlign: "center",
-          }}
-        >
-          ⬡ Demo Tour — This is a sample. Real tours are generated from your listing photos.{" "}
-          <a href="/tours" style={{ color: GOLD, textDecoration: "underline" }}>
-            Generate yours →
-          </a>
+        <div style={{ flexShrink: 0, background: "rgba(200,169,110,0.08)", borderBottom: `1px solid rgba(200,169,110,0.2)`, padding: "0.45rem 2rem", fontFamily: FONT_MONO, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.12em", color: GOLD, textAlign: "center" }}>
+          ⬡ Demo Tour · <a href="/tours" style={{ color: GOLD, textDecoration: "underline" }}>Order a real tour →</a>
         </div>
       )}
 
-      {/* Room grid */}
-      <main style={{ padding: "3rem 2.5rem 4rem", maxWidth: 1280, margin: "0 auto" }}>
-        <div style={{ marginBottom: "2.5rem" }}>
-          <div
-            style={{
-              fontFamily: FONT_MONO,
-              fontSize: "0.6rem",
-              textTransform: "uppercase",
-              letterSpacing: "0.2em",
-              color: GOLD,
-              marginBottom: "0.5rem",
-            }}
-          >
-            Room-by-Room Tour
+      {/* ── Body ── */}
+      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+
+        {/* ── Sidebar: room list ── */}
+        <aside style={{ width: SIDEBAR_W, flexShrink: 0, background: "rgba(6,6,5,0.95)", borderRight: `1px solid ${GOLD_DIM}`, overflowY: "auto", display: "flex", flexDirection: "column" }}>
+          <div style={{ padding: "1rem 1.25rem 0.5rem", fontFamily: FONT_MONO, fontSize: "0.52rem", textTransform: "uppercase", letterSpacing: "0.18em", color: SUBTEXT }}>
+            Rooms · {rooms.length}
           </div>
-          <h1
-            style={{
-              fontFamily: FONT_DISPLAY,
-              fontSize: "clamp(1.6rem, 3vw, 2.5rem)",
-              fontWeight: 900,
-              letterSpacing: "-0.02em",
-              margin: 0,
-            }}
-          >
-            {manifest.rooms.length} room{manifest.rooms.length !== 1 ? "s" : ""} · Click to explore
-          </h1>
-        </div>
+          {rooms.map((room, ri) => {
+            const active = ri === roomIdx;
+            return (
+              <button
+                key={room.slug}
+                type="button"
+                onClick={() => goToRoom(ri)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.75rem",
+                  padding: "0.75rem 1.25rem",
+                  background: active ? "rgba(200,169,110,0.1)" : "transparent",
+                  borderLeft: active ? `3px solid ${GOLD}` : "3px solid transparent",
+                  borderTop: "none",
+                  borderRight: "none",
+                  borderBottom: `1px solid ${active ? GOLD_DIM : "rgba(200,169,110,0.06)"}`,
+                  cursor: "pointer",
+                  textAlign: "left",
+                  width: "100%",
+                  transition: "background 0.15s, border-color 0.15s",
+                }}
+              >
+                {/* Cover thumbnail */}
+                {room.photos[0] ? (
+                  <img src={room.photos[0]} alt="" style={{ width: 40, height: 30, objectFit: "cover", flexShrink: 0, opacity: active ? 1 : 0.55, border: active ? `1px solid ${GOLD}` : `1px solid ${GOLD_DIM}`, transition: "opacity 0.15s" }} />
+                ) : (
+                  <div style={{ width: 40, height: 30, flexShrink: 0, background: "#1a1a14", border: `1px solid ${GOLD_DIM}`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT_DISPLAY, fontWeight: 900, fontSize: "0.7rem", color: `${GOLD}60` }}>
+                    {room.name.slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <div style={{ fontFamily: FONT_MONO, fontSize: "0.68rem", fontWeight: active ? 700 : 400, color: active ? GOLD : TEXT, textTransform: "uppercase", letterSpacing: "0.08em", lineHeight: 1.2 }}>
+                    {room.name}
+                  </div>
+                  <div style={{ fontFamily: FONT_MONO, fontSize: "0.55rem", color: SUBTEXT, marginTop: "0.15rem" }}>
+                    {room.photos.length} photo{room.photos.length !== 1 ? "s" : ""}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </aside>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-            gap: "1px",
-          }}
-        >
-          {manifest.rooms.map((room) => (
-            <RoomCard key={room.slug} room={room} onClick={() => openRoom(room)} />
-          ))}
-        </div>
-      </main>
+        {/* ── Main photo viewport ── */}
+        <main style={{ flex: 1, position: "relative", overflow: "hidden", background: "#000" }}>
 
-      {/* Lightbox */}
-      {selectedRoom && (
-        <Lightbox
-          room={selectedRoom}
-          photoIndex={photoIndex}
-          onClose={closeRoom}
-          onPrev={prevPhoto}
-          onNext={nextPhoto}
-        />
-      )}
-    </div>
-  );
-}
-
-// ---- Room Card ----
-function RoomCard({ room, onClick }: { room: Room; onClick: () => void }) {
-  const [hovered, setHovered] = useState(false);
-  const coverPhoto = room.photos[0];
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        position: "relative",
-        display: "block",
-        width: "100%",
-        aspectRatio: "4/3",
-        overflow: "hidden",
-        background: "#0f0f0b",
-        border: hovered ? `1px solid ${GOLD}` : `1px solid ${GOLD_DIM}`,
-        boxShadow: hovered ? `0 0 20px rgba(200,169,110,0.2)` : "none",
-        cursor: "pointer",
-        padding: 0,
-        transform: hovered ? "scale(1.02)" : "scale(1)",
-        transition: "transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease",
-      }}
-    >
-      {/* Photo */}
-      {coverPhoto ? (
-        <img
-          src={coverPhoto}
-          alt={room.name}
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            transition: "opacity 0.3s ease",
-          }}
-        />
-      ) : (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "linear-gradient(135deg, #1a1a14 0%, #0b0b0b 100%)",
-            fontFamily: FONT_DISPLAY,
-            fontSize: "2rem",
-            fontWeight: 900,
-            color: `${GOLD}40`,
-          }}
-        >
-          {room.name.slice(0, 2).toUpperCase()}
-        </div>
-      )}
-
-      {/* Gradient overlay */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.1) 60%, transparent 100%)",
-        }}
-      />
-
-      {/* Photo count badge */}
-      <div
-        style={{
-          position: "absolute",
-          top: 10,
-          right: 10,
-          background: "rgba(10,10,8,0.7)",
-          border: `1px solid ${GOLD_DIM}`,
-          padding: "0.2rem 0.6rem",
-          fontFamily: FONT_MONO,
-          fontSize: "0.58rem",
-          textTransform: "uppercase",
-          letterSpacing: "0.1em",
-          color: GOLD,
-          backdropFilter: "blur(4px)",
-        }}
-      >
-        {room.photos.length} photo{room.photos.length !== 1 ? "s" : ""}
-      </div>
-
-      {/* Room name */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          padding: "1rem 1.25rem",
-          fontFamily: FONT_MONO,
-          fontSize: "0.8rem",
-          fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: "0.12em",
-          color: GOLD,
-        }}
-      >
-        {room.name}
-      </div>
-    </button>
-  );
-}
-
-// ---- Lightbox ----
-function Lightbox({
-  room,
-  photoIndex,
-  onClose,
-  onPrev,
-  onNext,
-}: {
-  room: Room;
-  photoIndex: number;
-  onClose: () => void;
-  onPrev: () => void;
-  onNext: () => void;
-}) {
-  const currentPhoto = room.photos[photoIndex];
-  const total = room.photos.length;
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 50,
-        background: "rgba(5,5,4,0.97)",
-        display: "flex",
-        flexDirection: "column",
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      {/* Lightbox top bar */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "1rem 1.5rem",
-          borderBottom: `1px solid ${GOLD_DIM}`,
-          flexShrink: 0,
-        }}
-      >
-        <div>
-          <div
-            style={{
-              fontFamily: FONT_MONO,
-              fontSize: "0.65rem",
-              textTransform: "uppercase",
-              letterSpacing: "0.15em",
-              color: GOLD,
-              marginBottom: "0.15rem",
-            }}
-          >
-            {room.name}
-          </div>
-          <div
-            style={{
-              fontFamily: FONT_MONO,
-              fontSize: "0.6rem",
-              color: SUBTEXT,
-            }}
-          >
-            Photo {photoIndex + 1} of {total}
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={onClose}
-          style={{
-            background: "none",
-            border: `1px solid ${GOLD_DIM}`,
-            color: TEXT,
-            fontFamily: FONT_MONO,
-            fontSize: "1.1rem",
-            width: 36,
-            height: 36,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-            transition: "border-color 0.2s, color 0.2s",
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.borderColor = GOLD;
-            (e.currentTarget as HTMLButtonElement).style.color = GOLD;
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.borderColor = GOLD_DIM;
-            (e.currentTarget as HTMLButtonElement).style.color = TEXT;
-          }}
-          aria-label="Close lightbox"
-        >
-          ×
-        </button>
-      </div>
-
-      {/* Photo area */}
-      <div
-        style={{
-          flex: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          position: "relative",
-          overflow: "hidden",
-          padding: "1.5rem",
-        }}
-      >
-        {/* Left arrow */}
-        {total > 1 && (
-          <button
-            type="button"
-            onClick={onPrev}
-            style={{
-              position: "absolute",
-              left: "1rem",
-              zIndex: 2,
-              background: "rgba(10,10,8,0.75)",
-              border: `1px solid ${GOLD_DIM}`,
-              color: TEXT,
-              fontFamily: FONT_MONO,
-              fontSize: "1.2rem",
-              width: 44,
-              height: 44,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              transition: "border-color 0.2s, background 0.2s",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = GOLD;
-              (e.currentTarget as HTMLButtonElement).style.background = `rgba(200,169,110,0.12)`;
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = GOLD_DIM;
-              (e.currentTarget as HTMLButtonElement).style.background = "rgba(10,10,8,0.75)";
-            }}
-            aria-label="Previous photo"
-          >
-            ‹
-          </button>
-        )}
-
-        {/* Main photo */}
-        {currentPhoto && (
-          <img
-            key={currentPhoto}
-            src={currentPhoto}
-            alt={`${room.name} — photo ${photoIndex + 1}`}
-            style={{
-              maxWidth: "100%",
-              maxHeight: "100%",
-              objectFit: "contain",
-              display: "block",
-            }}
-          />
-        )}
-
-        {/* Right arrow */}
-        {total > 1 && (
-          <button
-            type="button"
-            onClick={onNext}
-            style={{
-              position: "absolute",
-              right: "1rem",
-              zIndex: 2,
-              background: "rgba(10,10,8,0.75)",
-              border: `1px solid ${GOLD_DIM}`,
-              color: TEXT,
-              fontFamily: FONT_MONO,
-              fontSize: "1.2rem",
-              width: 44,
-              height: 44,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              transition: "border-color 0.2s, background 0.2s",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = GOLD;
-              (e.currentTarget as HTMLButtonElement).style.background = `rgba(200,169,110,0.12)`;
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = GOLD_DIM;
-              (e.currentTarget as HTMLButtonElement).style.background = "rgba(10,10,8,0.75)";
-            }}
-            aria-label="Next photo"
-          >
-            ›
-          </button>
-        )}
-      </div>
-
-      {/* Photo strip thumbnails */}
-      {total > 1 && (
-        <div
-          style={{
-            display: "flex",
-            gap: 4,
-            padding: "0.75rem 1.5rem",
-            overflowX: "auto",
-            borderTop: `1px solid ${GOLD_DIM}`,
-            flexShrink: 0,
-          }}
-        >
-          {room.photos.map((photo, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => {
-                // navigate directly — parent state updated via prop
-                const diff = i - photoIndex;
-                if (diff === 0) return;
-                // Call prev/next as many times as needed; for simplicity use a direct setter
-                // We expose index via a workaround: call onPrev/onNext based on direction
-                // Actually for direct navigation we need the parent to expose setPhotoIndex.
-                // Since we only have onPrev/onNext, chain calls:
-                for (let j = 0; j < Math.abs(diff); j++) {
-                  diff > 0 ? onNext() : onPrev();
-                }
-              }}
+          {/* Background photo with Ken Burns */}
+          {currentPhoto && (
+            <img
+              key={imgKey}
+              src={currentPhoto}
+              alt={`${currentRoom.name} — photo ${photoIdx + 1}`}
               style={{
-                width: 56,
-                height: 40,
-                flexShrink: 0,
-                padding: 0,
-                border: i === photoIndex ? `2px solid ${GOLD}` : `1px solid ${GOLD_DIM}`,
-                cursor: "pointer",
-                overflow: "hidden",
-                background: "#0f0f0b",
-                opacity: i === photoIndex ? 1 : 0.5,
-                transition: "opacity 0.2s, border-color 0.2s",
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                animation: "kenBurns 9s ease-out forwards, fadeIn 0.35s ease",
+                transformOrigin: "center center",
               }}
-              aria-label={`Go to photo ${i + 1}`}
-            >
-              <img
-                src={photo}
-                alt=""
-                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-              />
-            </button>
-          ))}
-        </div>
-      )}
+            />
+          )}
+
+          {/* Bottom gradient for HUD legibility */}
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.15) 40%, transparent 70%)", pointerEvents: "none" }} />
+          {/* Top gradient for edge polish */}
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 80, background: "linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, transparent 100%)", pointerEvents: "none" }} />
+
+          {/* ── Left nav arrow ── */}
+          {hasPrev && (
+            <button type="button" onClick={prevPhoto} aria-label="Previous photo"
+              style={{ position: "absolute", left: "1.5rem", top: "50%", transform: "translateY(-50%)", zIndex: 10, width: 52, height: 52, background: "rgba(10,10,8,0.7)", border: `1px solid ${GOLD_DIM}`, color: TEXT, fontSize: "1.6rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)", transition: "border-color 0.2s, background 0.2s" }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = GOLD; (e.currentTarget as HTMLButtonElement).style.background = "rgba(200,169,110,0.15)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = GOLD_DIM; (e.currentTarget as HTMLButtonElement).style.background = "rgba(10,10,8,0.7)"; }}
+            >‹</button>
+          )}
+
+          {/* ── Right nav arrow ── */}
+          {hasNext && (
+            <button type="button" onClick={nextPhoto} aria-label="Next photo"
+              style={{ position: "absolute", right: "1.5rem", top: "50%", transform: "translateY(-50%)", zIndex: 10, width: 52, height: 52, background: "rgba(10,10,8,0.7)", border: `1px solid ${GOLD_DIM}`, color: TEXT, fontSize: "1.6rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)", transition: "border-color 0.2s, background 0.2s" }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = GOLD; (e.currentTarget as HTMLButtonElement).style.background = "rgba(200,169,110,0.15)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = GOLD_DIM; (e.currentTarget as HTMLButtonElement).style.background = "rgba(10,10,8,0.7)"; }}
+            >›</button>
+          )}
+
+          {/* ── Room label + photo counter ── */}
+          <div style={{ position: "absolute", bottom: THUMB_H + 12, left: "1.5rem", zIndex: 10 }}>
+            <div style={{ fontFamily: FONT_DISPLAY, fontWeight: 900, fontSize: "clamp(1.1rem, 2.5vw, 1.8rem)", color: TEXT, letterSpacing: "-0.01em", lineHeight: 1.1, textShadow: "0 2px 12px rgba(0,0,0,0.8)" }}>
+              {currentRoom.name}
+            </div>
+            <div style={{ fontFamily: FONT_MONO, fontSize: "0.62rem", color: "rgba(245,244,239,0.65)", marginTop: "0.25rem", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+              Photo {photoIdx + 1} of {currentRoom.photos.length}
+              {roomIdx < rooms.length - 1 && (
+                <span style={{ marginLeft: "1rem", color: GOLD, cursor: "pointer" }} onClick={nextPhoto}>
+                  {rooms[roomIdx + 1].name} →
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* ── Thumbnail strip ── */}
+          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: THUMB_H, display: "flex", alignItems: "center", gap: 4, padding: "0 1.5rem", background: "rgba(6,6,5,0.88)", borderTop: `1px solid ${GOLD_DIM}`, overflowX: "auto", zIndex: 10 }}>
+            {currentRoom.photos.map((photo, pi) => (
+              <button
+                key={pi}
+                type="button"
+                onClick={() => goToPhoto(pi)}
+                aria-label={`Go to photo ${pi + 1}`}
+                style={{ width: 60, height: 44, flexShrink: 0, padding: 0, border: pi === photoIdx ? `2px solid ${GOLD}` : `1px solid ${GOLD_DIM}`, cursor: "pointer", overflow: "hidden", background: "#0f0f0b", opacity: pi === photoIdx ? 1 : 0.55, transition: "opacity 0.2s, border-color 0.2s", outline: "none" }}
+              >
+                <img src={photo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+              </button>
+            ))}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
