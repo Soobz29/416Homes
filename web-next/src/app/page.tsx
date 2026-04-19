@@ -220,10 +220,11 @@ export default function LandingPage() {
         backdropFilter: "blur(16px)",
         borderBottom: "1px solid var(--border)",
       }}>
-        {/* Logo */}
-        <div style={{ fontFamily: "var(--serif)", fontSize: "1.5rem", fontWeight: 500, letterSpacing: "0.01em" }}>
-          <span style={{ color: "var(--accent)" }}>416</span>
-          <span style={{ color: "var(--text-mute)" }}>homes</span>
+        {/* Logo — Terminal Broker: bold mono */}
+        <div style={{ fontFamily: "var(--mono)", fontSize: "1.1rem", fontWeight: 500, letterSpacing: "-0.02em" }}>
+          <span style={{ color: "var(--accent)", fontWeight: 700 }}>416</span>
+          <span style={{ color: "var(--text)" }}> Homes</span>
+          <span style={{ color: "var(--text-dim)", fontSize: "0.6rem", marginLeft: 6, letterSpacing: "0.1em", textTransform: "uppercase" }}>GTA</span>
         </div>
 
         {/* Nav links — desktop */}
@@ -305,21 +306,25 @@ export default function LandingPage() {
         <div style={{ paddingRight: 56, borderRight: "1px solid var(--border)" }}>
           <Eyebrow line>Toronto · Mississauga · GTA 2026</Eyebrow>
 
+          {/* Terminal Broker headline — bold mono, amber accent */}
           <h1 style={{
-            fontFamily: "var(--serif)",
-            fontSize: "clamp(3rem, 5.4vw, 6.2rem)",
-            lineHeight: 0.94,
+            fontFamily: "var(--mono)",
+            fontSize: "clamp(2.6rem, 5vw, 5.6rem)",
+            lineHeight: 1.0,
             fontWeight: 500,
-            margin: "28px 0 24px",
+            margin: "28px 0 28px",
             color: "var(--text)",
+            letterSpacing: "-0.02em",
           }}>
             Stop chasing.<br />Let listings<br />
-            <em style={{ color: "var(--accent)", fontStyle: "italic" }}>chase you.</em>
+            <span style={{ color: "var(--accent)" }}>chase you.</span>
           </h1>
 
-          <p style={{ fontFamily: "var(--sans)", fontSize: "1rem", color: "var(--text-mute)", maxWidth: "42ch", lineHeight: 1.7, marginBottom: 36 }}>
-            Our agent monitors every listing across the GTA, flags underpriced properties,
-            and contacts agents on your behalf — automatically, every night.
+          <p style={{ fontFamily: "var(--mono)", fontSize: "0.88rem", color: "var(--text-mute)", maxWidth: "46ch", lineHeight: 1.75, marginBottom: 36 }}>
+            416Homes watches four listing platforms around the clock,
+            checks every property against what homes actually sold for
+            in that neighbourhood, and reaches out to listing agents
+            on your behalf — so you don't have to.
           </p>
 
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
@@ -334,17 +339,17 @@ export default function LandingPage() {
             borderTop: "1px solid var(--border)",
           }}>
             {[
-              ["2,847", "Active listings"],
-              ["50+", "Neighbourhoods"],
-              ["Q30m", "Scan cadence"],
-              ["$0", "To start"],
+              ["24/7", "Continuous monitoring"],
+              ["50+", "GTA neighbourhoods"],
+              ["2", "Cities: Toronto & Mississauga"],
+              ["$0", "To get started"],
             ].map(([n, l], i) => (
               <div key={l} style={{
                 padding: "20px 16px 0 0",
                 borderRight: i < 3 ? "1px solid var(--border)" : "none",
               }}>
-                <div style={{ fontFamily: "var(--serif)", fontSize: "1.8rem", fontWeight: 500, color: "var(--accent)" }}>{n}</div>
-                <div style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--text-mute)", marginTop: 6 }}>{l}</div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "1.8rem", fontWeight: 500, color: "var(--accent)" }}>{n}</div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "0.55rem", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--text-mute)", marginTop: 6 }}>{l}</div>
               </div>
             ))}
           </div>
