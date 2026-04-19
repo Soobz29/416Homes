@@ -19,6 +19,8 @@ export interface Listing {
   fair_value?: number;
   neighbourhood?: string;
   dom?: number;
+  floor_plan_url?: string;
+  is_assignment?: boolean;
 }
 
 export interface VideoJob {
