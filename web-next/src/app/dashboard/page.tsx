@@ -60,18 +60,62 @@ const LISTINGS_PAGE_SIZE = 36;
 const TELEGRAM_BOT = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ?? "Homes_Alertsbot";
 
 /* ── GTA Map component ──────────────────────────────────────────────── */
-function GTAMap({ listings, selectedId, onSelect }: {
+const GTA_DEFAULT_SRC =
+  "https://www.openstreetmap.org/export/embed.html?bbox=-79.95%2C43.50%2C-79.10%2C43.90&layer=mapnik";
+
+function bboxSrc(lat: number, lon: number, delta = 0.018) {
+  const w = (lon - delta).toFixed(5);
+  const s = (lat - delta).toFixed(5);
+  const e = (lon + delta).toFixed(5);
+  const n = (lat + delta).toFixed(5);
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${w}%2C${s}%2C${e}%2C${n}&layer=mapnik&marker=${lat.toFixed(5)}%2C${lon.toFixed(5)}`;
+}
+
+function GTAMap({ listings, selectedId }: {
   listings: Listing[];
   selectedId: string | null;
-  onSelect: (id: string) => void;
 }) {
-  const hasLocations = listings.some(l => l.lat !== undefined && l.lng !== undefined);
+  const [mapSrc, setMapSrc] = useState(GTA_DEFAULT_SRC);
+  const [geocoding, setGeocoding] = useState(false);
+
+  useEffect(() => {
+    if (!selectedId) {
+      setMapSrc(GTA_DEFAULT_SRC);
+      return;
+    }
+    const sel = listings.find(l => l.id === selectedId);
+    if (!sel) return;
+
+    // Use existing coords if available
+    if (sel.lat && sel.lng) {
+      setMapSrc(bboxSrc(sel.lat, sel.lng));
+      return;
+    }
+
+    // Geocode via Nominatim (free, no API key)
+    setGeocoding(true);
+    fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(sel.address + ", Ontario, Canada")}&format=json&limit=1`,
+      { headers: { "Accept-Language": "en" } }
+    )
+      .then(r => r.json())
+      .then((data: Array<{ lat: string; lon: string }>) => {
+        if (data[0]) {
+          setMapSrc(bboxSrc(parseFloat(data[0].lat), parseFloat(data[0].lon)));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setGeocoding(false));
+  }, [selectedId, listings]);
+
+  const sel = selectedId ? listings.find(l => l.id === selectedId) : null;
 
   return (
     <div style={{ width: "100%", height: "100%", position: "relative", overflow: "hidden" }}>
-      {/* OpenStreetMap embed — GTA area */}
+      {/* Map iframe — src changes on listing select */}
       <iframe
-        src="https://www.openstreetmap.org/export/embed.html?bbox=-80.05%2C43.40%2C-78.85%2C44.10&layer=mapnik"
+        key={mapSrc}
+        src={mapSrc}
         style={{
           width: "100%",
           height: "100%",
@@ -81,63 +125,61 @@ function GTAMap({ listings, selectedId, onSelect }: {
         title="Greater Toronto Area Map"
       />
 
-      {/* Dark overlay for legibility */}
-      <div style={{
-        position: "absolute", inset: 0,
-        background: "linear-gradient(to bottom, rgba(11,11,11,0.15), rgba(11,11,11,0.05))",
-        pointerEvents: "none",
-      }} />
-
-      {/* Status pill */}
-      <div style={{
-        position: "absolute",
-        bottom: 16,
-        left: "50%",
-        transform: "translateX(-50%)",
-        background: "rgba(11,11,11,0.88)",
-        backdropFilter: "blur(8px)",
-        border: "1px solid var(--border)",
-        padding: "8px 16px",
-        fontFamily: "var(--mono)",
-        fontSize: "0.58rem",
-        textTransform: "uppercase",
-        letterSpacing: "0.12em",
-        color: "var(--text-mute)",
-        whiteSpace: "nowrap",
-      }}>
-        {hasLocations
-          ? `◆ ${listings.filter(l => l.lat !== undefined).length} pins · click to focus`
-          : "◆ GTA · Toronto & Mississauga · Pins appear when location data is available"}
-      </div>
+      {/* Geocoding spinner */}
+      {geocoding && (
+        <div style={{
+          position: "absolute", top: 16, left: "50%", transform: "translateX(-50%)",
+          background: "rgba(11,11,11,0.88)", backdropFilter: "blur(8px)",
+          border: "1px solid var(--border)",
+          padding: "6px 14px",
+          fontFamily: "var(--mono)", fontSize: "0.58rem",
+          textTransform: "uppercase", letterSpacing: "0.12em",
+          color: "var(--accent)", whiteSpace: "nowrap",
+        }}>
+          ◆ Locating…
+        </div>
+      )}
 
       {/* Selected listing callout */}
-      {selectedId && (() => {
-        const sel = listings.find(l => l.id === selectedId);
-        if (!sel) return null;
-        return (
-          <div style={{
-            position: "absolute", top: 16, left: 16, right: 16,
-            background: "rgba(11,11,11,0.92)",
-            backdropFilter: "blur(12px)",
-            border: "1px solid var(--border-strong)",
-            padding: "12px 16px",
-          }}>
-            <div style={{ fontFamily: "var(--serif)", fontSize: "1.1rem", fontWeight: 500, color: "var(--text)" }}>
-              ${sel.price.toLocaleString()}
-            </div>
-            <div style={{ fontFamily: "var(--sans)", fontSize: "0.75rem", color: "var(--text-mute)", marginTop: 2 }}>
-              {sel.address}
-            </div>
-            <a href={sel.url} target="_blank" rel="noreferrer" style={{
-              display: "inline-block", marginTop: 8,
-              fontFamily: "var(--mono)", fontSize: "0.58rem", textTransform: "uppercase",
-              letterSpacing: "0.1em", color: "var(--accent)", textDecoration: "none",
-            }}>
-              View listing →
-            </a>
+      {sel && (
+        <div style={{
+          position: "absolute", top: 16, left: 16, right: 16,
+          background: "rgba(11,11,11,0.92)",
+          backdropFilter: "blur(12px)",
+          border: "1px solid var(--border-strong)",
+          padding: "14px 16px",
+        }}>
+          <div style={{ fontFamily: "var(--mono)", fontSize: "1.1rem", fontWeight: 500, color: "var(--accent)" }}>
+            ${sel.price.toLocaleString("en-CA")}
           </div>
-        );
-      })()}
+          <div style={{ fontFamily: "var(--sans)", fontSize: "0.75rem", color: "var(--text-mute)", marginTop: 4 }}>
+            {sel.address}
+          </div>
+          <a href={sel.url} target="_blank" rel="noreferrer" style={{
+            display: "inline-block", marginTop: 10,
+            fontFamily: "var(--mono)", fontSize: "0.58rem", textTransform: "uppercase",
+            letterSpacing: "0.1em", color: "var(--accent)", textDecoration: "none",
+            border: "1px solid var(--border)", padding: "4px 10px",
+          }}>
+            View listing →
+          </a>
+        </div>
+      )}
+
+      {/* Status pill — only when nothing selected */}
+      {!sel && (
+        <div style={{
+          position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)",
+          background: "rgba(11,11,11,0.88)", backdropFilter: "blur(8px)",
+          border: "1px solid var(--border)",
+          padding: "8px 16px",
+          fontFamily: "var(--mono)", fontSize: "0.58rem",
+          textTransform: "uppercase", letterSpacing: "0.12em",
+          color: "var(--text-mute)", whiteSpace: "nowrap",
+        }}>
+          ◆ GTA · Toronto & Mississauga · Select a listing to locate it
+        </div>
+      )}
     </div>
   );
 }
@@ -788,7 +830,6 @@ export default function DashboardPage() {
                 <GTAMap
                   listings={listings}
                   selectedId={selectedId}
-                  onSelect={(id) => setSelectedId(id)}
                 />
               </div>
             </div>
