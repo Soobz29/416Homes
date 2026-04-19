@@ -1,9 +1,33 @@
 import type { Metadata } from "next";
+import { Syne, Cormorant_Garamond, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
+const cormorant = Cormorant_Garamond({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  style: ["normal", "italic"],
+  variable: "--font-serif",
+  display: "swap",
+});
+
+const syne = Syne({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-syne",
+  display: "swap",
+});
+
+const jetbrains = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["300", "400", "500"],
+  variable: "--font-mono",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "416Homes - Toronto Real Estate Platform",
-  description: "AI-powered listing aggregation and cinematic videos",
+  title: "416Homes — Toronto Real Estate Intelligence",
+  description:
+    "AI-powered listing aggregation for Toronto & Mississauga. Stop chasing listings — let them chase you.",
 };
 
 export default function RootLayout({
@@ -12,16 +36,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body>
+    <html lang="en">
+      <body
+        className={`${cormorant.variable} ${syne.variable} ${jetbrains.variable}`}
+      >
         {children}
       </body>
     </html>

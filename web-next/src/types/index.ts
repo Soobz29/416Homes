@@ -12,9 +12,13 @@ export interface Listing {
   url: string;
   photos?: string[];
   created_at: string;
-  transit_score?: number | null;
-  is_assignment?: boolean | null;
-  floor_plan_url?: string | null;
+  // Optional fields — populated by backend when available
+  lat?: number;
+  lng?: number;
+  transit_score?: number;
+  fair_value?: number;
+  neighbourhood?: string;
+  dom?: number;
 }
 
 export interface VideoJob {
