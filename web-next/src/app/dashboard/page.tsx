@@ -8,6 +8,7 @@ import { getSession, signInWithEmail, signOut } from "@/lib/supabase";
 import { Alert, fetchAlerts, createAlert, updateAlert, deleteAlert, generateLinkCode, fetchMe } from "@/lib/alerts";
 import { DropdownSelect } from "@/components/DropdownSelect";
 import { ErrorBanner } from "@/components/ui/error-banner";
+import { ListingCard, ListingCardSkeleton, ListRow } from "@/components/listing-card";
 
 const CITIES = [
   { value: "GTA", label: "All GTA" },
@@ -55,9 +56,93 @@ const BATH_OPTIONS = [
   { value: "3", label: "3+ Baths" },
 ];
 
-/** Listings per page (API max 200; pagination keeps first paint fast while GTA interleaving fills each slice). */
 const LISTINGS_PAGE_SIZE = 36;
+const TELEGRAM_BOT = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ?? "Homes_Alertsbot";
 
+/* ── GTA Map component ──────────────────────────────────────────────── */
+function GTAMap({ listings, selectedId, onSelect }: {
+  listings: Listing[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  const hasLocations = listings.some(l => l.lat !== undefined && l.lng !== undefined);
+
+  return (
+    <div style={{ width: "100%", height: "100%", position: "relative", overflow: "hidden" }}>
+      {/* OpenStreetMap embed — GTA area */}
+      <iframe
+        src="https://www.openstreetmap.org/export/embed.html?bbox=-80.05%2C43.40%2C-78.85%2C44.10&layer=mapnik"
+        style={{
+          width: "100%",
+          height: "100%",
+          border: "none",
+          filter: "brightness(0.78) saturate(0.65) hue-rotate(10deg)",
+        }}
+        title="Greater Toronto Area Map"
+      />
+
+      {/* Dark overlay for legibility */}
+      <div style={{
+        position: "absolute", inset: 0,
+        background: "linear-gradient(to bottom, rgba(11,11,11,0.15), rgba(11,11,11,0.05))",
+        pointerEvents: "none",
+      }} />
+
+      {/* Status pill */}
+      <div style={{
+        position: "absolute",
+        bottom: 16,
+        left: "50%",
+        transform: "translateX(-50%)",
+        background: "rgba(11,11,11,0.88)",
+        backdropFilter: "blur(8px)",
+        border: "1px solid var(--border)",
+        padding: "8px 16px",
+        fontFamily: "var(--mono)",
+        fontSize: "0.58rem",
+        textTransform: "uppercase",
+        letterSpacing: "0.12em",
+        color: "var(--text-mute)",
+        whiteSpace: "nowrap",
+      }}>
+        {hasLocations
+          ? `◆ ${listings.filter(l => l.lat !== undefined).length} pins · click to focus`
+          : "◆ GTA · Toronto & Mississauga · Pins appear when location data is available"}
+      </div>
+
+      {/* Selected listing callout */}
+      {selectedId && (() => {
+        const sel = listings.find(l => l.id === selectedId);
+        if (!sel) return null;
+        return (
+          <div style={{
+            position: "absolute", top: 16, left: 16, right: 16,
+            background: "rgba(11,11,11,0.92)",
+            backdropFilter: "blur(12px)",
+            border: "1px solid var(--border-strong)",
+            padding: "12px 16px",
+          }}>
+            <div style={{ fontFamily: "var(--serif)", fontSize: "1.1rem", fontWeight: 500, color: "var(--text)" }}>
+              ${sel.price.toLocaleString()}
+            </div>
+            <div style={{ fontFamily: "var(--sans)", fontSize: "0.75rem", color: "var(--text-mute)", marginTop: 2 }}>
+              {sel.address}
+            </div>
+            <a href={sel.url} target="_blank" rel="noreferrer" style={{
+              display: "inline-block", marginTop: 8,
+              fontFamily: "var(--mono)", fontSize: "0.58rem", textTransform: "uppercase",
+              letterSpacing: "0.1em", color: "var(--accent)", textDecoration: "none",
+            }}>
+              View listing →
+            </a>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+/* ── Main page ──────────────────────────────────────────────────────── */
 export default function DashboardPage() {
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
   const [emailInput, setEmailInput] = useState("");
@@ -76,6 +161,8 @@ export default function DashboardPage() {
   const [listingsError, setListingsError] = useState<string | null>(null);
   const [listingsPage, setListingsPage] = useState(0);
   const [totalListings, setTotalListings] = useState(0);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(false);
   const [alertsError, setAlertsError] = useState<string | null>(null);
@@ -104,12 +191,9 @@ export default function DashboardPage() {
   const [valuationLoading, setValuationLoading] = useState(false);
   const [valuationError, setValuationError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
-    // Hydrate Supabase session on mount
     void (async () => {
       try {
         const session = await getSession();
@@ -125,14 +209,10 @@ export default function DashboardPage() {
     })();
   }, []);
 
-  useEffect(() => {
-    setListingsPage(0);
-  }, [filters]);
+  useEffect(() => { setListingsPage(0); }, [filters]);
 
   useEffect(() => {
-    if (activeTab === "listings") {
-      void loadListings();
-    }
+    if (activeTab === "listings") void loadListings();
   }, [activeTab, filters, listingsPage]);
 
   async function triggerScan() {
@@ -196,10 +276,7 @@ export default function DashboardPage() {
       if (/rate limit/i.test(msg)) {
         setAuthMessage("Too many login attempts. Please wait a few minutes and try again.");
       } else if (/confirmation email|error sending|smtp|sending email/i.test(msg)) {
-        setAuthMessage(
-          "Error sending confirmation email. Check Supabase Auth → Email (SMTP): " +
-            "Resend username 'resend', password = API key, sender = verified domain or onboarding@resend.dev."
-        );
+        setAuthMessage("Error sending confirmation email. Check Supabase Auth → Email (SMTP).");
       } else {
         setAuthMessage(msg);
       }
@@ -228,7 +305,7 @@ export default function DashboardPage() {
         property_types: alertForm.propertyTypes.length ? alertForm.propertyTypes : undefined,
       };
       const created = await createAlert(sessionEmail, payload);
-      setAlerts((prev) => [created, ...prev]);
+      setAlerts(prev => [created, ...prev]);
       setAlertForm({ city: "GTA", minPrice: "", maxPrice: "", minBeds: "", propertyTypes: [] });
     } catch (e) {
       setAlertActionError(e instanceof Error ? e.message : "Failed to create alert.");
@@ -241,7 +318,7 @@ export default function DashboardPage() {
     try {
       setAlertActionError(null);
       await deleteAlert(sessionEmail, alert.id);
-      setAlerts((prev) => prev.filter((a) => a.id !== alert.id));
+      setAlerts(prev => prev.filter(a => a.id !== alert.id));
     } catch (e) {
       setAlertActionError(e instanceof Error ? e.message : "Failed to delete alert.");
     }
@@ -255,7 +332,9 @@ export default function DashboardPage() {
     } catch (e: unknown) {
       console.error("Failed to load /api/me", e);
       const msg = e instanceof Error ? e.message : "Could not reach backend";
-      setMeError(msg.includes("401") || msg.includes("Missing") ? "Sign in required." : `${msg}. Set NEXT_PUBLIC_API_URL to your Railway API URL in Vercel.`);
+      setMeError(msg.includes("401") || msg.includes("Missing")
+        ? "Sign in required."
+        : `${msg}. Set NEXT_PUBLIC_API_URL to your Railway API URL in Vercel.`);
     }
   }
 
@@ -272,13 +351,10 @@ export default function DashboardPage() {
       const { code, expires_at } = await generateLinkCode(email);
       setLinkCode(code);
       setLinkExpiresAt(expires_at ?? null);
-      setLinkMessage(
-        expires_at
-          ? `Code valid for 30 minutes until ${new Date(expires_at).toLocaleTimeString()} (UTC).`
-          : null,
-      );
+      setLinkMessage(expires_at
+        ? `Code valid until ${new Date(expires_at).toLocaleTimeString()}`
+        : null);
     } catch (e: any) {
-      console.error("Failed to generate link code", e);
       setLinkMessage(e?.message ?? "Failed to generate link code");
     } finally {
       setLinkLoading(false);
@@ -298,7 +374,6 @@ export default function DashboardPage() {
         setLinkMessage(null);
       }
     } catch (e: unknown) {
-      console.error("Failed to check link status", e);
       setMeError(e instanceof Error ? e.message : "Could not reach backend");
     } finally {
       setCheckingLinked(false);
@@ -309,180 +384,37 @@ export default function DashboardPage() {
     if (!sessionEmail) return;
     try {
       setAlertActionError(null);
-      const updated = await updateAlert(sessionEmail, alert.id, {
-        is_active: !alert.is_active,
-      });
-      setAlerts((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+      const updated = await updateAlert(sessionEmail, alert.id, { is_active: !alert.is_active });
+      setAlerts(prev => prev.map(a => a.id === updated.id ? updated : a));
     } catch (e) {
       setAlertActionError(e instanceof Error ? e.message : "Failed to update alert.");
     }
   }
 
+  // ── Shared styles ──────────────────────────────────────────────────────
+  const monoSm: React.CSSProperties = { fontFamily: "var(--mono)", fontSize: "0.68rem", textTransform: "uppercase" as const, letterSpacing: "0.1em" };
+
   return (
-    <div className="min-h-screen bg-[#0a0a08] text-[#f5f4ef]">
-      {/* Nav */}
-      <nav className="fixed left-0 right-0 top-0 z-50 flex items-center justify-between border-b border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.75)] px-16 py-6 backdrop-blur-xl max-md:px-6">
-        <div className="logo text-[1.3rem] font-extrabold tracking-[0.05em]">
-          <span className="text-[#c8a96e]">416</span>
-          Homes
-          <sub className="ml-1 align-middle font-['DM Mono',monospace] text-[0.6rem] font-normal tracking-[0.1em] text-[#6b6b60]">
-            DASHBOARD
-          </sub>
-        </div>
-        <ul className="nav-links hidden list-none gap-10 font-['DM Mono',monospace] text-[0.72rem] uppercase tracking-[0.1em] text-[#6b6b60] md:flex">
-          <li>
-            <button
-              onClick={() => setActiveTab("listings")}
-              className="bg-transparent text-inherit"
-            >
-              Properties
-            </button>
-          </li>
-          <li>
-            <button
-              onClick={() => setActiveTab("valuation")}
-              className="bg-transparent text-inherit"
-            >
-              Valuation
-            </button>
-          </li>
-          <li>
-            <button
-              onClick={() => setActiveTab("videos")}
-              className="bg-transparent text-inherit"
-            >
-              Videos
-            </button>
-          </li>
-        </ul>
-        <button className="nav-cta flex items-center gap-2 bg-[#c8a96e] px-6 py-2 font-['DM Mono',monospace] text-[0.72rem] font-medium uppercase tracking-[0.08em] text-black transition-colors hover:bg-[#e4c98a]">
-          <span className="hidden md:inline">Back to 416Homes</span>
-          <Link href="/" className="md:hidden">
-            Home
-          </Link>
-        </button>
-      </nav>
+    <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)" }}>
 
-      {/* Hero */}
-      <section className="dashboard-hero border-b border-[rgba(200,169,110,0.2)] bg-[radial-gradient(circle_at_top,rgba(200,169,110,0.14),transparent_55%)] px-16 pb-8 pt-24 max-md:px-6">
-        <div className="mx-auto grid max-w-[1120px] items-center gap-8 md:grid-cols-[2fr,1.2fr]">
-          <div>
-            <p className="dashboard-hero-eyebrow mb-3 font-['DM Mono',monospace] text-[0.7rem] uppercase tracking-[0.18em] text-[#6b6b60]">
-              GTA
-            </p>
-            <h1 className="dashboard-hero-title mb-3 text-[clamp(2rem,3vw,2.8rem)] font-extrabold tracking-[-0.02em]">
-              Your <span className="text-[#c8a96e]">GTA real estate</span> dashboard.
-            </h1>
-            <p className="dashboard-hero-sub max-w-xl font-['DM Mono',monospace] text-[0.8rem] leading-relaxed text-[#6b6b60]">
-              Browse fresh listings across Toronto and Mississauga, run quick valuations on any address, and order
-              listing videos when it&apos;s time to sell.
-            </p>
-            <div className="mt-6" suppressHydrationWarning>
-              {!mounted ? (
-                <div className="flex flex-col gap-2 rounded-xl border border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.7)] p-4 max-w-md">
-                  <span className="text-[0.7rem] font-['DM Mono',monospace] uppercase tracking-[0.12em] text-[#6b6b60]">
-                    Early access login
-                  </span>
-                  <div className="flex flex-wrap gap-2 rounded-full bg-[#6b6b60]/30 px-4 py-3 font-['DM Mono',monospace] text-[0.72rem] text-[#6b6b60]">
-                    Loading…
-                  </div>
-                </div>
-              ) : sessionEmail ? (
-                <div className="inline-flex items-center gap-3 rounded-full border border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.7)] px-4 py-2">
-                  <span className="font-['DM Mono',monospace] text-[0.7rem] text-[#6b6b60]">
-                    Signed in as <span className="text-[#f5f4ef]">{sessionEmail}</span>
-                  </span>
-                  <button
-                    onClick={handleSignOut}
-                    className="text-[0.7rem] font-['DM Mono',monospace] uppercase tracking-[0.1em] text-[#c8a96e]"
-                  >
-                    Sign out
-                  </button>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2 rounded-xl border border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.7)] p-4 max-w-md">
-                  <span className="text-[0.7rem] font-['DM Mono',monospace] uppercase tracking-[0.12em] text-[#6b6b60]">
-                    Early access login
-                  </span>
-                  <div className="flex flex-wrap gap-2">
-                    <input
-                      type="email"
-                      value={emailInput}
-                      onChange={(e) => setEmailInput(e.target.value)}
-                      placeholder="you@example.com"
-                      className="flex-1 min-w-[10rem] border border-[rgba(200,169,110,0.2)] bg-transparent px-3 py-2 font-['DM Mono',monospace] text-[0.8rem] text-[#f5f4ef] outline-none placeholder:text-[#6b6b60]"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAuthSubmit}
-                      className="rounded-full bg-[#c8a96e] px-4 py-2 font-['DM Mono',monospace] text-[0.72rem] uppercase tracking-[0.12em] text-black hover:bg-[#e4c98a]"
-                    >
-                      Send link
-                    </button>
-                  </div>
-                  {authMessage && (
-                    <div className="mt-1">
-                      <p className={`text-[0.7rem] font-['DM Mono',monospace] ${authMessage.includes("Too many") ? "text-[#e4a84a]" : "text-[#6b6b60]"}`}>
-                        {authMessage}
-                      </p>
-                      {authMessage.includes("Too many") && (
-                        <p className="mt-0.5 text-[0.65rem] font-['DM Mono',monospace] text-[#6b6b60]">
-                          Wait 1–5 minutes, or try a different email address.
-                        </p>
-                      )}
-                      {authMessage.includes("Error sending confirmation") && (
-                        <p className="mt-0.5 text-[0.65rem] font-['DM Mono',monospace] text-[#6b6b60]">
-                          In Resend, ensure the sender domain is verified or use onboarding@resend.dev for testing.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="dashboard-hero-metrics grid grid-cols-2 gap-3">
-            <div className="dashboard-hero-metric rounded-[14px] border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.02)] p-4">
-              <div className="dashboard-hero-metric-label font-['DM Mono',monospace] text-[0.62rem] uppercase tracking-[0.11em] text-[#6b6b60]">
-                Active listings
-              </div>
-              <div className="dashboard-hero-metric-value text-[1.35rem] font-bold text-[#c8a96e]">
-                GTA-wide
-              </div>
-              <p className="mt-1 text-[0.72rem] text-[#6b6b60]">
-                Pulled from Realtor.ca, Zoocasa, Kijiji and more.
-              </p>
-            </div>
-            <div className="dashboard-hero-metric rounded-[14px] border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.02)] p-4">
-              <div className="dashboard-hero-metric-label font-['DM Mono',monospace] text-[0.62rem] uppercase tracking-[0.11em] text-[#6b6b60]">
-                Scan cadence
-              </div>
-              <div className="dashboard-hero-metric-value text-[1.35rem] font-bold text-[#c8a96e]">
-                Every 30 min
-              </div>
-              <p className="mt-1 text-[0.72rem] text-[#6b6b60]">
-                Nightly full scans plus on-demand refreshes for hot listings.
-              </p>
-            </div>
-          </div>
-          <div className="mt-4 flex items-center gap-4">
-            <button
-              onClick={() => void triggerScan()}
-              disabled={scanLoading}
-              className="rounded border border-[rgba(200,169,110,0.4)] bg-transparent px-4 py-2 font-['DM_Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-[#c8a96e] transition-colors hover:bg-[rgba(200,169,110,0.1)] disabled:opacity-50"
-            >
-              {scanLoading ? "Scanning..." : "Refresh Listings"}
-            </button>
-            {scanMessage && (
-              <span className="font-['DM_Mono',monospace] text-[0.68rem] text-[#6b6b60]">{scanMessage}</span>
-            )}
-          </div>
+      {/* ── Nav ──────────────────────────────────────────────────────── */}
+      <nav style={{
+        position: "sticky", top: 0, zIndex: 100,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        height: 64, padding: "0 40px",
+        background: "rgba(11,11,11,0.92)",
+        backdropFilter: "blur(16px)",
+        borderBottom: "1px solid var(--border)",
+      }}>
+        {/* Logo */}
+        <div style={{ fontFamily: "var(--serif)", fontSize: "1.4rem", fontWeight: 500 }}>
+          <span style={{ color: "var(--accent)" }}>416</span>
+          <span style={{ color: "var(--text-mute)" }}>homes</span>
+          <span style={{ fontFamily: "var(--mono)", fontSize: "0.52rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--text-dim)", marginLeft: 8 }}>Dashboard</span>
         </div>
-      </section>
 
-      {/* Tab nav */}
-      <div className="tab-nav sticky top-0 z-40 border-b border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.8)] backdrop-blur-xl">
-        <div className="tab-nav-inner flex justify-center px-16 max-md:px-6">
+        {/* Tab buttons — mid nav */}
+        <div style={{ display: "flex", gap: 0 }}>
           {[
             ["listings", "Listings"],
             ["valuation", "Valuation"],
@@ -491,120 +423,300 @@ export default function DashboardPage() {
             <button
               key={id}
               onClick={() => setActiveTab(id as any)}
-              className={`tab-btn border-b-2 px-6 py-5 font-['DM Mono',monospace] text-[0.68rem] uppercase tracking-[0.1em] transition-colors ${
-                activeTab === id ? "border-[#c8a96e] text-[#c8a96e]" : "border-transparent text-[#6b6b60]"
-              }`}
+              style={{
+                padding: "0 20px",
+                height: 64,
+                fontFamily: "var(--mono)",
+                fontSize: "0.65rem",
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+                background: "transparent",
+                border: "none",
+                borderBottom: `2px solid ${activeTab === id ? "var(--accent)" : "transparent"}`,
+                color: activeTab === id ? "var(--accent)" : "var(--text-dim)",
+                cursor: "pointer",
+                transition: "color 0.2s, border-color 0.2s",
+              }}
             >
               {label}
             </button>
           ))}
         </div>
-      </div>
 
-      {/* Content */}
-      <main className="px-16 py-16 max-md:px-6">
-        {activeTab === "listings" && (
-          <div className="tab-content">
-            {/* Filters */}
-            <div className="card mb-6 border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] p-6 backdrop-blur-md">
-              <h2 className="mb-4 text-[1.1rem] font-bold text-[#f5f4ef]">Search Filters</h2>
-              <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
-                <DropdownSelect
-                  options={CITIES}
-                  value={filters.city}
-                  onChange={(city) => setFilters({ ...filters, city })}
-                  placeholder="All GTA"
-                />
-                <input
-                  type="number"
-                  placeholder="Min Price"
-                  value={filters.minPrice}
-                  onChange={(e) => setFilters({ ...filters, minPrice: e.target.value })}
-                  className="fi w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.8)] px-3 py-2 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
-                />
-                <input
-                  type="number"
-                  placeholder="Max Price"
-                  value={filters.maxPrice}
-                  onChange={(e) => setFilters({ ...filters, maxPrice: e.target.value })}
-                  className="fi w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.8)] px-3 py-2 font-['DM Mono',monospace] text-[0.82rem] text-[#f5f4ef]"
-                />
-                <DropdownSelect
-                  options={BED_OPTIONS}
-                  value={filters.bedrooms}
-                  onChange={(bedrooms) => setFilters({ ...filters, bedrooms })}
-                  placeholder="Any Beds"
-                />
-                <DropdownSelect
-                  options={BATH_OPTIONS}
-                  value={filters.bathrooms}
-                  onChange={(bathrooms) => setFilters({ ...filters, bathrooms })}
-                  placeholder="Any Baths"
-                />
-                <DropdownSelect
-                  options={PROPERTY_TYPES}
-                  value={filters.propertyType}
-                  onChange={(propertyType) => setFilters({ ...filters, propertyType })}
-                  placeholder="Any type"
-                />
-                <button
-                  onClick={loadListings}
-                  className="btn w-full bg-[#c8a96e] px-4 py-3 font-['Syne',sans-serif] text-[0.88rem] font-bold uppercase tracking-[0.05em] text-black hover:bg-[#e4c98a]"
-                >
-                  Search
+        {/* Auth + Back */}
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }} suppressHydrationWarning>
+          {mounted && (
+            sessionEmail ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ ...monoSm, color: "var(--text-dim)" }}>
+                  {sessionEmail.split("@")[0]}
+                </span>
+                <button onClick={handleSignOut} style={{ ...monoSm, background: "transparent", border: "none", color: "var(--accent)", cursor: "pointer" }}>
+                  Sign out
                 </button>
               </div>
-            </div>
+            ) : null
+          )}
+          <Link href="/" style={{
+            padding: "8px 16px",
+            background: "var(--accent)",
+            color: "#000",
+            fontFamily: "var(--mono)",
+            fontSize: "0.62rem",
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+            textDecoration: "none",
+            fontWeight: 700,
+          }}>
+            ← Home
+          </Link>
+        </div>
+      </nav>
 
-            {/* My alerts */}
-            <div className="card mb-6 border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.02)] p-6 backdrop-blur-md">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-[1rem] font-bold text-[#f5f4ef]">My alerts</h2>
-                  <p className="mt-1 font-['DM Mono',monospace] text-[0.72rem] text-[#6b6b60]">
-                    Alerts are tied to your email and power both dashboard views and Telegram notifications.
-                  </p>
+      {/* ── Filter bar (listings tab only) ────────────────────────────── */}
+      {activeTab === "listings" && (
+        <div style={{
+          position: "sticky", top: 64, zIndex: 90,
+          background: "rgba(11,11,11,0.9)",
+          backdropFilter: "blur(16px)",
+          borderBottom: "1px solid var(--border)",
+          padding: "10px 24px",
+          display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+        }}>
+          <DropdownSelect
+            options={CITIES}
+            value={filters.city}
+            onChange={city => setFilters({ ...filters, city })}
+            placeholder="All GTA"
+          />
+          <input
+            type="number"
+            placeholder="Min Price"
+            value={filters.minPrice}
+            onChange={e => setFilters({ ...filters, minPrice: e.target.value })}
+            style={{ border: "1px solid var(--border)", background: "transparent", padding: "6px 10px", fontFamily: "var(--mono)", fontSize: "0.78rem", color: "var(--text)", width: 120, outline: "none" }}
+          />
+          <input
+            type="number"
+            placeholder="Max Price"
+            value={filters.maxPrice}
+            onChange={e => setFilters({ ...filters, maxPrice: e.target.value })}
+            style={{ border: "1px solid var(--border)", background: "transparent", padding: "6px 10px", fontFamily: "var(--mono)", fontSize: "0.78rem", color: "var(--text)", width: 120, outline: "none" }}
+          />
+          <DropdownSelect
+            options={BED_OPTIONS}
+            value={filters.bedrooms}
+            onChange={bedrooms => setFilters({ ...filters, bedrooms })}
+            placeholder="Any Beds"
+          />
+          <DropdownSelect
+            options={BATH_OPTIONS}
+            value={filters.bathrooms}
+            onChange={bathrooms => setFilters({ ...filters, bathrooms })}
+            placeholder="Any Baths"
+          />
+          <DropdownSelect
+            options={PROPERTY_TYPES}
+            value={filters.propertyType}
+            onChange={propertyType => setFilters({ ...filters, propertyType })}
+            placeholder="Any type"
+          />
+          <button
+            onClick={loadListings}
+            style={{ padding: "7px 18px", background: "var(--accent)", color: "#000", fontFamily: "var(--mono)", fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.08em", border: "none", cursor: "pointer", fontWeight: 700 }}
+          >
+            Search
+          </button>
+          <button
+            onClick={() => void triggerScan()}
+            disabled={scanLoading}
+            style={{ padding: "7px 14px", background: "transparent", border: "1px solid var(--border-strong)", color: "var(--accent)", fontFamily: "var(--mono)", fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.08em", cursor: "pointer", opacity: scanLoading ? 0.5 : 1 }}
+          >
+            {scanLoading ? "Scanning..." : "↻ Refresh"}
+          </button>
+          {scanMessage && <span style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", color: "var(--text-dim)" }}>{scanMessage}</span>}
+          <span style={{ marginLeft: "auto", fontFamily: "var(--mono)", fontSize: "0.62rem", color: "var(--text-dim)" }}>
+            {totalListings.toLocaleString()} listings
+          </span>
+        </div>
+      )}
+
+      {/* ── Main content ──────────────────────────────────────────────── */}
+      <main>
+
+        {/* ── LISTINGS TAB ──────────────────────────────────────────── */}
+        {activeTab === "listings" && (
+          <>
+            {/* My alerts + Telegram card */}
+            <div style={{ borderBottom: "1px solid var(--border)", padding: "20px 40px", background: "var(--bg-panel)" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 24 }}>
+
+                {/* Alerts section */}
+                <div style={{ flex: "1 1 400px" }}>
+                  <div style={{ fontFamily: "var(--serif)", fontSize: "1.1rem", fontWeight: 500, marginBottom: 4 }}>My Alerts</div>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", color: "var(--text-dim)", marginBottom: 16 }}>
+                    Alerts power email + Telegram notifications.
+                  </div>
+
+                  {sessionEmail ? (
+                    <>
+                      {/* Alert form */}
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+                        <DropdownSelect
+                          options={CITIES}
+                          value={alertForm.city}
+                          onChange={city => setAlertForm({ ...alertForm, city })}
+                          placeholder="All GTA"
+                          className="[&_button]:px-2 [&_button]:py-1.5 [&_button]:text-[0.78rem]"
+                        />
+                        <input
+                          type="number" placeholder="Min beds" value={alertForm.minBeds}
+                          onChange={e => setAlertForm({ ...alertForm, minBeds: e.target.value })}
+                          style={{ border: "1px solid var(--border)", background: "transparent", padding: "5px 8px", fontFamily: "var(--mono)", fontSize: "0.72rem", color: "var(--text)", width: 90, outline: "none" }}
+                        />
+                        <input
+                          type="number" placeholder="Min $" value={alertForm.minPrice}
+                          onChange={e => setAlertForm({ ...alertForm, minPrice: e.target.value })}
+                          style={{ border: "1px solid var(--border)", background: "transparent", padding: "5px 8px", fontFamily: "var(--mono)", fontSize: "0.72rem", color: "var(--text)", width: 90, outline: "none" }}
+                        />
+                        <input
+                          type="number" placeholder="Max $" value={alertForm.maxPrice}
+                          onChange={e => setAlertForm({ ...alertForm, maxPrice: e.target.value })}
+                          style={{ border: "1px solid var(--border)", background: "transparent", padding: "5px 8px", fontFamily: "var(--mono)", fontSize: "0.72rem", color: "var(--text)", width: 90, outline: "none" }}
+                        />
+                        <button
+                          onClick={handleCreateAlert}
+                          style={{ padding: "5px 14px", background: "var(--accent)", color: "#000", fontFamily: "var(--mono)", fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.08em", border: "none", cursor: "pointer", fontWeight: 700 }}
+                        >
+                          + Save
+                        </button>
+                      </div>
+
+                      {(alertsError || alertActionError) && (
+                        <div style={{ marginBottom: 8 }}>
+                          <ErrorBanner
+                            message={(alertsError || alertActionError)!}
+                            onDismiss={() => { setAlertsError(null); setAlertActionError(null); }}
+                          />
+                        </div>
+                      )}
+
+                      {alertsLoading ? (
+                        <span style={{ fontFamily: "var(--mono)", fontSize: "0.68rem", color: "var(--text-dim)" }}>Loading alerts...</span>
+                      ) : alerts.length === 0 ? (
+                        <span style={{ fontFamily: "var(--mono)", fontSize: "0.68rem", color: "var(--text-dim)" }}>No alerts yet.</span>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          {alerts.map(a => (
+                            <div key={a.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, border: "1px solid var(--border)", padding: "8px 12px" }}>
+                              <div>
+                                <span style={{ fontFamily: "var(--sans)", fontSize: "0.82rem", color: "var(--text)", fontWeight: 600 }}>
+                                  {(a.cities?.join(", ")) || "GTA"}
+                                  {(a.property_types?.length) ? ` · ${a.property_types.join(", ")}` : ""}
+                                </span>
+                                <span style={{ fontFamily: "var(--mono)", fontSize: "0.64rem", color: "var(--text-dim)", marginLeft: 10 }}>
+                                  {a.min_price ? `$${a.min_price.toLocaleString()}` : "Any"} – {a.max_price ? `$${a.max_price.toLocaleString()}` : "Any"} · {a.min_beds ? `${a.min_beds}+ beds` : "Any beds"}
+                                </span>
+                              </div>
+                              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                                <button
+                                  onClick={() => handleToggleAlert(a)}
+                                  style={{
+                                    padding: "3px 8px",
+                                    fontFamily: "var(--mono)", fontSize: "0.6rem",
+                                    textTransform: "uppercase", letterSpacing: "0.08em",
+                                    border: "none", cursor: "pointer",
+                                    background: a.is_active ? "rgba(46,213,115,0.15)" : "rgba(255,255,255,0.06)",
+                                    color: a.is_active ? "#2ed573" : "var(--text-dim)",
+                                  }}
+                                >
+                                  {a.is_active ? "On" : "Off"}
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteAlert(a)}
+                                  style={{ padding: "3px 8px", fontFamily: "var(--mono)", fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em", border: "1px solid rgba(231,76,60,0.5)", color: "#e74c3c", background: "transparent", cursor: "pointer" }}
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    // Sign in form
+                    <div style={{ maxWidth: 340 }}>
+                      <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)", marginBottom: 8 }}>Sign in to manage alerts</div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <input
+                          type="email"
+                          value={emailInput}
+                          onChange={e => setEmailInput(e.target.value)}
+                          placeholder="you@example.com"
+                          style={{ flex: 1, border: "1px solid var(--border)", background: "transparent", padding: "8px 10px", fontFamily: "var(--mono)", fontSize: "0.78rem", color: "var(--text)", outline: "none" }}
+                        />
+                        <button
+                          onClick={handleAuthSubmit}
+                          style={{ padding: "8px 16px", background: "var(--accent)", color: "#000", fontFamily: "var(--mono)", fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.1em", border: "none", cursor: "pointer", fontWeight: 700 }}
+                        >
+                          Send link
+                        </button>
+                      </div>
+                      {authMessage && (
+                        <p style={{ marginTop: 8, fontFamily: "var(--mono)", fontSize: "0.65rem", color: authMessage.includes("Too many") ? "#e4a84a" : "var(--text-dim)" }}>
+                          {authMessage}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
+
+                {/* Telegram connect */}
                 {sessionEmail && (
-                  <div className="text-right">
+                  <div style={{ flex: "0 0 260px" }}>
+                    <div style={{ fontFamily: "var(--mono)", fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--accent)", marginBottom: 10 }}>
+                      ✈️ Telegram Alerts
+                    </div>
                     {telegramLinked ? (
-                      <div className="inline-block rounded-lg border border-[rgba(200,169,110,0.3)] bg-[rgba(200,169,110,0.06)] px-4 py-2 text-center">
-                        <div className="font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.1em] text-[#c8a96e]">Linked</div>
-                        <p className="font-['DM Mono',monospace] text-[0.75rem] font-semibold text-[#f5f4ef]">Connected</p>
-                        <p className="font-['DM Mono',monospace] text-[0.65rem] text-[#6b6b60]">You&apos;ll receive alerts in Telegram</p>
+                      <div style={{ border: "1px solid var(--border-strong)", padding: "12px 16px", background: "rgba(212,175,55,0.04)" }}>
+                        <div style={{ fontFamily: "var(--mono)", fontSize: "0.72rem", color: "var(--accent)" }}>✓ Connected</div>
+                        <div style={{ fontFamily: "var(--sans)", fontSize: "0.75rem", color: "var(--text-mute)", marginTop: 4 }}>
+                          You&apos;ll receive matching alerts in Telegram DMs.
+                        </div>
                       </div>
                     ) : linkCode ? (
-                      <div className="space-y-2 text-right">
-                        <div className="rounded-lg border border-[rgba(200,169,110,0.3)] bg-[rgba(0,0,0,0.2)] p-3 font-['DM Mono',monospace]">
-                          <p className="text-[0.65rem] text-[#6b6b60] mb-1">Your link code (valid 30 min):</p>
-                          <p className="text-[1rem] font-semibold text-[#f5f4ef] tracking-wider">{linkCode}</p>
-                          {linkMessage && <p className="mt-1 text-[0.65rem] text-[#6b6b60]">{linkMessage}</p>}
+                      <div style={{ border: "1px solid var(--border)", padding: "14px" }}>
+                        <div style={{ fontFamily: "var(--mono)", fontSize: "0.6rem", color: "var(--text-dim)", marginBottom: 8 }}>
+                          Open @{TELEGRAM_BOT} and send:
                         </div>
-                        <div className="text-[0.68rem] text-[#6b6b60] space-y-0.5">
-                          <p>1. Open Telegram and find <strong className="text-[#c8a96e]">@Homes_Alertsbot</strong> (or your 416Homes Alerts bot)</p>
-                          <p>2. Send: <code className="bg-[rgba(255,255,255,0.06)] px-1 rounded">/link {linkCode}</code></p>
-                          <p>3. Wait for confirmation, then click below.</p>
+                        <div style={{ fontFamily: "var(--mono)", fontSize: "1rem", fontWeight: 700, color: "var(--accent)", letterSpacing: "0.1em", marginBottom: 10 }}>
+                          /link {linkCode}
                         </div>
+                        {linkMessage && <div style={{ fontFamily: "var(--mono)", fontSize: "0.6rem", color: "var(--text-dim)", marginBottom: 10 }}>{linkMessage}</div>}
+                        <a href={`https://t.me/${TELEGRAM_BOT}`} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginBottom: 10, fontFamily: "var(--mono)", fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--accent)", textDecoration: "none", border: "1px solid var(--border-strong)", padding: "5px 10px" }}>
+                          Open Telegram →
+                        </a>
+                        <br />
                         <button
-                          type="button"
                           onClick={handleCheckLinked}
                           disabled={checkingLinked}
-                          className="mt-1 rounded-full border border-[rgba(200,169,110,0.4)] px-3 py-1.5 font-['DM Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-[#c8a96e] hover:border-[#e4c98a] disabled:opacity-50"
+                          style={{ marginTop: 4, fontFamily: "var(--mono)", fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-mute)", background: "transparent", border: "1px solid var(--border)", padding: "5px 10px", cursor: "pointer" }}
                         >
-                          {checkingLinked ? "Checking..." : "I've linked it, check status"}
+                          {checkingLinked ? "Checking..." : "I linked it — verify"}
                         </button>
                       </div>
                     ) : (
-                      <div className="space-y-1 text-right">
+                      <div>
                         <button
                           onClick={handleGenerateLinkCode}
                           disabled={linkLoading}
-                          className="rounded-full border border-[rgba(200,169,110,0.4)] px-3 py-1.5 font-['DM Mono',monospace] text-[0.7rem] uppercase tracking-[0.11em] text-[#c8a96e] hover:border-[#e4c98a]"
+                          style={{ padding: "9px 18px", background: "transparent", border: "1px solid var(--border-strong)", color: "var(--accent)", fontFamily: "var(--mono)", fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer", display: "block", width: "100%" }}
                         >
-                          {linkLoading ? "Generating..." : "Connect Telegram"}
+                          {linkLoading ? "Generating..." : "Connect Telegram →"}
                         </button>
                         {(linkMessage || meError) && !linkCode && (
-                          <p className="text-[0.65rem] font-['DM Mono',monospace] text-[#e4a84a]">
+                          <p style={{ marginTop: 6, fontFamily: "var(--mono)", fontSize: "0.62rem", color: "#e4a84a" }}>
                             {meError ?? linkMessage}
                           </p>
                         )}
@@ -613,359 +725,214 @@ export default function DashboardPage() {
                   </div>
                 )}
               </div>
-
-              {sessionEmail ? (
-                <>
-                  <div className="mt-4 grid gap-2 md:grid-cols-2 lg:grid-cols-4">
-                    <DropdownSelect
-                      options={CITIES}
-                      value={alertForm.city}
-                      onChange={(city) => setAlertForm({ ...alertForm, city })}
-                      placeholder="All GTA"
-                      className="[&_button]:px-2 [&_button]:py-1.5 [&_button]:text-[0.78rem]"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Min beds"
-                      value={alertForm.minBeds}
-                      onChange={(e) => setAlertForm({ ...alertForm, minBeds: e.target.value })}
-                      className="border border-[rgba(200,169,110,0.2)] bg-transparent px-2 py-1.5 text-[0.78rem] font-['DM Mono',monospace] text-[#f5f4ef] placeholder:text-[#6b6b60]"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Min price"
-                      value={alertForm.minPrice}
-                      onChange={(e) => setAlertForm({ ...alertForm, minPrice: e.target.value })}
-                      className="border border-[rgba(200,169,110,0.2)] bg-transparent px-2 py-1.5 text-[0.78rem] font-['DM Mono',monospace] text-[#f5f4ef] placeholder:text-[#6b6b60]"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Max price"
-                      value={alertForm.maxPrice}
-                      onChange={(e) => setAlertForm({ ...alertForm, maxPrice: e.target.value })}
-                      className="border border-[rgba(200,169,110,0.2)] bg-transparent px-2 py-1.5 text-[0.78rem] font-['DM Mono',monospace] text-[#f5f4ef] placeholder:text-[#6b6b60]"
-                    />
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[0.7rem] text-[#6b6b60]">Property types:</span>
-                      {PROPERTY_TYPES.filter((p) => p.value).map((p) => (
-                        <label key={p.value} className="flex items-center gap-1.5 font-['DM Mono',monospace] text-[0.72rem] text-[#f5f4ef]">
-                          <input
-                            type="checkbox"
-                            checked={alertForm.propertyTypes.includes(p.value)}
-                            onChange={(e) => {
-                              const next = e.target.checked
-                                ? [...alertForm.propertyTypes, p.value]
-                                : alertForm.propertyTypes.filter((x) => x !== p.value);
-                              setAlertForm({ ...alertForm, propertyTypes: next });
-                            }}
-                            className="rounded border-[rgba(200,169,110,0.4)]"
-                          />
-                          {p.label}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleCreateAlert}
-                    className="mt-3 rounded-full bg-[#c8a96e] px-4 py-2 font-['DM Mono',monospace] text-[0.74rem] uppercase tracking-[0.12em] text-black hover:bg-[#e4c98a]"
-                  >
-                    Save alert
-                  </button>
-
-                  <div className="mt-4 border-t border-[rgba(200,169,110,0.2)] pt-3">
-                    {(alertsError || alertActionError) && (
-                      <div className="mb-3">
-                        <ErrorBanner
-                          message={(alertsError || alertActionError)!}
-                          onDismiss={() => { setAlertsError(null); setAlertActionError(null); }}
-                        />
-                      </div>
-                    )}
-                    {alertsLoading ? (
-                      <p className="font-['DM Mono',monospace] text-[0.72rem] text-[#6b6b60]">Loading alerts...</p>
-                    ) : alerts.length === 0 ? (
-                      <p className="font-['DM Mono',monospace] text-[0.72rem] text-[#6b6b60]">
-                        No alerts yet. Create your first one above.
-                      </p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {alerts.map((a) => (
-                          <li
-                            key={a.id}
-                            className="flex flex-nowrap items-center justify-between gap-3 rounded-md border border-[rgba(200,169,110,0.25)] px-3 py-2"
-                          >
-                            <div className="min-w-0 flex-1">
-                              <div className="text-[0.8rem] font-semibold text-[#f5f4ef]">
-                                {(a.cities && a.cities.join(", ")) || "GTA"}
-                                {(a.property_types && a.property_types.length) ? ` · ${a.property_types.join(", ")}` : ""}
-                              </div>
-                              <div className="text-[0.7rem] font-['DM Mono',monospace] text-[#6b6b60]">
-                                {a.min_price ? `$${a.min_price.toLocaleString()}` : "Any"} –{" "}
-                                {a.max_price ? `$${a.max_price.toLocaleString()}` : "Any"} •{" "}
-                                {a.min_beds ? `${a.min_beds}+ beds` : "Any beds"}
-                              </div>
-                            </div>
-                            <div className="flex flex-shrink-0 flex-nowrap items-center gap-2 border-l border-[rgba(200,169,110,0.2)] pl-3">
-                              <button
-                                type="button"
-                                onClick={() => handleToggleAlert(a)}
-                                className={`rounded px-2 py-1 font-['DM Mono',monospace] text-[0.68rem] uppercase tracking-[0.1em] ${
-                                  a.is_active
-                                    ? "bg-[rgba(46,213,115,0.2)] text-[#2ed573]"
-                                    : "bg-[rgba(255,255,255,0.06)] text-[#6b6b60]"
-                                }`}
-                              >
-                                {a.is_active ? "On" : "Off"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteAlert(a)}
-                                className="rounded border border-[rgba(231,76,60,0.5)] px-2 py-1 font-['DM Mono',monospace] text-[0.68rem] uppercase tracking-[0.08em] text-[#e74c3c] hover:bg-[rgba(231,76,60,0.15)] hover:text-[#ff6b6b]"
-                                title="Delete this alert"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <p className="mt-3 font-['DM Mono',monospace] text-[0.72rem] text-[#6b6b60]">
-                  Sign in with your email above to create and manage alerts.
-                </p>
-              )}
             </div>
 
-            {/* Listings */}
+            {/* Errors */}
             {listingsError && (
-              <div className="mb-4">
+              <div style={{ padding: "0 40px" }}>
                 <ErrorBanner message={listingsError} onDismiss={() => setListingsError(null)} />
               </div>
             )}
-            {loading ? (
-              <div className="flex h-64 items-center justify-center">
-                <div className="loading-spinner h-10 w-10 animate-spin rounded-full border-[3px] border-[rgba(200,169,110,0.2)] border-t-[#c8a96e]" />
-              </div>
-            ) : (
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {listings.map((l) => (
-                  <div
-                    key={l.id}
-                    className="listing-card card border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] p-6 backdrop-blur-md transition-all hover:-translate-y-1 hover:border-[rgba(200,169,110,0.4)] hover:shadow-xl"
-                  >
-                    <div className="mb-4 flex items-start justify-between">
-                      <div>
-                        <h3 className="mb-1 text-[0.9rem] font-semibold leading-tight">{l.address}</h3>
-                        <p className="text-[1.6rem] font-extrabold tracking-[0.03em] text-[#c8a96e]">
-                          ${l.price.toLocaleString()}
-                        </p>
-                      </div>
-                      <span className="inline-block border border-[rgba(200,169,110,0.35)] px-2 py-0.5 font-['DM Mono',monospace] text-[0.58rem] uppercase tracking-[0.12em] text-[#c8a96e]">
-                        {(l.source || "").toUpperCase()}
-                      </span>
-                    </div>
-                    <div className="mb-4 grid grid-cols-3 gap-4 text-center">
-                      <div>
-                        <div className="stat-value text-[1.05rem] font-bold">{l.beds || "—"}</div>
-                        <div className="stat-label mt-1 font-['DM Mono',monospace] text-[0.58rem] uppercase tracking-[0.08em] text-[#6b6b60]">
-                          Beds
-                        </div>
-                      </div>
-                      <div>
-                        <div className="stat-value text-[1.05rem] font-bold">{l.baths || "—"}</div>
-                        <div className="stat-label mt-1 font-['DM Mono',monospace] text-[0.58rem] uppercase tracking-[0.08em] text-[#6b6b60]">
-                          Baths
-                        </div>
-                      </div>
-                      <div>
-                        <div className="stat-value text-[1.05rem] font-bold">
-                          {l.sqft ? l.sqft.toLocaleString() : "—"}
-                        </div>
-                        <div className="stat-label mt-1 font-['DM Mono',monospace] text-[0.58rem] uppercase tracking-[0.08em] text-[#6b6b60]">
-                          Sq Ft
-                        </div>
+
+            {/* ── Split view: List | Map ───────────────────────────── */}
+            <div
+              className="split-view"
+              style={{ display: "grid", gridTemplateColumns: "440px 1fr", minHeight: 640 }}
+            >
+              {/* List column */}
+              <div style={{ overflowY: "auto", borderRight: "1px solid var(--border)", maxHeight: "calc(100vh - 180px)" }}>
+                {loading ? (
+                  Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} style={{ padding: "14px 16px", borderBottom: "1px solid var(--border)", display: "flex", gap: 12 }}>
+                      <div style={{ width: 56, height: 56, background: "linear-gradient(90deg,#1a1a14 25%,#222218 50%,#1a1a14 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite", flexShrink: 0 }} />
+                      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                        {[70, 50, 40].map(w => (
+                          <div key={w} style={{ height: 12, width: `${w}%`, background: "linear-gradient(90deg,#1a1a14 25%,#222218 50%,#1a1a14 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite" }} />
+                        ))}
                       </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <a
-                        href={l.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[0.78rem] font-['DM Mono',monospace] uppercase tracking-[0.08em] text-[#f5f4ef] no-underline"
-                      >
-                        View Listing
-                      </a>
-                      <button
-                        className="btn bg-[#c8a96e] px-4 py-2 font-['Syne',sans-serif] text-[0.8rem] font-bold uppercase tracking-[0.08em] text-black hover:bg-[#e4c98a]"
-                        onClick={() => {
-                          setValuationForm({
-                            neighbourhood: "",
-                            city: l.city || "Toronto",
-                            bedrooms: l.beds > 0 ? String(l.beds) : "",
-                            bathrooms: l.baths > 0 ? String(l.baths) : "",
-                            sqft: l.sqft > 0 ? String(l.sqft) : "",
-                            list_price: l.price > 0 ? String(l.price) : "",
-                          });
-                          setValuationResult(null);
-                          setValuationError(null);
-                          setActiveTab("valuation");
-                        }}
-                      >
-                        Valuate
-                      </button>
-                    </div>
+                  ))
+                ) : listings.length === 0 ? (
+                  <div style={{ padding: "60px 24px", textAlign: "center" }}>
+                    <div style={{ fontSize: "2rem", color: "var(--border)", marginBottom: 12 }}>◎</div>
+                    <div style={{ fontFamily: "var(--serif)", fontSize: "1.1rem", color: "var(--text-mute)" }}>No listings match your filters</div>
+                    <div style={{ fontFamily: "var(--sans)", fontSize: "0.82rem", color: "var(--text-dim)", marginTop: 6 }}>Try a broader area or price range</div>
                   </div>
-                ))}
+                ) : (
+                  listings.map(l => (
+                    <ListRow
+                      key={l.id}
+                      listing={l}
+                      active={l.id === selectedId}
+                      onClick={() => setSelectedId(l.id === selectedId ? null : l.id)}
+                      onValuate={() => {
+                        setValuationForm({
+                          neighbourhood: "",
+                          city: l.city || "Toronto",
+                          bedrooms: l.beds > 0 ? String(l.beds) : "",
+                          bathrooms: l.baths > 0 ? String(l.baths) : "",
+                          sqft: l.sqft > 0 ? String(l.sqft) : "",
+                          list_price: l.price > 0 ? String(l.price) : "",
+                        });
+                        setValuationResult(null);
+                        setValuationError(null);
+                        setActiveTab("valuation");
+                      }}
+                    />
+                  ))
+                )}
               </div>
-            )}
+
+              {/* Map column */}
+              <div className="map-col" style={{ position: "relative" }}>
+                <GTAMap
+                  listings={listings}
+                  selectedId={selectedId}
+                  onSelect={(id) => setSelectedId(id)}
+                />
+              </div>
+            </div>
+
+            {/* Pagination */}
             {!loading && totalListings > LISTINGS_PAGE_SIZE && (
-              <div className="mt-8 flex flex-wrap items-center justify-center gap-4 font-['DM_Mono',monospace] text-[0.72rem] uppercase tracking-[0.08em] text-[#6b6b60]">
+              <div style={{ padding: "24px 40px", borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", gap: 20 }}>
                 <button
-                  type="button"
                   disabled={listingsPage <= 0}
-                  onClick={() => setListingsPage((p) => Math.max(0, p - 1))}
-                  className="rounded border border-[rgba(200,169,110,0.35)] px-4 py-2 text-[#c8a96e] transition-colors hover:border-[#c8a96e] disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={() => setListingsPage(p => Math.max(0, p - 1))}
+                  className="btn-ghost"
+                  style={{ opacity: listingsPage <= 0 ? 0.4 : 1, cursor: listingsPage <= 0 ? "not-allowed" : "pointer", padding: "8px 20px" }}
                 >
-                  Previous
+                  ← Previous
                 </button>
-                <span>
-                  Page {listingsPage + 1} of {Math.max(1, Math.ceil(totalListings / LISTINGS_PAGE_SIZE))}
-                  <span className="ml-2 normal-case tracking-normal text-[#6b6b60]">
-                    ({totalListings.toLocaleString()} listings)
-                  </span>
+                <span style={{ fontFamily: "var(--mono)", fontSize: "0.7rem", color: "var(--text-mute)" }}>
+                  Page {listingsPage + 1} / {Math.max(1, Math.ceil(totalListings / LISTINGS_PAGE_SIZE))}
                 </span>
                 <button
-                  type="button"
                   disabled={(listingsPage + 1) * LISTINGS_PAGE_SIZE >= totalListings}
-                  onClick={() => setListingsPage((p) => p + 1)}
-                  className="rounded border border-[rgba(200,169,110,0.35)] px-4 py-2 text-[#c8a96e] transition-colors hover:border-[#c8a96e] disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={() => setListingsPage(p => p + 1)}
+                  className="btn-ghost"
+                  style={{ opacity: (listingsPage + 1) * LISTINGS_PAGE_SIZE >= totalListings ? 0.4 : 1, cursor: (listingsPage + 1) * LISTINGS_PAGE_SIZE >= totalListings ? "not-allowed" : "pointer", padding: "8px 20px" }}
                 >
-                  Next
+                  Next →
                 </button>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── VALUATION TAB ─────────────────────────────────────────── */}
+        {activeTab === "valuation" && (
+          <div style={{ maxWidth: 640, margin: "0 auto", padding: "48px 40px" }}>
+            <div style={{ fontFamily: "var(--serif)", fontSize: "clamp(1.4rem,2vw,2.2rem)", fontWeight: 500, marginBottom: 32 }}>Property Valuation</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
+              {[
+                { label: "City", key: "city", placeholder: "Toronto" },
+                { label: "Neighbourhood", key: "neighbourhood", placeholder: "King West" },
+                { label: "Bedrooms", key: "bedrooms", placeholder: "3" },
+                { label: "Bathrooms", key: "bathrooms", placeholder: "2" },
+                { label: "Sq Ft", key: "sqft", placeholder: "1200" },
+                { label: "List Price", key: "list_price", placeholder: "750000" },
+              ].map(({ label, key, placeholder }) => (
+                <div key={key}>
+                  <label style={{ display: "block", fontFamily: "var(--mono)", fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)", marginBottom: 6 }}>{label}</label>
+                  <input
+                    type="text"
+                    placeholder={placeholder}
+                    value={valuationForm[key as keyof typeof valuationForm]}
+                    onChange={e => setValuationForm(f => ({ ...f, [key]: e.target.value }))}
+                    style={{ width: "100%", border: "1px solid var(--border)", background: "transparent", padding: "9px 12px", fontFamily: "var(--mono)", fontSize: "0.8rem", color: "var(--text)", outline: "none" }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <button
+              disabled={valuationLoading}
+              className="btn-primary"
+              style={{ marginTop: 24, width: "100%", textAlign: "center", opacity: valuationLoading ? 0.6 : 1 }}
+              onClick={async () => {
+                setValuationLoading(true);
+                setValuationError(null);
+                setValuationResult(null);
+                try {
+                  const result = await fetchValuation({
+                    neighbourhood: valuationForm.neighbourhood,
+                    property_type: "",
+                    city: valuationForm.city,
+                    bedrooms: Number(valuationForm.bedrooms) || 0,
+                    bathrooms: Number(valuationForm.bathrooms) || 0,
+                    sqft: Number(valuationForm.sqft) || 0,
+                    list_price: Number(valuationForm.list_price) || 0,
+                  });
+                  setValuationResult(result);
+                } catch {
+                  setValuationError("Valuation failed — check API connection.");
+                } finally {
+                  setValuationLoading(false);
+                }
+              }}
+            >
+              {valuationLoading ? "Estimating..." : "Get Valuation"}
+            </button>
+
+            {valuationError && (
+              <p style={{ marginTop: 16, fontFamily: "var(--mono)", fontSize: "0.78rem", color: "#e74c3c" }}>{valuationError}</p>
+            )}
+
+            {valuationResult && (
+              <div style={{ marginTop: 28, border: "1px solid var(--border)", padding: 24 }}>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)", marginBottom: 6 }}>Estimated Value</div>
+                <div style={{ fontFamily: "var(--serif)", fontSize: "2.5rem", fontWeight: 500, color: "var(--accent)" }}>
+                  ${valuationResult.estimated_value.toLocaleString()}
+                </div>
+                {valuationResult.price_per_sqft && (
+                  <div style={{ fontFamily: "var(--mono)", fontSize: "0.78rem", color: "var(--text)", marginTop: 4 }}>
+                    ${Math.round(valuationResult.price_per_sqft).toLocaleString()} / sqft
+                  </div>
+                )}
+                <div style={{ fontFamily: "var(--mono)", fontSize: "0.75rem", color: "var(--text-mute)", marginTop: 8 }}>
+                  {valuationResult.market_analysis}
+                </div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "0.65rem", color: "var(--text-dim)", marginTop: 6 }}>
+                  Confidence: {Math.round(valuationResult.confidence * 100)}%
+                </div>
               </div>
             )}
           </div>
         )}
 
-        {activeTab === "valuation" && (
-          <div className="tab-content mx-auto max-w-[60rem]">
-            <div className="card border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] p-6 backdrop-blur-md">
-              <h2 className="mb-6 text-[clamp(1.4rem,2vw,2.2rem)] font-extrabold tracking-[-0.02em]">
-                Property Valuation
-              </h2>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {[
-                  { label: "City", key: "city", placeholder: "Toronto" },
-                  { label: "Neighbourhood", key: "neighbourhood", placeholder: "King West" },
-                  { label: "Bedrooms", key: "bedrooms", placeholder: "3" },
-                  { label: "Bathrooms", key: "bathrooms", placeholder: "2" },
-                  { label: "Sq Ft", key: "sqft", placeholder: "1200" },
-                  { label: "List Price", key: "list_price", placeholder: "750000" },
-                ].map(({ label, key, placeholder }) => (
-                  <div key={key} className="flex flex-col gap-1">
-                    <label className="font-['DM_Mono',monospace] text-[0.65rem] uppercase tracking-[0.08em] text-[#6b6b60]">{label}</label>
-                    <input
-                      type="text"
-                      placeholder={placeholder}
-                      value={valuationForm[key as keyof typeof valuationForm]}
-                      onChange={e => setValuationForm(f => ({ ...f, [key]: e.target.value }))}
-                      className="border border-[rgba(200,169,110,0.2)] bg-transparent px-3 py-2 font-['DM_Mono',monospace] text-[0.8rem] text-[#f5f4ef] outline-none placeholder:text-[#6b6b60] focus:border-[#c8a96e]"
-                    />
-                  </div>
-                ))}
-              </div>
-              <button
-                disabled={valuationLoading}
-                className="mt-5 bg-[#c8a96e] px-6 py-2.5 font-['Syne',sans-serif] text-[0.85rem] font-bold uppercase tracking-[0.08em] text-black hover:bg-[#e4c98a] disabled:opacity-50"
-                onClick={async () => {
-                  setValuationLoading(true);
-                  setValuationError(null);
-                  setValuationResult(null);
-                  try {
-                    const result = await fetchValuation({
-                      neighbourhood: valuationForm.neighbourhood,
-                      property_type: "",
-                      city: valuationForm.city,
-                      bedrooms: Number(valuationForm.bedrooms) || 0,
-                      bathrooms: Number(valuationForm.bathrooms) || 0,
-                      sqft: Number(valuationForm.sqft) || 0,
-                      list_price: Number(valuationForm.list_price) || 0,
-                    });
-                    setValuationResult(result);
-                  } catch {
-                    setValuationError("Valuation failed — check API connection.");
-                  } finally {
-                    setValuationLoading(false);
-                  }
-                }}
-              >
-                {valuationLoading ? "Estimating..." : "Get Valuation"}
-              </button>
-              {valuationError && (
-                <p className="mt-4 font-['DM_Mono',monospace] text-[0.78rem] text-red-400">{valuationError}</p>
-              )}
-              {valuationResult && (
-                <div className="mt-6 border border-[rgba(200,169,110,0.2)] p-5">
-                  <p className="font-['DM_Mono',monospace] text-[0.65rem] uppercase tracking-[0.1em] text-[#6b6b60]">Estimated Value</p>
-                  <p className="text-[2rem] font-extrabold text-[#c8a96e]">
-                    ${valuationResult.estimated_value.toLocaleString()}
-                  </p>
-                  {valuationResult.price_per_sqft && (
-                    <p className="mt-1 font-['DM_Mono',monospace] text-[0.78rem] text-[#f5f4ef]">
-                      ${Math.round(valuationResult.price_per_sqft).toLocaleString()} / sqft
-                    </p>
-                  )}
-                  <p className="mt-2 font-['DM_Mono',monospace] text-[0.78rem] text-[#6b6b60]">
-                    {valuationResult.market_analysis}
-                  </p>
-                  <p className="mt-1 font-['DM_Mono',monospace] text-[0.65rem] text-[#6b6b60]">
-                    Confidence: {Math.round(valuationResult.confidence * 100)}%
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
+        {/* ── VIDEOS TAB ────────────────────────────────────────────── */}
         {activeTab === "videos" && (
-          <div className="tab-content flex flex-col items-center justify-center px-4 py-16 text-center">
-            <p className="mb-6 font-['DM Mono',monospace] text-[0.72rem] uppercase tracking-[0.1em] text-[#6b6b60]">
-              Professional listing videos for GTA agents
-            </p>
-            <h2 className="mb-4 text-[clamp(1.6rem,2.5vw,2.8rem)] font-extrabold text-[#f5f4ef]">
-              Turn any listing into a <span className="text-[#c8a96e]">cinematic video</span>
+          <div style={{ padding: "80px 40px", textAlign: "center", maxWidth: 640, margin: "0 auto" }}>
+            <div style={{ fontFamily: "var(--mono)", fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--text-dim)", marginBottom: 20 }}>
+              Professional listing videos · GTA agents
+            </div>
+            <h2 style={{ fontFamily: "var(--serif)", fontSize: "clamp(2rem, 3vw, 3.2rem)", fontWeight: 500, marginBottom: 20 }}>
+              Turn any listing into a{" "}
+              <em style={{ color: "var(--accent)", fontStyle: "italic" }}>cinematic video</em>
             </h2>
-            <p className="mb-10 max-w-xl font-['DM Mono',monospace] text-[0.8rem] text-[#6b6b60]">
-              Paste a Realtor.ca or Zillow URL. We write the script, record the voiceover, and add music — your
-              polished 30-second video is ready in under 15 minutes.
+            <p style={{ fontFamily: "var(--sans)", fontSize: "0.9rem", color: "var(--text-mute)", lineHeight: 1.7, marginBottom: 40, maxWidth: "44ch", margin: "0 auto 40px" }}>
+              Paste a Realtor.ca or Zillow URL. We write the script, record the voiceover,
+              and add music — your polished 30-second video is ready in under 15 minutes.
             </p>
-            <Link
-              href="/video"
-              className="btn rounded-full bg-[#c8a96e] px-10 py-4 font-['Syne',sans-serif] text-[0.9rem] font-bold uppercase tracking-[0.08em] text-black no-underline hover:bg-[#e4c98a]"
-            >
-              Order a Video
+            <Link href="/video" className="btn-primary" style={{ textDecoration: "none", display: "inline-block" }}>
+              Order a Video — $199
             </Link>
           </div>
         )}
       </main>
 
-      <footer className="border-t border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.8)] px-16 py-10 max-md:flex-col max-md:gap-3 max-md:px-6">
-        <div className="footer-logo text-[1.1rem] font-extrabold">
-          <span className="text-[#c8a96e]">416</span>
-          Homes Dashboard
+      {/* ── Footer ───────────────────────────────────────────────────── */}
+      <footer style={{ borderTop: "1px solid var(--border)", padding: "24px 40px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+        <div style={{ fontFamily: "var(--serif)", fontSize: "1rem", fontWeight: 500 }}>
+          <span style={{ color: "var(--accent)" }}>416</span>
+          <span style={{ color: "var(--text-mute)" }}>homes</span>
+          <span style={{ fontFamily: "var(--mono)", fontSize: "0.5rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)", marginLeft: 8 }}>Dashboard</span>
         </div>
-        <div className="footer-copy font-['DM Mono',monospace] text-[0.62rem] text-[#6b6b60]">
-          Toronto Real Estate Intelligence Platform
-        </div>
-        <div className="footer-copy font-['DM Mono',monospace] text-[0.62rem] text-[#6b6b60]">
-          © 2024 416Homes · Dashboard
+        <div style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)" }}>
+          © 2026 416Homes · Toronto Real Estate Intelligence
         </div>
       </footer>
     </div>
   );
 }
-
-

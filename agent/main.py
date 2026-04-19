@@ -220,6 +220,38 @@ class PropertyAgent:
             logger.error(f"Error sending email: {e}")
             return False
     
+    async def send_telegram_alert(self, chat_id: str, listing: Dict[str, Any], valuation: Dict[str, Any]):
+        """Send a Telegram notification to a buyer when a matching listing is found."""
+        token = os.getenv("TELEGRAM_BOT_TOKEN")
+        if not token:
+            return
+        try:
+            import httpx
+            price = listing.get("price", 0)
+            beds = listing.get("bedrooms", listing.get("beds", "?"))
+            baths = listing.get("bathrooms", listing.get("baths", "?"))
+            market_analysis = valuation.get("market_analysis", "—")
+            url = listing.get("url", "")
+            address = listing.get("address", "Unknown")
+            msg = (
+                f"🏠 *New Match: {address}*\n"
+                f"💰 ${price:,} CAD\n"
+                f"🛏 {beds}bd · 🚿 {baths}ba\n"
+                f"📊 Fair value: {market_analysis}\n"
+                f"🔗 [View listing]({url})"
+            )
+            async with httpx.AsyncClient(timeout=10) as c:
+                resp = await c.post(
+                    f"https://api.telegram.org/bot{token}/sendMessage",
+                    json={"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"},
+                )
+                if resp.status_code != 200:
+                    logger.warning(f"Telegram notification failed: {resp.text}")
+                else:
+                    logger.info(f"Telegram alert sent to chat_id {chat_id} for {address}")
+        except Exception as e:
+            logger.error(f"Error sending Telegram alert: {e}")
+
     async def record_match(self, listing: Dict[str, Any], alert: Dict[str, Any], match_score: float, email_sent: bool):
         """Record the match in database"""
         
@@ -276,6 +308,11 @@ class PropertyAgent:
                 email_content = await self.generate_outreach_email(listing, alert, match_score)
                 email_sent = await self.send_outreach_email(listing, alert, email_content)
                 await self.record_match(listing, alert, match_score, email_sent)
+
+                # Send Telegram notification if the buyer has linked their account
+                if alert.get("telegram_chat_id"):
+                    valuation = self.valuation_model.predict(listing)
+                    await self.send_telegram_alert(alert["telegram_chat_id"], listing, valuation)
 
         await asyncio.gather(*[_process_match(l, s) for l, s in good_matches])
         logger.info(f"Alert processing complete: {len(good_matches)} matches found and processed")

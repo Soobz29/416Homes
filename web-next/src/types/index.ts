@@ -12,6 +12,13 @@ export interface Listing {
   url: string;
   photos?: string[];
   created_at: string;
+  // Optional fields — populated by backend when available
+  lat?: number;
+  lng?: number;
+  transit_score?: number;
+  fair_value?: number;
+  neighbourhood?: string;
+  dom?: number;
 }
 
 export interface VideoJob {
