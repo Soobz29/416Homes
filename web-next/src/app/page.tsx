@@ -23,6 +23,9 @@ function formatPrice(n: number) {
   if (n >= 1_000) return `$${Math.round(n / 1_000)}K`;
   return `$${n}`;
 }
+function formatPriceFull(n: number) {
+  return "$" + n.toLocaleString("en-CA");
+}
 
 /* ── Inline design-system components ───────────────────────────────── */
 function Eyebrow({ children, line }: { children: React.ReactNode; line?: boolean }) {
@@ -291,8 +294,10 @@ export default function LandingPage() {
       <section style={{
         maxWidth: 1320, margin: "0 auto",
         display: "grid", gridTemplateColumns: "1.1fr 1fr",
+        alignItems: "stretch",
         gap: 0,
         padding: "80px 56px 64px",
+        minHeight: "max(68vh, 580px)",
         borderBottom: "1px solid var(--border)",
       }} className="hero-split">
 
@@ -345,59 +350,105 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Right — featured listing card */}
-        <div className="hero-right" style={{ paddingLeft: 56, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {/* Right — featured listing card (terminal broker style) */}
+        <div className="hero-right" style={{ paddingLeft: 56, display: "flex", flexDirection: "column" }}>
           <div style={{
-            width: "100%",
-            maxWidth: 360,
-            aspectRatio: "4/5",
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
             position: "relative",
             background: "var(--bg-elev)",
             border: "1px solid var(--border-strong)",
             overflow: "hidden",
+            minHeight: 520,
           }}>
-            {/* Initials placeholder */}
-            {!featuredPhoto && (
-              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <span style={{ fontFamily: "var(--serif)", fontSize: "4rem", fontWeight: 700, color: "var(--border)", userSelect: "none" }}>416</span>
+            {/* Photo area */}
+            <div style={{ position: "relative", flex: 1, minHeight: 0, background: "#0d0d0a" }}>
+              {/* Placeholder */}
+              {!featuredPhoto && (
+                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: "3rem", fontWeight: 700, color: "var(--border)", userSelect: "none" }}>416</span>
+                </div>
+              )}
+
+              {featuredPhoto && (
+                <img
+                  src={featuredPhoto}
+                  alt={featuredListing?.address ?? "Featured listing"}
+                  style={{
+                    position: "absolute", inset: 0, width: "100%", height: "100%",
+                    objectFit: "cover",
+                    opacity: imgLoaded && !imgError ? 1 : 0,
+                    transition: "opacity 0.6s",
+                  }}
+                  onLoad={() => setImgLoaded(true)}
+                  onError={() => setImgError(true)}
+                />
+              )}
+
+              {/* Top badges */}
+              <div style={{ position: "absolute", top: 16, left: 16, right: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontFamily: "var(--mono)", fontSize: "0.52rem", textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--accent)" }}>
+                  Live · {featuredListing?.source?.toUpperCase() ?? "GTA"}
+                </span>
+                <span style={{ fontFamily: "var(--mono)", fontSize: "0.52rem", textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--accent)" }}>
+                  Featured
+                </span>
               </div>
-            )}
 
-            {featuredPhoto && (
-              <img
-                src={featuredPhoto}
-                alt={featuredListing?.address ?? "Featured listing"}
-                style={{
-                  position: "absolute", inset: 0, width: "100%", height: "100%",
-                  objectFit: "cover",
-                  opacity: imgLoaded && !imgError ? 1 : 0,
-                  transition: "opacity 0.6s",
-                }}
-                onLoad={() => setImgLoaded(true)}
-                onError={() => setImgError(true)}
-              />
-            )}
+              {/* Bottom gradient */}
+              <div style={{
+                position: "absolute", bottom: 0, left: 0, right: 0, height: "65%",
+                background: "linear-gradient(to top, rgba(11,11,11,0.98) 0%, rgba(11,11,11,0.5) 60%, transparent 100%)",
+              }} />
 
-            {/* Bottom gradient overlay */}
-            <div style={{
-              position: "absolute", bottom: 0, left: 0, right: 0, height: "60%",
-              background: "linear-gradient(to top, rgba(11,11,11,0.95) 0%, transparent 100%)",
-            }} />
+              {/* Listing info overlay */}
+              {featuredListing && (
+                <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "24px 24px 20px" }}>
+                  {/* Neighbourhood */}
+                  <div style={{ fontFamily: "var(--mono)", fontSize: "0.52rem", textTransform: "uppercase", letterSpacing: "0.18em", color: "var(--text-dim)", marginBottom: 8 }}>
+                    {featuredListing.city ?? "GTA"}, Ontario
+                  </div>
+                  {/* Address — bold mono terminal style */}
+                  <div style={{ fontFamily: "var(--mono)", fontSize: "1.25rem", fontWeight: 500, color: "var(--text)", lineHeight: 1.25, marginBottom: 12 }}>
+                    {featuredListing.address}
+                  </div>
+                  {/* Price — large gold mono */}
+                  <div style={{ fontFamily: "var(--mono)", fontSize: "1.8rem", fontWeight: 500, color: "var(--accent)", marginBottom: 10, letterSpacing: "-0.01em" }}>
+                    {formatPriceFull(featuredListing.price)}
+                  </div>
+                  {/* Beds · Baths · Sqft */}
+                  <div style={{ fontFamily: "var(--mono)", fontSize: "0.65rem", color: "var(--text-dim)", letterSpacing: "0.08em" }}>
+                    {[
+                      featuredListing.beds && `${featuredListing.beds} BD`,
+                      featuredListing.baths && `${featuredListing.baths} BA`,
+                      featuredListing.sqft && `${featuredListing.sqft.toLocaleString()} SF`,
+                    ].filter(Boolean).join(" · ")}
+                  </div>
+                </div>
+              )}
+            </div>
 
-            {/* Listing info */}
-            {featuredListing && (
-              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "20px 20px 20px" }}>
-                <div style={{ fontFamily: "var(--mono)", fontSize: "0.55rem", textTransform: "uppercase", letterSpacing: "0.15em", color: "var(--accent)", marginBottom: 6 }}>
-                  ◆ Featured
-                </div>
-                <div style={{ fontFamily: "var(--serif)", fontSize: "1.8rem", fontWeight: 500, color: "var(--text)", marginBottom: 4 }}>
-                  {formatPrice(featuredListing.price)}
-                </div>
-                <div style={{ fontFamily: "var(--sans)", fontSize: "0.8rem", color: "var(--text-mute)", lineHeight: 1.4 }}>
-                  {featuredListing.address}
-                </div>
-              </div>
-            )}
+            {/* VIEW THIS LISTING bottom panel */}
+            <a
+              href={featuredListing?.url ?? "/dashboard"}
+              target={featuredListing?.url ? "_blank" : undefined}
+              rel="noreferrer"
+              style={{
+                display: "block", padding: "18px 24px",
+                borderTop: "1px solid var(--border-strong)",
+                fontFamily: "var(--mono)", fontSize: "0.65rem",
+                textTransform: "uppercase", letterSpacing: "0.14em",
+                color: "var(--accent)", textDecoration: "none",
+                textAlign: "center",
+                background: "rgba(212,175,55,0.04)",
+                transition: "background 0.2s",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = "rgba(212,175,55,0.10)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "rgba(212,175,55,0.04)")}
+            >
+              View This Listing →
+            </a>
           </div>
         </div>
       </section>
