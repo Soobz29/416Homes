@@ -79,6 +79,20 @@ function extractListingPhotos(listing: any): string[] {
   return photos;
 }
 
+/** Parse city from "Street, City, ON, Postal" style address */
+function parseCityFromAddress(address: string): string {
+  if (!address) return "";
+  const parts = address.split(",").map(p => p.trim());
+  // Find the part immediately before a 2-letter province code
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (/^(ON|BC|AB|QC|MB|SK|NS|NB|PE|NL|NT|YT|NU)$/i.test(parts[i + 1])) {
+      return parts[i];
+    }
+  }
+  // Fallback: second comma-delimited token
+  return parts.length >= 2 ? parts[1] : "";
+}
+
 export async function fetchListings(params?: {
   city?: string;
   minPrice?: number;
@@ -114,13 +128,22 @@ export async function fetchListings(params?: {
       beds: Number(l.bedrooms) || 0,
       baths: Number(l.bathrooms) || 0,
       sqft: Number(l.area) || 0,
-      city: "", // not present on backend response today
-      region: "",
-      property_type: l.strategy ?? "Unknown",
+      city: l.city || parseCityFromAddress(l.address),
+      region: l.region || "",
+      property_type: l.strategy ?? l.property_type ?? "Unknown",
       source: l.source,
       url: l.url,
       photos: extractListingPhotos(l),
       created_at: l.scraped_at,
+      // Scrapers return lat/lng — pass them through
+      lat:  l.lat  != null ? Number(l.lat)  : undefined,
+      lng:  l.lng  != null ? Number(l.lng)  : undefined,
+      neighbourhood:  l.neighbourhood  || undefined,
+      transit_score:  l.transit_score  != null ? Number(l.transit_score)  : undefined,
+      fair_value:     l.fair_value     != null ? Number(l.fair_value)     : undefined,
+      dom:            l.dom            != null ? Number(l.dom)            : undefined,
+      floor_plan_url: l.floor_plan_url || undefined,
+      is_assignment:  l.is_assignment  || false,
     })),
     total: typeof data?.total === "number" ? data.total : rawListings.length,
     scan_time: data?.scan_time ?? null,

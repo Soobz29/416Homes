@@ -60,7 +60,8 @@ const LISTINGS_PAGE_SIZE = 36;
 const TELEGRAM_BOT = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ?? "Homes_Alertsbot";
 
 /* ── SVG GTA Map (Terminal Broker style) ────────────────────────────── */
-const MAP_BOUNDS = { minLat: 43.52, maxLat: 43.85, minLng: -79.72, maxLng: -79.23 };
+// Wide GTA bounds — covers Burlington (S), Ajax (E), Brampton (W), Richmond Hill (N)
+const MAP_BOUNDS = { minLat: 43.25, maxLat: 43.95, minLng: -79.95, maxLng: -79.00 };
 const MAP_W = 800, MAP_H = 560;
 
 function proj(lat: number, lng: number): [number, number] {
@@ -125,8 +126,13 @@ const NBHD_COORDS: Record<string, [number, number]> = {
 
 function getListingCoords(l: Listing): [number, number] | null {
   if (l.lat != null && l.lng != null) return [l.lat, l.lng];
-  const needle = ((l.neighbourhood || l.city || "") + " " + (l.city || "")).toLowerCase();
-  for (const [key, coords] of Object.entries(NBHD_COORDS)) {
+  // Build a search string from neighbourhood, city, and address
+  const needle = [l.neighbourhood, l.city, l.address]
+    .filter(Boolean).join(" ").toLowerCase();
+  // Longest-key-first so "richmond hill" matches before "hill"
+  const sortedEntries = Object.entries(NBHD_COORDS)
+    .sort((a, b) => b[0].length - a[0].length);
+  for (const [key, coords] of sortedEntries) {
     if (needle.includes(key)) return coords;
   }
   return null;
