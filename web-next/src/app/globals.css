@@ -134,9 +134,61 @@ select option { background: #ffffff; color: #0a0a08; }
   .products-grid  { grid-template-columns: 1fr !important; }
   .split-view     { grid-template-columns: 1fr !important; }
   .map-col        { display: none !important; }
+  .alert-cta      { grid-template-columns: 1fr !important; }
+  .why-grid       { grid-template-columns: 1fr 1fr !important; }
+  .how-header     { grid-template-columns: 1fr !important; gap: 20px !important; }
+  .demo-card      { grid-template-columns: 1fr !important; min-height: unset !important; }
+  .demo-video-col { min-height: 280px !important; }
+  .tours-2col     { grid-template-columns: 1fr !important; }
 }
+
 @media (max-width: 600px) {
-  .how-grid { grid-template-columns: 1fr !important; }
+  .how-grid        { grid-template-columns: 1fr !important; }
+  .why-grid        { grid-template-columns: 1fr !important; }
+  .stats-strip     { grid-template-columns: 1fr 1fr !important; }
+  .hero-split      { padding: 36px 20px 32px !important; }
+  .hero-left       { padding-right: 0 !important; border-right: none !important; }
+
+  /* Nav */
+  .nav-bar         { padding: 0 16px !important; }
+  .nav-links       { display: none !important; }
+  .nav-cta         { font-size: 0.65rem !important; padding: 8px 14px !important; }
+
+  /* Sections */
+  .sec-wrap        { padding-left: 20px !important; padding-right: 20px !important; }
+  .sec-pad-lg      { padding-top: 48px !important; padding-bottom: 40px !important; }
+
+  /* Filter bar horizontal scroll */
+  .filter-bar      { overflow-x: auto !important; flex-wrap: nowrap !important;
+                     padding: 8px 16px !important; -webkit-overflow-scrolling: touch; }
+  .filter-bar > *  { flex-shrink: 0; }
+
+  /* Dashboard nav */
+  .dash-nav        { padding: 0 16px !important; }
+  .dash-nav-tabs   { gap: 0 !important; }
+  .dash-nav-tabs button { padding: 0 10px !important; font-size: 0.58rem !important; }
+
+  /* Dashboard list: full width when map hidden */
+  .split-view      { grid-template-columns: 1fr !important; }
+  .list-col        { max-height: 70vh !important; }
+
+  /* Footer */
+  .footer-bar      { flex-direction: column !important; gap: 10px !important;
+                     text-align: center !important; padding: 28px 20px !important; }
+
+  /* Demo card video */
+  .demo-card       { grid-template-columns: 1fr !important; }
+  .demo-video-col  { min-height: 220px !important; }
+
+  /* Tours */
+  .tours-2col      { grid-template-columns: 1fr !important; }
+  .tours-order     { position: static !important; }
+
+  /* Alert form */
+  .alert-cta       { grid-template-columns: 1fr !important; }
+
+  /* Typography */
+  .page-h1         { font-size: clamp(2.4rem, 9vw, 4rem) !important; }
 }
 
 /* ── Reduced motion ──────────────────────────────────────────────────── */

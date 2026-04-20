@@ -124,16 +124,16 @@ function fmtPriceFull(n: number) {
 
 function TopNav({ active }: { active?: string }) {
   return (
-    <nav style={{
+    <nav className="nav-bar" style={{
       position: "sticky", top: 0, zIndex: 40,
       display: "flex", alignItems: "center", justifyContent: "space-between",
-      padding: "20px 56px",
+      padding: "0 56px", height: 64,
       background: "color-mix(in srgb, var(--bg) 82%, transparent)",
       backdropFilter: "blur(20px)",
       borderBottom: "1px solid var(--border)",
     }}>
       <Link href="/" style={{ textDecoration: "none" }}><Logo sub="GTA" /></Link>
-      <ul style={{ display: "flex", listStyle: "none", gap: 36, margin: 0, padding: 0, fontFamily: "var(--mono)", fontSize: "0.68rem", letterSpacing: "0.14em", textTransform: "uppercase" }}>
+      <ul className="nav-links" style={{ display: "flex", listStyle: "none", gap: 36, margin: 0, padding: 0, fontFamily: "var(--mono)", fontSize: "0.68rem", letterSpacing: "0.14em", textTransform: "uppercase" }}>
         {[
           ["/dashboard", "Listings"],
           ["/#how-it-works", "How It Works"],
@@ -156,7 +156,7 @@ function TopNav({ active }: { active?: string }) {
 
 function FooterBar() {
   return (
-    <footer style={{
+    <footer className="footer-bar" style={{
       maxWidth: 1320, margin: "0 auto",
       padding: "40px 56px",
       borderTop: "1px solid var(--border)",
@@ -294,7 +294,7 @@ export default function HomePage() {
         borderBottom: "1px solid var(--border)",
       }} className="hero-split">
         {/* Left */}
-        <div style={{ paddingRight: 48, borderRight: "1px solid var(--border)" }}>
+        <div className="hero-left" style={{ paddingRight: 48, borderRight: "1px solid var(--border)" }}>
           <Eyebrow line>Toronto · Mississauga · GTA 2026</Eyebrow>
           <h1 style={{
             fontFamily: "var(--mono)",
@@ -321,7 +321,7 @@ export default function HomePage() {
           </div>
 
           {/* Stats strip */}
-          <div style={{ marginTop: 64, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 0, borderTop: "1px solid var(--border)" }}>
+          <div className="stats-strip" style={{ marginTop: 64, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 0, borderTop: "1px solid var(--border)" }}>
             {[
               ["2,847", "Active listings"],
               ["50+", "Neighbourhoods"],
@@ -386,8 +386,8 @@ export default function HomePage() {
       </section>
 
       {/* ── How It Works ── */}
-      <section id="how-it-works" style={{ maxWidth: 1320, margin: "0 auto", padding: "96px 56px", borderBottom: "1px solid var(--border)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 64, marginBottom: 56 }}>
+      <section id="how-it-works" className="sec-wrap sec-pad-lg" style={{ maxWidth: 1320, margin: "0 auto", padding: "96px 56px", borderBottom: "1px solid var(--border)" }}>
+        <div className="how-header" style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 64, marginBottom: 56 }}>
           <div>
             <Eyebrow line>The Process</Eyebrow>
             <h2 style={{ fontFamily: "var(--mono)", fontSize: "clamp(2rem, 3.2vw, 3.4rem)", fontWeight: 700, lineHeight: 1.02, letterSpacing: "-0.015em", margin: "20px 0 0" }}>
@@ -428,14 +428,14 @@ export default function HomePage() {
       </section>
 
       {/* ── Why 416 / Intelligence ── */}
-      <section style={{ maxWidth: 1320, margin: "0 auto", padding: "96px 56px", borderBottom: "1px solid var(--border)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 64, marginBottom: 48 }}>
+      <section className="sec-wrap sec-pad-lg" style={{ maxWidth: 1320, margin: "0 auto", padding: "96px 56px", borderBottom: "1px solid var(--border)" }}>
+        <div className="how-header" style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 64, marginBottom: 48 }}>
           <Eyebrow line>Why 416</Eyebrow>
           <h2 style={{ fontFamily: "var(--mono)", fontSize: "clamp(2rem, 3.2vw, 3.4rem)", fontWeight: 700, lineHeight: 1.02, letterSpacing: "-0.015em", margin: 0 }}>
             Built for the way the GTA <span className="accent-highlight">actually works.</span>
           </h2>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 0, border: "1px solid var(--border)" }}>
+        <div className="why-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 0, border: "1px solid var(--border)" }}>
           {[
             ["Sold comps", "What homes actually sold for",
               "We pull real transaction prices from HouseSigma across 50+ GTA neighbourhoods — not estimates, not Zestimates. Every listing is compared against actual closes in the exact same pocket."],
@@ -460,7 +460,7 @@ export default function HomePage() {
       </section>
 
       {/* ── Products strip ── */}
-      <section style={{ maxWidth: 1320, margin: "0 auto", padding: "64px 56px 96px", borderBottom: "1px solid var(--border)" }}>
+      <section className="sec-wrap" style={{ maxWidth: 1320, margin: "0 auto", padding: "64px 56px 96px", borderBottom: "1px solid var(--border)" }}>
         <Eyebrow line>Optional add-ons</Eyebrow>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, marginTop: 32, border: "1px solid var(--border)" }} className="products-grid">
           {[
@@ -486,7 +486,7 @@ export default function HomePage() {
       </section>
 
       {/* ── Alert CTA ── */}
-      <section style={{ maxWidth: 1320, margin: "0 auto", padding: "96px 56px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64 }} className="products-grid">
+      <section className="sec-wrap sec-pad-lg alert-cta" style={{ maxWidth: 1320, margin: "0 auto", padding: "96px 56px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64 }}>
         <div>
           <Eyebrow line>Free · No credit card</Eyebrow>
           <h2 style={{ fontFamily: "var(--mono)", fontSize: "clamp(2.2rem, 3.4vw, 3.6rem)", fontWeight: 700, lineHeight: 1, letterSpacing: "-0.015em", margin: "20px 0 20px" }}>

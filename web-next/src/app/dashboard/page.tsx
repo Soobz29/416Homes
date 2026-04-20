@@ -60,7 +60,7 @@ const LISTINGS_PAGE_SIZE = 36;
 const TELEGRAM_BOT = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ?? "Homes_Alertsbot";
 
 /* ── SVG GTA Map (Terminal Broker style) ────────────────────────────── */
-const MAP_BOUNDS = { minLat: 43.52, maxLat: 43.75, minLng: -79.70, maxLng: -79.28 };
+const MAP_BOUNDS = { minLat: 43.52, maxLat: 43.85, minLng: -79.72, maxLng: -79.23 };
 const MAP_W = 800, MAP_H = 560;
 
 function proj(lat: number, lng: number): [number, number] {
@@ -69,12 +69,78 @@ function proj(lat: number, lng: number): [number, number] {
   return [x, y];
 }
 
+/* Approximate centre coordinates for GTA neighbourhoods & cities */
+const NBHD_COORDS: Record<string, [number, number]> = {
+  "downtown":           [43.6476, -79.3830],
+  "king west":          [43.6420, -79.4049],
+  "king":               [43.6420, -79.4049],
+  "yorkville":          [43.6703, -79.3935],
+  "leslieville":        [43.6603, -79.3288],
+  "the beaches":        [43.6674, -79.2956],
+  "beaches":            [43.6674, -79.2956],
+  "roncesvalles":       [43.6484, -79.4487],
+  "annex":              [43.6688, -79.4001],
+  "midtown":            [43.6977, -79.3900],
+  "north york":         [43.7615, -79.4111],
+  "scarborough":        [43.7731, -79.2577],
+  "etobicoke":          [43.6368, -79.5614],
+  "mississauga":        [43.5890, -79.6441],
+  "port credit":        [43.5500, -79.5836],
+  "brampton":           [43.6832, -79.7633],
+  "vaughan":            [43.8361, -79.5085],
+  "markham":            [43.8561, -79.3370],
+  "richmond hill":      [43.8828, -79.4403],
+  "oakville":           [43.4675, -79.6877],
+  "burlington":         [43.3255, -79.7990],
+  "ajax":               [43.8509, -79.0204],
+  "pickering":          [43.8384, -79.0868],
+  "whitby":             [43.8975, -78.9429],
+  "oshawa":             [43.8971, -78.8658],
+  "corktown":           [43.6505, -79.3613],
+  "trinity bellwoods":  [43.6478, -79.4154],
+  "liberty village":    [43.6383, -79.4202],
+  "distillery":         [43.6503, -79.3593],
+  "kensington":         [43.6553, -79.4003],
+  "junction":           [43.6595, -79.4670],
+  "parkdale":           [43.6424, -79.4408],
+  "high park":          [43.6469, -79.4629],
+  "mimico":             [43.6133, -79.5033],
+  "east york":          [43.6918, -79.3251],
+  "forest hill":        [43.6921, -79.4214],
+  "leaside":            [43.7071, -79.3460],
+  "riverdale":          [43.6656, -79.3480],
+  "rosedale":           [43.6836, -79.3815],
+  "davisville":         [43.6993, -79.3939],
+  "don mills":          [43.7468, -79.3388],
+  "agincourt":          [43.7861, -79.2783],
+  "willowdale":         [43.7713, -79.4131],
+  "thornhill":          [43.8097, -79.4338],
+  "woodbridge":         [43.7773, -79.5830],
+  "yonge eglinton":     [43.7046, -79.3979],
+  "yonge":              [43.6532, -79.3832],
+  "eglinton":           [43.7046, -79.3979],
+  "toronto":            [43.6532, -79.3832],
+  "gta":                [43.7000, -79.4200],
+};
+
+function getListingCoords(l: Listing): [number, number] | null {
+  if (l.lat != null && l.lng != null) return [l.lat, l.lng];
+  const needle = ((l.neighbourhood || l.city || "") + " " + (l.city || "")).toLowerCase();
+  for (const [key, coords] of Object.entries(NBHD_COORDS)) {
+    if (needle.includes(key)) return coords;
+  }
+  return null;
+}
+
 function GTAMap({ listings, selectedId, onSelect }: {
   listings: Listing[];
   selectedId: string | null;
   onSelect?: (id: string) => void;
 }) {
-  const listingsWithCoords = listings.filter(l => l.lat != null && l.lng != null);
+  // Use exact lat/lng when available, fall back to neighbourhood lookup
+  const listingsWithCoords = listings
+    .map(l => ({ listing: l, coords: getListingCoords(l) }))
+    .filter((x): x is { listing: Listing; coords: [number, number] } => x.coords !== null);
   const selected = selectedId ? listings.find(l => l.id === selectedId) : null;
 
   return (
@@ -114,30 +180,32 @@ function GTAMap({ listings, selectedId, onSelect }: {
         </text>
 
         {/* Pins */}
-        {listingsWithCoords.map(l => {
-          const [x, y] = proj(l.lat!, l.lng!);
+        {listingsWithCoords.map(({ listing: l, coords }) => {
+          const [x, y] = proj(coords[0], coords[1]);
           const isSelected = l.id === selectedId;
           const isDeal = (l.fair_value ?? 0) >= 3;
+          // Clamp callout so it doesn't overflow SVG edges
+          const calloutX = x + 14 > MAP_W - 120 ? x - 116 : x + 14;
           return (
             <g key={l.id} style={{ cursor: "pointer" }} onClick={() => onSelect?.(l.id)}>
               {isSelected && <circle cx={x} cy={y} r={22} fill="var(--accent)" opacity="0.15" />}
               <circle
-                cx={x} cy={y} r={isSelected ? 10 : 7}
+                cx={x} cy={y} r={isSelected ? 10 : 6}
                 fill={isDeal ? "var(--accent)" : "#1a1a18"}
                 stroke="var(--accent)"
                 strokeWidth={isSelected ? 2 : 1.5}
               />
               {isSelected && (
                 <g>
-                  <rect x={x + 14} y={y - 20} width="100" height="38"
-                    fill="#0A0D14" stroke="var(--accent)" strokeWidth="1" />
-                  <text x={x + 20} y={y - 5} fill="#E8E4D9" fontSize="11"
+                  <rect x={calloutX} y={y - 22} width="110" height="40"
+                    fill="#0A0D14" stroke="var(--accent)" strokeWidth="1" rx="0" />
+                  <text x={calloutX + 8} y={y - 5} fill="#E8E4D9" fontSize="11"
                     fontFamily="'JetBrains Mono', monospace" fontWeight="700">
                     ${Math.round(l.price / 1000)}K
                   </text>
-                  <text x={x + 20} y={y + 10} fill="#8A8876" fontSize="8"
+                  <text x={calloutX + 8} y={y + 11} fill="#8A8876" fontSize="8"
                     fontFamily="'JetBrains Mono', monospace" letterSpacing="1">
-                    {(l.neighbourhood || l.city || "GTA").toUpperCase().slice(0, 14)}
+                    {(l.neighbourhood || l.city || "GTA").toUpperCase().slice(0, 15)}
                   </text>
                 </g>
               )}
@@ -223,7 +291,7 @@ function GTAMap({ listings, selectedId, onSelect }: {
         </div>
       )}
 
-      {/* No coords hint */}
+      {/* No listings hint */}
       {listingsWithCoords.length === 0 && (
         <div style={{
           position: "absolute", bottom: 20, left: "50%", transform: "translateX(-50%)",
@@ -233,7 +301,7 @@ function GTAMap({ listings, selectedId, onSelect }: {
           textTransform: "uppercase", letterSpacing: "0.12em",
           color: "var(--text-mute)", whiteSpace: "nowrap",
         }}>
-          ◆ GTA · Pins appear when location data is available
+          ◆ GTA · Load listings to see pins
         </div>
       )}
     </div>
@@ -496,7 +564,7 @@ export default function DashboardPage() {
     <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)" }}>
 
       {/* ── Nav ──────────────────────────────────────────────────────── */}
-      <nav style={{
+      <nav className="dash-nav" style={{
         position: "sticky", top: 0, zIndex: 100,
         display: "flex", alignItems: "center", justifyContent: "space-between",
         height: 64, padding: "0 40px",
@@ -512,7 +580,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Tab buttons — mid nav */}
-        <div style={{ display: "flex", gap: 0 }}>
+        <div className="dash-nav-tabs" style={{ display: "flex", gap: 0 }}>
           {[
             ["listings", "Listings"],
             ["valuation", "Valuation"],
@@ -573,7 +641,7 @@ export default function DashboardPage() {
 
       {/* ── Filter bar (listings tab only) ────────────────────────────── */}
       {activeTab === "listings" && (
-        <div style={{
+        <div className="filter-bar" style={{
           position: "sticky", top: 64, zIndex: 90,
           background: "rgba(11,11,11,0.9)",
           backdropFilter: "blur(16px)",
@@ -838,7 +906,7 @@ export default function DashboardPage() {
               style={{ display: "grid", gridTemplateColumns: "440px 1fr", minHeight: 640 }}
             >
               {/* List column */}
-              <div style={{ overflowY: "auto", borderRight: "1px solid var(--border)", maxHeight: "calc(100vh - 180px)" }}>
+              <div className="list-col" style={{ overflowY: "auto", borderRight: "1px solid var(--border)", maxHeight: "calc(100vh - 180px)" }}>
                 {loading ? (
                   Array.from({ length: 8 }).map((_, i) => (
                     <div key={i} style={{ padding: "14px 16px", borderBottom: "1px solid var(--border)", display: "flex", gap: 12 }}>

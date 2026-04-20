@@ -150,7 +150,7 @@ export default function VideoPage() {
   const [revisionMessage, setRevisionMessage] = useState<string | null>(null);
   const [revisionSuccess, setRevisionSuccess] = useState(false);
   const [revisionVisible, setRevisionVisible] = useState(false);
-  const [demoPlaying, setDemoPlaying] = useState(false);
+  const [demoPlaying, setDemoPlaying] = useState(true);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const price = TIERS.find(t => t.id === tier)?.price ?? 249;
@@ -268,7 +268,7 @@ export default function VideoPage() {
     <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)" }}>
 
       {/* ── Nav ─────────────────────────────────────────────────────── */}
-      <nav style={{
+      <nav className="nav-bar" style={{
         position: "sticky", top: 0, zIndex: 100,
         display: "flex", alignItems: "center", justifyContent: "space-between",
         height: 64, padding: "0 56px",
@@ -276,25 +276,25 @@ export default function VideoPage() {
         borderBottom: "1px solid var(--border)",
       }}>
         <Link href="/" style={{ textDecoration: "none" }}>
-          <div style={{ ...mono, fontSize: "1.1rem", fontWeight: 500, letterSpacing: "-0.02em" }}>
-            <span style={{ color: "var(--accent)", fontWeight: 700 }}>416</span>
+          <div style={{ ...mono, fontSize: "1.1rem", fontWeight: 800, letterSpacing: "0.02em" }}>
+            <span style={{ color: "var(--accent)" }}>416</span>
             <span style={{ color: "var(--text)" }}> Homes</span>
-            <span style={{ color: "var(--text-dim)", fontSize: "0.6rem", marginLeft: 6, letterSpacing: "0.1em", textTransform: "uppercase" }}>GTA</span>
+            <span style={{ color: "var(--text-dim)", fontSize: "0.56rem", marginLeft: 6, letterSpacing: "0.14em", textTransform: "uppercase" }}>GTA</span>
           </div>
         </Link>
-        <ul style={{ display: "flex", listStyle: "none", gap: 36, ...mono, fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)" }}>
+        <ul className="nav-links" style={{ display: "flex", listStyle: "none", gap: 36, margin: 0, padding: 0, ...mono, fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)" }}>
           <li><Link href="/dashboard" style={{ color: "inherit", textDecoration: "none" }}>Listings</Link></li>
-          <li><Link href="/#how" style={{ color: "inherit", textDecoration: "none" }}>How It Works</Link></li>
+          <li><Link href="/#how-it-works" style={{ color: "inherit", textDecoration: "none" }}>How It Works</Link></li>
           <li><span style={{ color: "var(--accent)", borderBottom: "1px solid var(--accent)", paddingBottom: 2 }}>Videos</span></li>
           <li><Link href="/tours" style={{ color: "inherit", textDecoration: "none" }}>Virtual Tours</Link></li>
         </ul>
-        <Link href="/#alert" className="btn-primary" style={{ fontSize: "0.72rem", padding: "10px 20px" }}>
+        <Link href="/#alert" className="btn-primary nav-cta" style={{ fontSize: "0.72rem", padding: "10px 20px" }}>
           Set My Alert
         </Link>
       </nav>
 
       {/* ── Hero ─────────────────────────────────────────────────────── */}
-      <section style={{ maxWidth: 1320, margin: "0 auto", padding: "72px 56px 64px", borderBottom: "1px solid var(--border)" }}>
+      <section className="sec-wrap sec-pad-lg" style={{ maxWidth: 1320, margin: "0 auto", padding: "72px 56px 64px", borderBottom: "1px solid var(--border)" }}>
         {/* Eyebrow */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, ...mono, fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.18em", color: "var(--accent)", marginBottom: 24 }}>
           <span style={{ height: 1, width: 28, background: "var(--accent)", flexShrink: 0 }} />
@@ -315,17 +315,19 @@ export default function VideoPage() {
         </p>
 
         {/* Demo card — 2 col */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", border: "1px solid var(--border-strong)", overflow: "hidden", minHeight: 400 }}>
-          {/* Left: photo + play */}
-          <div style={{ position: "relative", background: "#060606", overflow: "hidden" }}>
-            {demoPlaying ? (
-              <iframe
-                src="https://player.vimeo.com/video/1172407404?badge=0&autoplay=1&loop=1&autopause=0"
-                allow="autoplay; fullscreen"
-                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
-                title="416Homes cinematic video"
-              />
-            ) : (
+        <div className="demo-card" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", border: "1px solid var(--border-strong)", overflow: "hidden", minHeight: 400 }}>
+          {/* Left: video */}
+          <div className="demo-video-col" style={{ position: "relative", background: "#060606", overflow: "hidden", minHeight: 340 }}>
+            <video
+              src="https://upwkbeyzmdfdkwoaayub.supabase.co/storage/v1/object/sign/416homevideo/5314533739356475027.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8zYTEyZTQyMC1mMGZiLTQ4YzEtYTQ1OC00NjRkZTQ0MTdkMTciLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiI0MTZob21ldmlkZW8vNTMxNDUzMzczOTM1NjQ3NTAyNy5tcDQiLCJpYXQiOjE3NzY3MDA5NzgsImV4cCI6MTgwODIzNjk3OH0.GipcwNQCMjJkRZyFJlhlLbyiciHFW0-k47odpXpdBKg"
+              autoPlay
+              muted
+              loop
+              playsInline
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+              onError={() => setDemoPlaying(false)}
+            />
+            {!demoPlaying && (
               <>
                 <img src={DEMO_HOUSE} alt="Demo listing" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.65 }} />
                 <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom right, rgba(11,11,11,0.4), rgba(11,11,11,0.1))" }} />
