@@ -1,477 +1,346 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import { useState, useEffect } from "react";
 
-const API_BASE = (
-  process.env.NEXT_PUBLIC_API_URL ||
-  (typeof window !== "undefined" ? window.location.origin : "http://localhost:8000")
-).replace(/\/$/, "");
-
-const TOUR_STEPS = ["pending", "processing", "classifying", "building", "completed", "failed"] as const;
-type TourStatus = (typeof TOUR_STEPS)[number];
-
-const STEP_LABELS: Record<string, string> = {
-  pending: "Fetching photos",
-  processing: "Fetching photos",
-  classifying: "Classifying rooms",
-  building: "Building tour",
-  completed: "Tour ready",
-};
-
-const FEATURES = [
-  {
-    title: "Room-by-room navigation",
-    desc: "Buyers click any room to see all photos from that space",
-    icon: "⬡",
-  },
-  {
-    title: "Shareable link",
-    desc: "Send directly to buyers or embed on any website",
-    icon: "↗",
-  },
-  {
-    title: "Works on any listing",
-    desc: "Paste a Realtor.ca or Zoocasa URL — we handle the rest",
-    icon: "◈",
-  },
-];
-
-function stepIndex(status: TourStatus): number {
-  const map: Record<TourStatus, number> = {
-    pending: 0,
-    processing: 1,
-    classifying: 2,
-    building: 3,
-    completed: 4,
-    failed: -1,
-  };
-  return map[status] ?? 0;
+/* ── Shared nav primitives ──────────────────────────────────────────── */
+function Logo({ sub }: { sub?: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontFamily: "var(--mono)", fontWeight: 800, fontSize: "1.2rem", letterSpacing: "0.02em" }}>
+      <span style={{ color: "var(--accent)" }}>416</span>
+      <span style={{ color: "var(--text)" }}>Homes</span>
+      {sub && <span style={{ fontFamily: "var(--mono)", fontSize: "0.56rem", color: "var(--text-dim)", letterSpacing: "0.14em", textTransform: "uppercase", paddingLeft: 4, fontWeight: 400 }}>{sub}</span>}
+    </div>
+  );
 }
 
-export default function ToursPage() {
-  const [listingUrl, setListingUrl] = useState("");
-  const [email, setEmail] = useState("");
-  const [agentName, setAgentName] = useState("");
-  const [submitLoading, setSubmitLoading] = useState(false);
-  const [jobId, setJobId] = useState<string | null>(null);
-  const [status, setStatus] = useState<TourStatus>("pending");
-  const [tourUrl, setTourUrl] = useState<string | null>(null);
-  const [showProgress, setShowProgress] = useState(false);
-  const [embedCopied, setEmbedCopied] = useState(false);
-  const [demoMode, setDemoMode] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Detect ?status=success return from Stripe (production flow)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("status") === "success") {
-      const storedJobId = window.sessionStorage.getItem("tour_job_id");
-      if (storedJobId) {
-        setJobId(storedJobId);
-        setShowProgress(true);
-      }
-    }
-  }, []);
-
-  const pollJob = useCallback(
-    async (id: string) => {
-      try {
-        const res = await fetch(`${API_BASE}/api/tour-jobs/${id}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        const s: TourStatus = data.status ?? "pending";
-        setStatus(s);
-        if (s === "completed") {
-          setTourUrl(data.tour_url ?? null);
-          if (pollRef.current) {
-            clearInterval(pollRef.current);
-            pollRef.current = null;
-          }
-        }
-        if (s === "failed") {
-          if (pollRef.current) {
-            clearInterval(pollRef.current);
-            pollRef.current = null;
-          }
-        }
-      } catch (e) {
-        console.error("Tour poll error:", e);
-      }
-    },
-    []
+function Eyebrow({ children, line }: { children: React.ReactNode; line?: boolean }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, fontFamily: "var(--mono)", fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.18em", color: "var(--accent)" }}>
+      {line && <span style={{ height: 1, width: 28, background: "var(--accent)", flexShrink: 0 }} />}
+      {children}
+    </div>
   );
+}
+
+function PrimaryBtn({ children, onClick, disabled }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        width: "100%", padding: "15px",
+        background: disabled ? "var(--accent-dim)" : "var(--accent)",
+        border: "none", color: "var(--bg)",
+        fontFamily: "var(--mono)", fontSize: "0.82rem", fontWeight: 700,
+        letterSpacing: "0.08em", textTransform: "uppercase", cursor: disabled ? "not-allowed" : "pointer",
+        boxShadow: disabled ? "none" : "0 0 22px rgba(255,176,0,0.30), inset 0 1px 0 rgba(255,255,255,0.14)",
+        transition: "background 0.2s",
+      }}
+    >{children}</button>
+  );
+}
+
+const inputStyle: React.CSSProperties = {
+  width: "100%", padding: "12px 14px",
+  background: "transparent", border: "1px solid var(--border)",
+  color: "var(--text)", fontFamily: "var(--mono)", fontSize: "0.85rem", outline: "none",
+};
+
+function FormField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <label style={{ display: "block", fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-mute)", marginBottom: 6 }}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+/* ── Room map for the 3D dollhouse demo ─────────────────────────────── */
+const DEMO_PHOTOS = [
+  "https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=800&q=80",
+  "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&q=80",
+  "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=800&q=80",
+  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80",
+];
+
+type RoomKey = "living" | "kitchen" | "bedroom" | "bath";
+const ROOM_MAP: Record<RoomKey, { name: string; photo: string }> = {
+  living:  { name: "Living Room",      photo: DEMO_PHOTOS[0] },
+  kitchen: { name: "Kitchen",          photo: DEMO_PHOTOS[1] },
+  bedroom: { name: "Primary Bedroom",  photo: DEMO_PHOTOS[2] },
+  bath:    { name: "Bathroom",         photo: DEMO_PHOTOS[3] },
+};
+
+/* ── 3D Dollhouse SVG ───────────────────────────────────────────────── */
+function Dollhouse({ selected, onSelect }: { selected: RoomKey; onSelect: (r: RoomKey) => void }) {
+  return (
+    <svg viewBox="0 0 800 500" style={{ width: "100%", height: "100%", display: "block" }}>
+      {/* Isometric floor */}
+      <polygon points="100,350 400,200 700,350 400,500" fill="#1A1A18" stroke="rgba(255,191,0,0.2)" strokeWidth="1" />
+
+      {/* Living room */}
+      <g onClick={() => onSelect("living")} style={{ cursor: "pointer" }} opacity={selected === "living" ? 1 : 0.65}>
+        <polygon points="100,350 250,275 250,150 100,225"
+          fill="#0F1218" stroke={selected === "living" ? "var(--accent)" : "rgba(255,191,0,0.25)"}
+          strokeWidth={selected === "living" ? 2 : 1} />
+        <text x="175" y="265" fill={selected === "living" ? "var(--accent)" : "#666"}
+          fontSize="10" fontFamily="'JetBrains Mono',monospace" textAnchor="middle" letterSpacing="1">LIVING</text>
+        {selected === "living" && <circle cx="175" cy="240" r="18" fill="none" stroke="var(--accent)" strokeWidth="1.5" opacity="0.6" />}
+      </g>
+
+      {/* Kitchen */}
+      <g onClick={() => onSelect("kitchen")} style={{ cursor: "pointer" }} opacity={selected === "kitchen" ? 1 : 0.65}>
+        <polygon points="250,275 400,200 400,100 250,175"
+          fill="#0F1218" stroke={selected === "kitchen" ? "var(--accent)" : "rgba(255,191,0,0.25)"}
+          strokeWidth={selected === "kitchen" ? 2 : 1} />
+        <text x="325" y="222" fill={selected === "kitchen" ? "var(--accent)" : "#666"}
+          fontSize="10" fontFamily="'JetBrains Mono',monospace" textAnchor="middle" letterSpacing="1">KITCHEN</text>
+        {selected === "kitchen" && <circle cx="325" cy="200" r="18" fill="none" stroke="var(--accent)" strokeWidth="1.5" opacity="0.6" />}
+      </g>
+
+      {/* Bedroom */}
+      <g onClick={() => onSelect("bedroom")} style={{ cursor: "pointer" }} opacity={selected === "bedroom" ? 1 : 0.65}>
+        <polygon points="400,200 550,275 550,150 400,100"
+          fill="#0F1218" stroke={selected === "bedroom" ? "var(--accent)" : "rgba(255,191,0,0.25)"}
+          strokeWidth={selected === "bedroom" ? 2 : 1} />
+        <text x="475" y="222" fill={selected === "bedroom" ? "var(--accent)" : "#666"}
+          fontSize="10" fontFamily="'JetBrains Mono',monospace" textAnchor="middle" letterSpacing="1">BEDROOM</text>
+        {selected === "bedroom" && <circle cx="475" cy="200" r="18" fill="none" stroke="var(--accent)" strokeWidth="1.5" opacity="0.6" />}
+      </g>
+
+      {/* Bathroom */}
+      <g onClick={() => onSelect("bath")} style={{ cursor: "pointer" }} opacity={selected === "bath" ? 1 : 0.65}>
+        <polygon points="550,275 700,350 700,225 550,150"
+          fill="#0F1218" stroke={selected === "bath" ? "var(--accent)" : "rgba(255,191,0,0.25)"}
+          strokeWidth={selected === "bath" ? 2 : 1} />
+        <text x="625" y="262" fill={selected === "bath" ? "var(--accent)" : "#666"}
+          fontSize="10" fontFamily="'JetBrains Mono',monospace" textAnchor="middle" letterSpacing="1">BATH</text>
+        {selected === "bath" && <circle cx="625" cy="240" r="18" fill="none" stroke="var(--accent)" strokeWidth="1.5" opacity="0.6" />}
+      </g>
+
+      {/* Grid guides */}
+      <line x1="400" y1="100" x2="400" y2="500" stroke="rgba(255,255,255,0.04)" strokeWidth="1" strokeDasharray="4 4" />
+      <line x1="250" y1="150" x2="550" y2="150" stroke="rgba(255,255,255,0.04)" strokeWidth="1" strokeDasharray="4 4" />
+    </svg>
+  );
+}
+
+/* ── Page ───────────────────────────────────────────────────────────── */
+export default function ToursPage() {
+  const [selectedRoom, setSelectedRoom] = useState<RoomKey>("living");
+  const [url, setUrl] = useState("");
+  const [email, setEmail] = useState("");
+  const [paid, setPaid] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [tourId] = useState(() => Math.floor(Math.random() * 9000 + 1000));
 
   useEffect(() => {
-    if (!jobId || !showProgress) return;
-    pollJob(jobId);
-    pollRef.current = setInterval(() => pollJob(jobId), 3000);
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, [jobId, showProgress, pollJob]);
+    if (!paid) return;
+    const t = setInterval(() => setProgress(p => {
+      if (p >= 100) { clearInterval(t); return 100; }
+      return p + 5;
+    }), 200);
+    return () => clearInterval(t);
+  }, [paid]);
 
-  const handleSubmit = useCallback(async () => {
-    const trimmedUrl = listingUrl.trim();
-    const trimmedEmail = email.trim();
-
-    if (!trimmedUrl) {
-      alert("Please enter a listing URL");
-      return;
-    }
-    if (!trimmedEmail || !trimmedEmail.includes("@")) {
-      alert("Please enter a valid email address");
-      return;
-    }
-
-    const fullUrl =
-      trimmedUrl.startsWith("http://") || trimmedUrl.startsWith("https://")
-        ? trimmedUrl
-        : "https://" + trimmedUrl;
-
-    setSubmitLoading(true);
-
-    try {
-      const res = await fetch(`${API_BASE}/api/tour-jobs`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          listing_url: fullUrl,
-          customer_email: trimmedEmail,
-          customer_name: agentName.trim() || undefined,
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error((err as { detail?: string }).detail || `Server error ${res.status}`);
-      }
-
-      const data = await res.json();
-      const id = data.job_id || data.id;
-      if (!id) throw new Error("No job ID returned from server");
-
-      if (typeof window !== "undefined") {
-        window.sessionStorage.setItem("tour_job_id", id);
-      }
-      setJobId(id);
-      setStatus("pending");
-      setTourUrl(null);
-      setShowProgress(true);
-      setDemoMode(false);
-    } catch (err: unknown) {
-      console.error("Tour submit error:", err);
-      // Demo fallback
-      setDemoMode(true);
-      const fakeId = "demo-" + Math.random().toString(36).slice(2, 8);
-      setJobId(fakeId);
-      setStatus("pending");
-      setTourUrl(null);
-      setShowProgress(true);
-      runDemoSimulation(fakeId);
-    } finally {
-      setSubmitLoading(false);
-    }
-  }, [listingUrl, email, agentName]);
-
-  function runDemoSimulation(id: string) {
-    const transitions: { s: TourStatus; delay: number }[] = [
-      { s: "processing", delay: 1500 },
-      { s: "classifying", delay: 4000 },
-      { s: "building", delay: 7500 },
-      { s: "completed", delay: 11000 },
-    ];
-    transitions.forEach(({ s, delay }) => {
-      setTimeout(() => {
-        setStatus(s);
-        if (s === "completed") {
-          setTourUrl(`/tours/${id}`);
-        }
-      }, delay);
-    });
-  }
-
-  const embedCode = tourUrl
-    ? `<iframe src="${tourUrl}" width="100%" height="600" frameborder="0" allowfullscreen></iframe>`
-    : "";
-
-  const handleCopyEmbed = useCallback(() => {
-    if (!embedCode) return;
-    navigator.clipboard.writeText(embedCode).then(() => {
-      setEmbedCopied(true);
-      setTimeout(() => setEmbedCopied(false), 2000);
-    });
-  }, [embedCode]);
-
-  const currentStepIdx = stepIndex(status);
-  const progressSteps: { key: TourStatus; label: string }[] = [
-    { key: "processing", label: "Fetching photos" },
-    { key: "classifying", label: "Classifying rooms" },
-    { key: "building", label: "Building tour" },
-  ];
+  const progressLabel =
+    progress < 30  ? "Fetching listing photos…" :
+    progress < 60  ? "Classifying rooms with Gemini Vision…" :
+    progress < 100 ? "Assembling hosted manifest…" :
+    `Tour live: 416homes.ca/tours/${tourId}`;
 
   return (
-    <div className="min-h-screen bg-[#0a0a08] text-[#f5f4ef]">
+    <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)" }}>
+
       {/* Nav */}
-      <nav className="flex items-center justify-between border-b border-[rgba(200,169,110,0.2)] bg-[rgba(10,10,8,0.8)] px-16 py-6 backdrop-blur-xl max-md:px-6">
-        <div className="logo text-[1.2rem] font-extrabold">
-          <span className="text-[#c8a96e]">416</span>
-          Homes{" "}
-          <span className="align-middle font-['DM_Mono',monospace] text-[0.75rem] font-normal tracking-[0.1em] text-[#6b6b60]">
-            TOURS
-          </span>
-        </div>
-        <Link
-          href="/"
-          className="flex items-center gap-2 font-['DM_Mono',monospace] text-[0.7rem] uppercase tracking-[0.1em] text-[#6b6b60] no-underline hover:text-[#c8a96e]"
-        >
-          Back to Dashboard
+      <nav style={{
+        position: "sticky", top: 0, zIndex: 40,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "20px 56px",
+        background: "color-mix(in srgb, var(--bg) 82%, transparent)",
+        backdropFilter: "blur(20px)",
+        borderBottom: "1px solid var(--border)",
+      }}>
+        <Link href="/" style={{ textDecoration: "none" }}><Logo sub="GTA" /></Link>
+        <ul style={{ display: "flex", listStyle: "none", gap: 36, margin: 0, padding: 0, fontFamily: "var(--mono)", fontSize: "0.68rem", letterSpacing: "0.14em", textTransform: "uppercase" }}>
+          {[["dashboard", "Listings"], ["/video", "Videos"], ["/tours", "Virtual Tours"]].map(([href, label]) => (
+            <li key={href}>
+              <Link href={href} style={{ textDecoration: "none", color: label === "Virtual Tours" ? "var(--accent)" : "var(--text-mute)" }}>{label}</Link>
+            </li>
+          ))}
+        </ul>
+        <Link href="/#alert" style={{ display: "inline-block", padding: "10px 18px", background: "var(--accent)", color: "var(--bg)", fontFamily: "var(--mono)", fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", textDecoration: "none" }}>
+          Set My Alert
         </Link>
       </nav>
 
-      {/* Hero */}
-      <section className="border-b border-[rgba(200,169,110,0.2)] px-16 pb-16 pt-24 max-md:px-6">
-        <div className="hero-tag mb-6 flex items-center gap-3 font-['DM_Mono',monospace] text-[0.65rem] uppercase tracking-[0.2em] text-[#c8a96e]">
-          <span className="h-px w-6 bg-[#c8a96e]" />
-          Virtual Tour Builder
-        </div>
-        <h1 className="mb-5 max-w-[20ch] text-[clamp(2.2rem,4vw,4rem)] font-extrabold leading-[0.95] tracking-[-0.03em]">
-          Interactive Virtual Tours —{" "}
-          <span className="text-[#c8a96e]">$49 CAD</span>
-        </h1>
-        <p className="max-w-[52ch] font-['DM_Mono',monospace] text-[0.85rem] leading-[1.8] text-[#6b6b60]">
-          From listing URL to shareable room-by-room tour in minutes. Paste your listing URL below.
-        </p>
-      </section>
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 56px" }}>
 
-      {/* Order form + progress */}
-      <section className="grid gap-16 border-b border-[rgba(200,169,110,0.2)] px-16 py-20 md:grid-cols-2 max-md:px-6">
-        {/* Left: cost summary */}
-        <div>
-          <h2 className="mb-4 text-[1.6rem] font-extrabold tracking-[-0.02em]">
-            Generate your virtual tour
-          </h2>
-          <p className="mb-6 font-['DM_Mono',monospace] text-[0.78rem] leading-[1.8] text-[#6b6b60]">
-            Paste any Realtor.ca or Zoocasa listing URL. We fetch all photos, classify each room
-            using AI, and build an interactive room-by-room tour — automatically.
-          </p>
-          <div className="border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] p-6">
-            {[
-              ["Price", "$49 CAD"],
-              ["Turnaround", "~5 minutes"],
-              ["Room detection", "AI-powered"],
-              ["Output", "Hosted shareable link"],
-              ["Embed", "Copy iframe code"],
-            ].map(([label, value], i) => (
-              <div
-                key={label}
-                className={`flex items-center justify-between border-b border-[rgba(200,169,110,0.1)] py-2 font-['DM_Mono',monospace] text-[0.72rem] ${
-                  i === 4 ? "border-b-0" : ""
-                }`}
-              >
-                <span className="text-[#6b6b60]">{label}</span>
-                <span className={i === 0 ? "text-[1.05rem] font-bold text-[#c8a96e]" : "text-[#f5f4ef]"}>
-                  {value}
-                </span>
+        {/* Header */}
+        <Eyebrow line>Virtual tour · $49</Eyebrow>
+        <h1 style={{ fontFamily: "var(--mono)", fontSize: "clamp(2rem, 3.2vw, 3.2rem)", fontWeight: 700, lineHeight: 1.02, letterSpacing: "-0.015em", margin: "16px 0 12px" }}>
+          Listing photos →{" "}
+          <span style={{ color: "var(--accent)", background: "linear-gradient(180deg,transparent 60%,rgba(255,176,0,0.18) 60%)", padding: "0 4px" }}>
+            hosted room-by-room tour.
+          </span>
+        </h1>
+        <p style={{ fontFamily: "var(--mono)", fontSize: "0.85rem", lineHeight: 1.7, color: "var(--text-mute)", maxWidth: "54ch", marginBottom: 40 }}>
+          Gemini Vision classifies every photo by room, assembles a shareable tour,
+          and gives you a public link and embed code. Delivered in under five minutes.
+        </p>
+
+        {/* Demo — dollhouse + sidebar */}
+        <div style={{ marginBottom: 48, border: "1px solid var(--border-strong)", overflow: "hidden", background: "var(--bg-elev)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 0 }}>
+            {/* Dollhouse */}
+            <div style={{ position: "relative", aspectRatio: "16/10", background: "#000", overflow: "hidden" }}>
+              <Dollhouse selected={selectedRoom} onSelect={setSelectedRoom} />
+
+              {/* Top chrome */}
+              <div style={{ position: "absolute", top: 20, left: 20, background: "rgba(5,6,10,0.88)", padding: "10px 16px", border: "1px solid var(--border)" }}>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)" }}>3D Dollhouse</div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "1.05rem", fontWeight: 600, color: "#fff", marginTop: 4 }}>{ROOM_MAP[selectedRoom].name}</div>
               </div>
-            ))}
+
+              {/* Bottom bar */}
+              <div style={{ position: "absolute", bottom: 16, left: 16, right: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ background: "rgba(5,6,10,0.88)", padding: "8px 14px", border: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.68rem", color: "#fff" }}>
+                  <span style={{ color: "var(--accent)" }}>◆</span> 88 Niagara St, Unit 412 — King West · 2BR 2BA
+                </div>
+                <div style={{ background: "rgba(5,6,10,0.88)", padding: "8px 12px", border: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.64rem", color: "var(--accent)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                  ⬡ 3D View
+                </div>
+              </div>
+            </div>
+
+            {/* Sidebar */}
+            <div style={{ padding: 28, borderLeft: "1px solid var(--border)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+              <div>
+                <Eyebrow>Interactive demo</Eyebrow>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "1.05rem", fontWeight: 600, margin: "10px 0 12px" }}>Click any room</div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "0.7rem", lineHeight: 1.6, color: "var(--text-mute)", marginBottom: 16 }}>
+                  Matterport-style 3D dollhouse. Click rooms in the model to navigate through the property.
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {(Object.entries(ROOM_MAP) as [RoomKey, { name: string }][]).map(([k, v]) => (
+                    <button key={k} onClick={() => setSelectedRoom(k)} style={{
+                      padding: "10px 12px", textAlign: "left",
+                      background: selectedRoom === k ? "var(--bg-panel)" : "transparent",
+                      border: `1px solid ${selectedRoom === k ? "var(--accent)" : "var(--border)"}`,
+                      color: selectedRoom === k ? "var(--accent)" : "var(--text)",
+                      fontFamily: "var(--mono)", fontSize: "0.68rem",
+                      cursor: "pointer", transition: "all 0.15s",
+                      display: "flex", alignItems: "center", gap: 8,
+                    }}>
+                      <span style={{ opacity: selectedRoom === k ? 1 : 0.4 }}>{selectedRoom === k ? "●" : "○"}</span>
+                      {v.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ paddingTop: 16, borderTop: "1px solid var(--border)", marginTop: 16, fontFamily: "var(--mono)", fontSize: "0.58rem", color: "var(--text-dim)", lineHeight: 1.6, letterSpacing: "0.06em" }}>
+                Gemini Vision classifies photos → auto-generates 3D dollhouse + room-by-room gallery.
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Right: form or progress */}
-        <div>
-          {!showProgress ? (
-            <div className="border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] p-10">
-              <div className="mb-1 text-[1.1rem] font-bold">Submit Your Listing</div>
-              <p className="mb-6 font-['DM_Mono',monospace] text-[0.7rem] leading-[1.6] text-[#6b6b60]">
-                Enter your listing URL and we&apos;ll build an interactive tour in minutes.
-              </p>
-
-              <div className="mb-4">
-                <label className="mb-1 block font-['DM_Mono',monospace] text-[0.6rem] uppercase tracking-[0.15em] text-[#6b6b60]">
-                  Listing URL *
-                </label>
-                <input
-                  type="text"
-                  value={listingUrl}
-                  onChange={(e) => setListingUrl(e.target.value)}
-                  className="w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none focus:border-[#c8a96e]"
-                  placeholder="https://www.realtor.ca/real-estate/..."
-                />
-              </div>
-
-              <div className="mb-4">
-                <label className="mb-1 block font-['DM_Mono',monospace] text-[0.6rem] uppercase tracking-[0.15em] text-[#6b6b60]">
-                  Email Address *
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none focus:border-[#c8a96e]"
-                  placeholder="agent@yourbrokerage.com"
-                />
-              </div>
-
-              <div className="mb-6">
-                <label className="mb-1 block font-['DM_Mono',monospace] text-[0.6rem] uppercase tracking-[0.15em] text-[#6b6b60]">
-                  Agent Name (optional)
-                </label>
-                <input
-                  type="text"
-                  value={agentName}
-                  onChange={(e) => setAgentName(e.target.value)}
-                  className="w-full border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.04)] px-4 py-3 font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] outline-none focus:border-[#c8a96e]"
-                  placeholder="Jane Smith"
-                />
-              </div>
-
-              <button
-                type="button"
-                disabled={submitLoading}
-                onClick={handleSubmit}
-                className="mt-2 w-full bg-[#c8a96e] px-4 py-4 font-['Syne',sans-serif] text-[0.95rem] font-extrabold uppercase tracking-[0.05em] text-black transition-all hover:-translate-y-[1px] hover:bg-[#e4c98a] disabled:cursor-not-allowed disabled:transform-none disabled:opacity-50"
-              >
-                {submitLoading ? "Processing..." : "Generate Tour — $49 CAD"}
-              </button>
-
-              <p className="mt-3 text-center font-['DM_Mono',monospace] text-[0.62rem] text-[#6b6b60]">
-                Stripe payment coming soon — free demo for now.
-                <br />
-                Questions? hello@416homes.ca
-              </p>
-            </div>
-          ) : status === "completed" && tourUrl ? (
-            /* Completion */
-            <div className="border border-[rgba(46,213,115,0.25)] bg-[rgba(46,213,115,0.05)] p-10">
-              <div className="mb-1 text-[1rem] font-bold text-[#2ed573]">Your tour is ready!</div>
-              <p className="mb-6 font-['DM_Mono',monospace] text-[0.72rem] text-[#6b6b60]">
-                Share the link below or embed it on your website.
-              </p>
-              <a
-                href={tourUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mb-6 inline-block w-full bg-[#c8a96e] px-6 py-4 text-center font-['Syne',sans-serif] text-[0.95rem] font-extrabold uppercase tracking-[0.05em] text-black no-underline transition-all hover:-translate-y-[1px] hover:bg-[#e4c98a]"
-              >
-                View Your Tour →
-              </a>
-
-              <div className="mt-4">
-                <div className="mb-2 font-['DM_Mono',monospace] text-[0.6rem] uppercase tracking-[0.15em] text-[#6b6b60]">
-                  Embed Code
+        {/* Order section */}
+        <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 64 }}>
+          {/* What's included */}
+          <div>
+            <div style={{ border: "1px solid var(--border)", padding: 28 }}>
+              <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 14 }}>What&apos;s included</div>
+              {[
+                ["Room-by-room classification", "Living, kitchen, bedrooms, bath — automatic"],
+                ["Hosted link", "Mobile-friendly, no login required"],
+                ["Embed code", "Drop into any listing page or MLS"],
+                ["Lifetime hosting", "Yours for as long as the listing is live"],
+              ].map(([t, d]) => (
+                <div key={t as string} style={{ padding: "12px 0", borderBottom: "1px dotted var(--border)" }}>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: "0.95rem", fontWeight: 600 }}>{t}</div>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: "0.68rem", color: "var(--text-mute)", marginTop: 2 }}>{d}</div>
                 </div>
-                <div className="relative">
-                  <pre className="overflow-x-auto border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.03)] p-4 font-['DM_Mono',monospace] text-[0.65rem] leading-[1.6] text-[#c8a96e] whitespace-pre-wrap break-all">
-                    {embedCode}
-                  </pre>
+              ))}
+            </div>
+
+            {/* Pricing comparison */}
+            <div style={{ marginTop: 24, border: "1px solid var(--border)", padding: 28 }}>
+              <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 14 }}>Why 416Homes tours?</div>
+              {[
+                ["Matterport", "$500+", "Complex setup, equipment needed"],
+                ["Virtual staging", "$200–400", "Static images only"],
+                ["416Homes", "$49", "From existing photos, 5 minutes"],
+              ].map(([name, price, note]) => (
+                <div key={name as string} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "10px 0", borderBottom: "1px dotted var(--border)" }}>
+                  <div>
+                    <span style={{ fontFamily: "var(--mono)", fontSize: "0.85rem", fontWeight: 600, color: name === "416Homes" ? "var(--accent)" : "var(--text)" }}>{name}</span>
+                    <span style={{ fontFamily: "var(--mono)", fontSize: "0.66rem", color: "var(--text-mute)", marginLeft: 12 }}>{note}</span>
+                  </div>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: "0.85rem", color: name === "416Homes" ? "var(--accent)" : "var(--text-mute)" }}>{price}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Order form */}
+          <div style={{ border: "1px solid var(--border-strong)", padding: 32, background: "var(--bg-elev)", height: "fit-content", position: "sticky", top: 100 }}>
+            {!paid ? (
+              <>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "1.3rem", fontWeight: 700, marginBottom: 20 }}>Order a tour</div>
+                <FormField label="Listing URL">
+                  <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://www.realtor.ca/..." style={inputStyle} />
+                </FormField>
+                <FormField label="Delivery email">
+                  <input value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" style={inputStyle} />
+                </FormField>
+
+                <div style={{ marginTop: 20, padding: "16px 0", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 20 }}>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-mute)" }}>Total</div>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: "2.4rem", fontWeight: 700 }}>
+                    $49 <span style={{ fontSize: "0.7rem", fontFamily: "var(--mono)", color: "var(--text-mute)", letterSpacing: "0.1em", textTransform: "uppercase" }}>CAD</span>
+                  </div>
+                </div>
+
+                <PrimaryBtn onClick={() => { if (url && email) setPaid(true); }}>
+                  Pay &amp; generate →
+                </PrimaryBtn>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "0.6rem", color: "var(--text-dim)", textAlign: "center", marginTop: 12 }}>
+                  Secure checkout via Stripe
+                </div>
+              </>
+            ) : (
+              <>
+                <Eyebrow>{progress < 100 ? "Generating" : "Ready"}</Eyebrow>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "1.4rem", fontWeight: 700, margin: "14px 0 20px" }}>
+                  {progress < 100 ? "Building your tour…" : "Your tour is live."}
+                </div>
+                <div style={{ width: "100%", height: 6, background: "var(--bg)", overflow: "hidden", marginBottom: 16 }}>
+                  <div style={{ width: `${progress}%`, height: "100%", background: "var(--accent)", transition: "width 0.2s" }} />
+                </div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "0.72rem", color: "var(--text-mute)", lineHeight: 1.6 }}>
+                  {progressLabel}
+                </div>
+                {progress >= 100 && (
                   <button
-                    type="button"
-                    onClick={handleCopyEmbed}
-                    className="mt-2 w-full border border-[rgba(200,169,110,0.3)] py-2 font-['DM_Mono',monospace] text-[0.7rem] uppercase tracking-[0.1em] text-[#c8a96e] transition-colors hover:border-[#c8a96e] hover:bg-[rgba(200,169,110,0.06)]"
+                    onClick={() => { setPaid(false); setProgress(0); setUrl(""); setEmail(""); }}
+                    style={{ marginTop: 24, padding: "10px 20px", background: "transparent", border: "1px solid var(--border-strong)", color: "var(--accent)", fontFamily: "var(--mono)", fontSize: "0.68rem", letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer" }}
                   >
-                    {embedCopied ? "Copied!" : "Copy Embed Code"}
+                    Order another →
                   </button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* Progress */
-            <div className="border border-[rgba(200,169,110,0.2)] bg-[rgba(255,255,255,0.025)] p-10">
-              <div className="mb-1 text-[1rem] font-bold">
-                {demoMode ? "Demo — generating tour..." : "Generating your tour..."}
-              </div>
-              <div className="mb-8 font-['DM_Mono',monospace] text-[0.72rem] text-[#c8a96e]">
-                {listingUrl.length > 60 ? listingUrl.slice(0, 60) + "..." : listingUrl}
-              </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
 
-              <div className="flex flex-col gap-0">
-                {progressSteps.map((step, i) => {
-                  const stepDone = currentStepIdx > i + 1;
-                  const stepActive = currentStepIdx === i + 1;
-                  return (
-                    <div
-                      key={step.key}
-                      className="flex items-center gap-4 border-b border-[rgba(200,169,110,0.08)] py-4 last:border-b-0"
-                    >
-                      <div
-                        className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border text-[0.75rem] ${
-                          stepDone
-                            ? "border-[#2ed573] bg-[rgba(46,213,115,0.15)]"
-                            : stepActive
-                              ? "animate-pulse border-[#c8a96e] bg-[rgba(200,169,110,0.1)]"
-                              : "border-[rgba(200,169,110,0.2)] opacity-30"
-                        }`}
-                      >
-                        {stepDone ? "✓" : String(i + 1)}
-                      </div>
-                      <div>
-                        <div className="text-[0.85rem] font-semibold">{step.label}</div>
-                        <div className="font-['DM_Mono',monospace] text-[0.68rem] text-[#6b6b60]">
-                          {stepDone
-                            ? "Complete"
-                            : stepActive
-                              ? "Working..."
-                              : "Waiting..."}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {demoMode && (
-                <p className="mt-6 font-['DM_Mono',monospace] text-[0.62rem] text-[#6b6b60]">
-                  Demo mode active — connect API for real tour generation.
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Feature callouts */}
-      <section className="border-b border-[rgba(200,169,110,0.2)] px-16 py-20 max-md:px-6">
-        <div className="mb-3 font-['DM_Mono',monospace] text-[0.62rem] uppercase tracking-[0.2em] text-[#c8a96e]">
-          What you get
-        </div>
-        <h2 className="mb-12 text-[clamp(1.6rem,2.5vw,2.8rem)] font-extrabold tracking-[-0.02em]">
-          Everything buyers need, nothing they don&apos;t.
-        </h2>
-        <div className="grid gap-0 md:grid-cols-3">
-          {FEATURES.map((f, i) => (
-            <div
-              key={f.title}
-              className={`border-r border-[rgba(200,169,110,0.2)] p-8 last:border-r-0 ${
-                i === 0 ? "" : ""
-              }`}
-            >
-              <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(200,169,110,0.35)] font-['DM_Mono',monospace] text-[1rem] text-[#c8a96e]">
-                {f.icon}
-              </div>
-              <div className="mb-2 text-[0.9rem] font-bold">{f.title}</div>
-              <div className="font-['DM_Mono',monospace] text-[0.72rem] leading-[1.65] text-[#6b6b60]">
-                {f.desc}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <footer className="flex items-center justify-between border-t border-[rgba(200,169,110,0.2)] px-16 py-8 max-md:flex-col max-md:gap-3 max-md:px-6">
-        <Link
-          href="/"
-          className="text-[1rem] font-extrabold no-underline transition-colors hover:text-[#c8a96e]"
-        >
-          <span className="text-[#c8a96e]">416</span>Homes Tours
-        </Link>
-        <div className="font-['DM_Mono',monospace] text-[0.6rem] text-[#6b6b60]">
-          Interactive virtual tours · Toronto + Mississauga · $49
-        </div>
-        <div className="font-['DM_Mono',monospace] text-[0.6rem] text-[#6b6b60]">
-          © 2025 416Homes · hello@416homes.ca
-        </div>
+      {/* Footer */}
+      <footer style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 56px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: "var(--mono)", fontSize: "0.62rem", color: "var(--text-mute)" }}>
+        <Logo />
+        <span>Covering Toronto &amp; Mississauga · Built on real sold data</span>
+        <span>© 2026 416Homes · Early Access</span>
       </footer>
     </div>
   );
