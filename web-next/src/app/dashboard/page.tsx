@@ -59,6 +59,51 @@ const BATH_OPTIONS = [
 const LISTINGS_PAGE_SIZE = 36;
 const TELEGRAM_BOT = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ?? "Homes_Alertsbot";
 
+/* ── MarketInsightsBar ───────────────────────────────────────────────── */
+function MarketInsightsBar({ listings, total }: { listings: Listing[]; total: number }) {
+  const withVal   = listings.filter(l => l.fair_value != null);
+  const under     = withVal.filter(l => (l.fair_value ?? 0) >= 3).length;
+  const over      = withVal.filter(l => (l.fair_value ?? 0) <= -3).length;
+  const fair      = withVal.length - under - over;
+  const domArr    = listings.filter(l => l.dom != null).map(l => l.dom!);
+  const avgDom    = domArr.length ? Math.round(domArr.reduce((s, d) => s + d, 0) / domArr.length) : null;
+  const psfArr    = listings.filter(l => l.sqft > 0 && l.price > 0).map(l => l.price / l.sqft);
+  const avgPsf    = psfArr.length ? Math.round(psfArr.reduce((s, p) => s + p, 0) / psfArr.length) : null;
+
+  const mono: React.CSSProperties = { fontFamily: "var(--mono)", fontSize: "0.62rem", letterSpacing: "0.08em" };
+
+  return (
+    <div style={{
+      padding: "8px 20px", borderBottom: "1px solid var(--border)",
+      background: "rgba(255,191,0,0.02)",
+      display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap",
+    }}>
+      <span style={{ ...mono, color: "var(--text-dim)" }}>
+        ◆ {total.toLocaleString()} listings
+      </span>
+      {withVal.length > 0 && (
+        <>
+          <span style={{ ...mono, color: "#2ed573" }}>
+            ↓ {Math.round(under / withVal.length * 100)}% underpriced
+          </span>
+          <span style={{ ...mono, color: "#cf6357" }}>
+            ↑ {Math.round(over / withVal.length * 100)}% overpriced
+          </span>
+          <span style={{ ...mono, color: "var(--text-dim)" }}>
+            ≈ {Math.round(fair / withVal.length * 100)}% fair
+          </span>
+        </>
+      )}
+      {avgDom != null && (
+        <span style={{ ...mono, color: "var(--text-dim)" }}>· avg {avgDom}d DOM</span>
+      )}
+      {avgPsf != null && (
+        <span style={{ ...mono, color: "var(--text-dim)" }}>· ${avgPsf.toLocaleString()}/sf avg</span>
+      )}
+    </div>
+  );
+}
+
 /* ── SVG GTA Map (Terminal Broker style) ────────────────────────────── */
 // Wide GTA bounds — covers Burlington (S), Ajax (E), Brampton (W), Richmond Hill (N)
 const MAP_BOUNDS = { minLat: 43.25, maxLat: 43.95, minLng: -79.95, maxLng: -79.00 };
@@ -912,7 +957,11 @@ export default function DashboardPage() {
               style={{ display: "grid", gridTemplateColumns: "440px 1fr", minHeight: 640 }}
             >
               {/* List column */}
-              <div className="list-col" style={{ overflowY: "auto", borderRight: "1px solid var(--border)", maxHeight: "calc(100vh - 180px)" }}>
+              <div className="list-col" style={{ overflowY: "auto", borderRight: "1px solid var(--border)", maxHeight: "calc(100vh - 180px)", display: "flex", flexDirection: "column" }}>
+                {/* Market insights bar */}
+                {!loading && listings.length > 0 && (
+                  <MarketInsightsBar listings={listings} total={totalListings} />
+                )}
                 {loading ? (
                   Array.from({ length: 8 }).map((_, i) => (
                     <div key={i} style={{ padding: "14px 16px", borderBottom: "1px solid var(--border)", display: "flex", gap: 12 }}>
