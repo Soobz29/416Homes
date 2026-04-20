@@ -59,125 +59,181 @@ const BATH_OPTIONS = [
 const LISTINGS_PAGE_SIZE = 36;
 const TELEGRAM_BOT = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ?? "Homes_Alertsbot";
 
-/* ── GTA Map component ──────────────────────────────────────────────── */
-const GTA_DEFAULT_SRC =
-  "https://www.openstreetmap.org/export/embed.html?bbox=-79.95%2C43.50%2C-79.10%2C43.90&layer=mapnik";
+/* ── SVG GTA Map (Terminal Broker style) ────────────────────────────── */
+const MAP_BOUNDS = { minLat: 43.52, maxLat: 43.75, minLng: -79.70, maxLng: -79.28 };
+const MAP_W = 800, MAP_H = 560;
 
-function bboxSrc(lat: number, lon: number, delta = 0.018) {
-  const w = (lon - delta).toFixed(5);
-  const s = (lat - delta).toFixed(5);
-  const e = (lon + delta).toFixed(5);
-  const n = (lat + delta).toFixed(5);
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${w}%2C${s}%2C${e}%2C${n}&layer=mapnik&marker=${lat.toFixed(5)}%2C${lon.toFixed(5)}`;
+function proj(lat: number, lng: number): [number, number] {
+  const x = ((lng - MAP_BOUNDS.minLng) / (MAP_BOUNDS.maxLng - MAP_BOUNDS.minLng)) * MAP_W;
+  const y = MAP_H - ((lat - MAP_BOUNDS.minLat) / (MAP_BOUNDS.maxLat - MAP_BOUNDS.minLat)) * MAP_H;
+  return [x, y];
 }
 
-function GTAMap({ listings, selectedId }: {
+function GTAMap({ listings, selectedId, onSelect }: {
   listings: Listing[];
   selectedId: string | null;
+  onSelect?: (id: string) => void;
 }) {
-  const [mapSrc, setMapSrc] = useState(GTA_DEFAULT_SRC);
-  const [geocoding, setGeocoding] = useState(false);
-
-  useEffect(() => {
-    if (!selectedId) {
-      setMapSrc(GTA_DEFAULT_SRC);
-      return;
-    }
-    const sel = listings.find(l => l.id === selectedId);
-    if (!sel) return;
-
-    // Use existing coords if available
-    if (sel.lat && sel.lng) {
-      setMapSrc(bboxSrc(sel.lat, sel.lng));
-      return;
-    }
-
-    // Geocode via Nominatim (free, no API key)
-    setGeocoding(true);
-    fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(sel.address + ", Ontario, Canada")}&format=json&limit=1`,
-      { headers: { "Accept-Language": "en" } }
-    )
-      .then(r => r.json())
-      .then((data: Array<{ lat: string; lon: string }>) => {
-        if (data[0]) {
-          setMapSrc(bboxSrc(parseFloat(data[0].lat), parseFloat(data[0].lon)));
-        }
-      })
-      .catch(() => {})
-      .finally(() => setGeocoding(false));
-  }, [selectedId, listings]);
-
-  const sel = selectedId ? listings.find(l => l.id === selectedId) : null;
+  const listingsWithCoords = listings.filter(l => l.lat != null && l.lng != null);
+  const selected = selectedId ? listings.find(l => l.id === selectedId) : null;
 
   return (
-    <div style={{ width: "100%", height: "100%", position: "relative", overflow: "hidden" }}>
-      {/* Map iframe — src changes on listing select */}
-      <iframe
-        key={mapSrc}
-        src={mapSrc}
-        style={{
-          width: "100%",
-          height: "100%",
-          border: "none",
-          filter: "brightness(0.78) saturate(0.65) hue-rotate(10deg)",
-        }}
-        title="Greater Toronto Area Map"
-      />
+    <div style={{ width: "100%", height: "100%", position: "relative", background: "#08080A", overflow: "hidden" }}>
+      <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} style={{ width: "100%", height: "100%", display: "block" }}>
+        <defs>
+          <pattern id="mapGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
+          </pattern>
+        </defs>
 
-      {/* Geocoding spinner */}
-      {geocoding && (
+        {/* Background */}
+        <rect width={MAP_W} height={MAP_H} fill="#08080A" />
+        <rect width={MAP_W} height={MAP_H} fill="url(#mapGrid)" />
+
+        {/* Transit lines — Yonge/Bloor/Eglinton */}
+        <line
+          x1={proj(43.745, -79.399)[0]} y1={proj(43.745, -79.399)[1]}
+          x2={proj(43.63, -79.399)[0]}  y2={proj(43.63, -79.399)[1]}
+          stroke="rgba(255,191,0,0.28)" strokeWidth="2" strokeDasharray="4 3"
+        />
+        <line
+          x1={proj(43.666, -79.55)[0]} y1={proj(43.666, -79.55)[1]}
+          x2={proj(43.666, -79.31)[0]} y2={proj(43.666, -79.31)[1]}
+          stroke="rgba(255,191,0,0.28)" strokeWidth="2" strokeDasharray="4 3"
+        />
+        <line
+          x1={proj(43.71, -79.52)[0]}  y1={proj(43.71, -79.52)[1]}
+          x2={proj(43.707, -79.30)[0]} y2={proj(43.707, -79.30)[1]}
+          stroke="rgba(110,200,255,0.18)" strokeWidth="2" strokeDasharray="2 3"
+        />
+
+        {/* Label */}
+        <text x="14" y="22" fill="rgba(255,255,255,0.16)" fontSize="10"
+          fontFamily="'JetBrains Mono', monospace" letterSpacing="2">
+          TORONTO · MISSISSAUGA · 43°N
+        </text>
+
+        {/* Pins */}
+        {listingsWithCoords.map(l => {
+          const [x, y] = proj(l.lat!, l.lng!);
+          const isSelected = l.id === selectedId;
+          const isDeal = (l.fair_value ?? 0) >= 3;
+          return (
+            <g key={l.id} style={{ cursor: "pointer" }} onClick={() => onSelect?.(l.id)}>
+              {isSelected && <circle cx={x} cy={y} r={22} fill="var(--accent)" opacity="0.15" />}
+              <circle
+                cx={x} cy={y} r={isSelected ? 10 : 7}
+                fill={isDeal ? "var(--accent)" : "#1a1a18"}
+                stroke="var(--accent)"
+                strokeWidth={isSelected ? 2 : 1.5}
+              />
+              {isSelected && (
+                <g>
+                  <rect x={x + 14} y={y - 20} width="100" height="38"
+                    fill="#0A0D14" stroke="var(--accent)" strokeWidth="1" />
+                  <text x={x + 20} y={y - 5} fill="#E8E4D9" fontSize="11"
+                    fontFamily="'JetBrains Mono', monospace" fontWeight="700">
+                    ${Math.round(l.price / 1000)}K
+                  </text>
+                  <text x={x + 20} y={y + 10} fill="#8A8876" fontSize="8"
+                    fontFamily="'JetBrains Mono', monospace" letterSpacing="1">
+                    {(l.neighbourhood || l.city || "GTA").toUpperCase().slice(0, 14)}
+                  </text>
+                </g>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+
+      {/* Legend — top left */}
+      <div style={{
+        position: "absolute", top: 20, left: 20,
+        background: "var(--bg)", border: "1px solid var(--border)",
+        padding: "10px 14px",
+        fontFamily: "var(--mono)", fontSize: "0.62rem",
+        color: "var(--text-mute)", letterSpacing: "0.1em", textTransform: "uppercase",
+      }}>
+        <div style={{ color: "var(--accent)", marginBottom: 6, letterSpacing: "0.14em" }}>Legend</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)", display: "inline-block", flexShrink: 0 }} />
+          Under market
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", border: "1.5px solid var(--accent)", display: "inline-block", flexShrink: 0 }} />
+          At market
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ width: 16, height: 2, background: "rgba(255,191,0,0.5)", display: "inline-block", flexShrink: 0 }} />
+          TTC subway
+        </div>
+      </div>
+
+      {/* Selected card — bottom right */}
+      {selected && (
         <div style={{
-          position: "absolute", top: 16, left: "50%", transform: "translateX(-50%)",
-          background: "rgba(11,11,11,0.88)", backdropFilter: "blur(8px)",
-          border: "1px solid var(--border)",
-          padding: "6px 14px",
-          fontFamily: "var(--mono)", fontSize: "0.58rem",
-          textTransform: "uppercase", letterSpacing: "0.12em",
-          color: "var(--accent)", whiteSpace: "nowrap",
+          position: "absolute", bottom: 20, right: 20, width: 320,
+          background: "var(--bg)", border: "1px solid var(--border-strong)",
+          overflow: "hidden",
+          boxShadow: "0 12px 40px rgba(0,0,0,0.5)",
         }}>
-          ◆ Locating…
+          {selected.photos?.[0] && (
+            <img src={selected.photos[0]} alt=""
+              style={{ width: "100%", height: 160, objectFit: "cover", display: "block" }} />
+          )}
+          <div style={{ padding: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 12 }}>
+              <div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "0.6rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-mute)" }}>
+                  {selected.neighbourhood || selected.city}
+                </div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "1.4rem", fontWeight: 600, marginTop: 2 }}>
+                  ${selected.price.toLocaleString("en-CA")}
+                </div>
+              </div>
+              {selected.fair_value != null && (
+                <span style={{
+                  border: `1px solid ${selected.fair_value >= 3 ? "var(--border-strong)" : "var(--border)"}`,
+                  padding: "3px 8px", fontFamily: "var(--mono)", fontSize: "0.56rem",
+                  letterSpacing: "0.1em", textTransform: "uppercase",
+                  color: selected.fair_value >= 3 ? "var(--accent)" : "var(--text-mute)",
+                }}>
+                  {selected.fair_value >= 3 ? "↓" : "="} {Math.abs(selected.fair_value).toFixed(1)}%
+                </span>
+              )}
+            </div>
+            <div style={{ fontFamily: "var(--mono)", fontSize: "0.72rem", color: "var(--text-mute)", marginTop: 6 }}>
+              {selected.address}
+            </div>
+            <div style={{ display: "flex", gap: 12, marginTop: 8, fontFamily: "var(--mono)", fontSize: "0.72rem", color: "var(--text)" }}>
+              {selected.beds  > 0 && <span>{selected.beds} BD</span>}
+              {selected.baths > 0 && <><span style={{ opacity: 0.4 }}>·</span><span>{selected.baths} BA</span></>}
+              {selected.sqft  > 0 && <><span style={{ opacity: 0.4 }}>·</span><span>{selected.sqft.toLocaleString()} SF</span></>}
+            </div>
+            <a href={selected.url} target="_blank" rel="noreferrer" style={{
+              display: "block", width: "100%", marginTop: 12, padding: "9px",
+              background: "var(--accent)", color: "var(--bg)",
+              fontFamily: "var(--mono)", fontSize: "0.7rem",
+              letterSpacing: "0.12em", textTransform: "uppercase",
+              textDecoration: "none", textAlign: "center", fontWeight: 700,
+            }}>
+              Open listing →
+            </a>
+          </div>
         </div>
       )}
 
-      {/* Selected listing callout */}
-      {sel && (
+      {/* No coords hint */}
+      {listingsWithCoords.length === 0 && (
         <div style={{
-          position: "absolute", top: 16, left: 16, right: 16,
-          background: "rgba(11,11,11,0.92)",
-          backdropFilter: "blur(12px)",
-          border: "1px solid var(--border-strong)",
-          padding: "14px 16px",
-        }}>
-          <div style={{ fontFamily: "var(--mono)", fontSize: "1.1rem", fontWeight: 500, color: "var(--accent)" }}>
-            ${sel.price.toLocaleString("en-CA")}
-          </div>
-          <div style={{ fontFamily: "var(--sans)", fontSize: "0.75rem", color: "var(--text-mute)", marginTop: 4 }}>
-            {sel.address}
-          </div>
-          <a href={sel.url} target="_blank" rel="noreferrer" style={{
-            display: "inline-block", marginTop: 10,
-            fontFamily: "var(--mono)", fontSize: "0.58rem", textTransform: "uppercase",
-            letterSpacing: "0.1em", color: "var(--accent)", textDecoration: "none",
-            border: "1px solid var(--border)", padding: "4px 10px",
-          }}>
-            View listing →
-          </a>
-        </div>
-      )}
-
-      {/* Status pill — only when nothing selected */}
-      {!sel && (
-        <div style={{
-          position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)",
-          background: "rgba(11,11,11,0.88)", backdropFilter: "blur(8px)",
-          border: "1px solid var(--border)",
+          position: "absolute", bottom: 20, left: "50%", transform: "translateX(-50%)",
+          background: "rgba(10,13,20,0.92)", border: "1px solid var(--border)",
           padding: "8px 16px",
           fontFamily: "var(--mono)", fontSize: "0.58rem",
           textTransform: "uppercase", letterSpacing: "0.12em",
           color: "var(--text-mute)", whiteSpace: "nowrap",
         }}>
-          ◆ GTA · Toronto & Mississauga · Select a listing to locate it
+          ◆ GTA · Pins appear when location data is available
         </div>
       )}
     </div>
@@ -449,10 +505,10 @@ export default function DashboardPage() {
         borderBottom: "1px solid var(--border)",
       }}>
         {/* Logo */}
-        <div style={{ fontFamily: "var(--serif)", fontSize: "1.4rem", fontWeight: 500 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontFamily: "var(--mono)", fontWeight: 800, fontSize: "1.2rem", letterSpacing: "0.02em" }}>
           <span style={{ color: "var(--accent)" }}>416</span>
-          <span style={{ color: "var(--text-mute)" }}>homes</span>
-          <span style={{ fontFamily: "var(--mono)", fontSize: "0.52rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--text-dim)", marginLeft: 8 }}>Dashboard</span>
+          <span style={{ color: "var(--text)" }}>Homes</span>
+          <span style={{ fontFamily: "var(--mono)", fontSize: "0.52rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--text-dim)", fontWeight: 400 }}>Dashboard</span>
         </div>
 
         {/* Tab buttons — mid nav */}
@@ -826,10 +882,11 @@ export default function DashboardPage() {
               </div>
 
               {/* Map column */}
-              <div className="map-col" style={{ position: "relative" }}>
+              <div className="map-col" style={{ position: "relative", height: "calc(100vh - 180px)" }}>
                 <GTAMap
                   listings={listings}
                   selectedId={selectedId}
+                  onSelect={id => setSelectedId(id === selectedId ? null : id)}
                 />
               </div>
             </div>
