@@ -150,7 +150,7 @@ export default function VideoPage() {
   const [revisionMessage, setRevisionMessage] = useState<string | null>(null);
   const [revisionSuccess, setRevisionSuccess] = useState(false);
   const [revisionVisible, setRevisionVisible] = useState(false);
-  const [demoPlaying, setDemoPlaying] = useState(false);
+  const [demoPlaying, setDemoPlaying] = useState(true);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const price = TIERS.find(t => t.id === tier)?.price ?? 249;
