@@ -154,9 +154,18 @@ export default function DashboardPage() {
   const [valuationForm, setValuationForm] = useState({
     neighbourhood: "", city: "Toronto", bedrooms: "", bathrooms: "", sqft: "", list_price: "",
   });
+  const [valuationCondition, setValuationCondition] = useState<"excellent"|"good"|"fair"|"poor">("good");
   const [valuationResult, setValuationResult] = useState<null | { estimated_value: number; confidence: number; price_per_sqft?: number; market_analysis: string }>(null);
   const [valuationLoading, setValuationLoading] = useState(false);
   const [valuationError, setValuationError] = useState<string | null>(null);
+
+  /* Condition multipliers — applied to estimated_value on the frontend */
+  const CONDITION_MULT: Record<string, number> = {
+    excellent: 1.12,
+    good:      1.00,
+    fair:      0.92,
+    poor:      0.82,
+  };
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -793,8 +802,11 @@ export default function DashboardPage() {
 
         {/* ── VALUATION TAB ─────────────────────────────────────────── */}
         {activeTab === "valuation" && (
-          <div style={{ maxWidth: 640, margin: "0 auto", padding: "48px 40px" }}>
-            <div style={{ fontFamily: "var(--serif)", fontSize: "clamp(1.4rem,2vw,2.2rem)", fontWeight: 500, marginBottom: 32 }}>Property Valuation</div>
+          <div style={{ maxWidth: 680, margin: "0 auto", padding: "48px 40px" }}>
+            <div style={{ fontFamily: "var(--serif)", fontSize: "clamp(1.4rem,2vw,2.2rem)", fontWeight: 500, marginBottom: 8 }}>Property Valuation</div>
+            <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", color: "var(--text-dim)", marginBottom: 28 }}>LightGBM model trained on GTA sold comps · $600/sqft fallback when model unavailable</div>
+
+            {/* Input grid */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
               {[
                 { label: "City", key: "city", placeholder: "Toronto" },
@@ -817,10 +829,32 @@ export default function DashboardPage() {
               ))}
             </div>
 
+            {/* Property condition slider */}
+            <div style={{ marginTop: 20 }}>
+              <div style={{ fontFamily: "var(--mono)", fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)", marginBottom: 10 }}>Property Condition</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 0, border: "1px solid var(--border)", overflow: "hidden" }}>
+                {(["poor","fair","good","excellent"] as const).map((c, i) => {
+                  const labels = { poor: "Poor\n−18%", fair: "Fair\n−8%", good: "Good\n±0%", excellent: "Excellent\n+12%" };
+                  const active = valuationCondition === c;
+                  return (
+                    <button key={c} onClick={() => setValuationCondition(c)} style={{
+                      padding: "10px 8px", background: active ? "rgba(255,191,0,0.1)" : "transparent",
+                      border: "none", borderRight: i < 3 ? "1px solid var(--border)" : "none",
+                      borderBottom: active ? "2px solid var(--accent)" : "2px solid transparent",
+                      cursor: "pointer", textAlign: "center",
+                    }}>
+                      <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.06em", color: active ? "var(--accent)" : "var(--text-mute)", fontWeight: active ? 700 : 400 }}>{c}</div>
+                      <div style={{ fontFamily: "var(--mono)", fontSize: "0.56rem", color: active ? "var(--accent)" : "var(--text-dim)", marginTop: 3 }}>{labels[c].split("\n")[1]}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <button
               disabled={valuationLoading}
               className="btn-primary"
-              style={{ marginTop: 24, width: "100%", textAlign: "center", opacity: valuationLoading ? 0.6 : 1 }}
+              style={{ marginTop: 20, width: "100%", textAlign: "center", opacity: valuationLoading ? 0.6 : 1 }}
               onClick={async () => {
                 setValuationLoading(true);
                 setValuationError(null);
@@ -850,25 +884,67 @@ export default function DashboardPage() {
               <p style={{ marginTop: 16, fontFamily: "var(--mono)", fontSize: "0.78rem", color: "#e74c3c" }}>{valuationError}</p>
             )}
 
-            {valuationResult && (
-              <div style={{ marginTop: 28, border: "1px solid var(--border)", padding: 24 }}>
-                <div style={{ fontFamily: "var(--mono)", fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)", marginBottom: 6 }}>Estimated Value</div>
-                <div style={{ fontFamily: "var(--serif)", fontSize: "2.5rem", fontWeight: 500, color: "var(--accent)" }}>
-                  ${valuationResult.estimated_value.toLocaleString()}
-                </div>
-                {valuationResult.price_per_sqft && (
-                  <div style={{ fontFamily: "var(--mono)", fontSize: "0.78rem", color: "var(--text)", marginTop: 4 }}>
-                    ${Math.round(valuationResult.price_per_sqft).toLocaleString()} / sqft
+            {valuationResult && (() => {
+              const condMult  = CONDITION_MULT[valuationCondition] ?? 1;
+              const baseVal   = valuationResult.estimated_value;
+              const adjVal    = Math.round(baseVal * condMult);
+              const rangeLow  = Math.round(adjVal * 0.92);
+              const rangeHigh = Math.round(adjVal * 1.08);
+              const conf      = valuationResult.confidence;
+              const confLabel = conf >= 0.82 ? "High" : conf >= 0.72 ? "Medium" : "Low";
+              const confColor = conf >= 0.82 ? "#2ed573" : conf >= 0.72 ? "#ffa502" : "#cf6357";
+              const listPrice = Number(valuationForm.list_price) || 0;
+              const delta     = listPrice > 0 ? ((adjVal - listPrice) / listPrice) * 100 : null;
+              return (
+                <div style={{ marginTop: 24, border: "1px solid var(--border)", overflow: "hidden" }}>
+                  {/* Header */}
+                  <div style={{ padding: "20px 24px", borderBottom: "1px solid var(--border)", background: "var(--bg-elev)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div>
+                        <div style={{ fontFamily: "var(--mono)", fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--text-dim)", marginBottom: 6 }}>
+                          Estimated Value · {valuationCondition.charAt(0).toUpperCase() + valuationCondition.slice(1)} condition
+                        </div>
+                        <div style={{ fontFamily: "var(--mono)", fontSize: "2.6rem", fontWeight: 700, color: "var(--accent)", lineHeight: 1 }}>
+                          ${adjVal.toLocaleString("en-CA")}
+                        </div>
+                        <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", color: "var(--text-dim)", marginTop: 6 }}>
+                          Range: ${rangeLow.toLocaleString("en-CA")} – ${rangeHigh.toLocaleString("en-CA")}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+                        {/* Confidence badge */}
+                        <span style={{ border: `1px solid ${confColor}`, padding: "4px 10px", fontFamily: "var(--mono)", fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: "0.12em", color: confColor }}>
+                          {confLabel} confidence · {Math.round(conf * 100)}%
+                        </span>
+                        {/* Vs list price */}
+                        {delta != null && (
+                          <span style={{ border: "1px solid var(--border)", padding: "4px 10px", fontFamily: "var(--mono)", fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: "0.12em", color: delta > 3 ? "#2ed573" : delta < -3 ? "#cf6357" : "var(--text-mute)" }}>
+                            {delta > 0 ? "↑" : "↓"} {Math.abs(delta).toFixed(1)}% vs list
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                )}
-                <div style={{ fontFamily: "var(--mono)", fontSize: "0.75rem", color: "var(--text-mute)", marginTop: 8 }}>
-                  {valuationResult.market_analysis}
+                  {/* Details row */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)" }}>
+                    {[
+                      { label: "$/sqft", value: valuationResult.price_per_sqft ? `$${Math.round(valuationResult.price_per_sqft * condMult).toLocaleString()}` : "—" },
+                      { label: "Condition adj.", value: condMult !== 1 ? `${condMult > 1 ? "+" : ""}${Math.round((condMult - 1) * 100)}%` : "None (Good)" },
+                      { label: "Analysis", value: valuationResult.market_analysis.slice(0, 28) + "…" },
+                    ].map(({ label, value }, i) => (
+                      <div key={label} style={{ padding: "14px 20px", borderRight: i < 2 ? "1px solid var(--border)" : "none" }}>
+                        <div style={{ fontFamily: "var(--mono)", fontSize: "0.54rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)", marginBottom: 4 }}>{label}</div>
+                        <div style={{ fontFamily: "var(--mono)", fontSize: "0.8rem", color: "var(--text)" }}>{value}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Full analysis */}
+                  <div style={{ padding: "14px 20px", borderTop: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.68rem", color: "var(--text-mute)", lineHeight: 1.6 }}>
+                    {valuationResult.market_analysis}
+                  </div>
                 </div>
-                <div style={{ fontFamily: "var(--mono)", fontSize: "0.65rem", color: "var(--text-dim)", marginTop: 6 }}>
-                  Confidence: {Math.round(valuationResult.confidence * 100)}%
-                </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         )}
 
