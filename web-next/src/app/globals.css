@@ -132,8 +132,8 @@ select option { background: #ffffff; color: #0a0a08; }
   .hero-right     { display: none !important; }
   .how-grid       { grid-template-columns: 1fr 1fr !important; }
   .products-grid  { grid-template-columns: 1fr !important; }
-  .split-view     { grid-template-columns: 1fr !important; }
-  .map-col        { display: none !important; }
+  .split-view     { grid-template-columns: 1fr !important; grid-template-rows: 1fr 340px !important; }
+  .map-col        { display: block !important; height: 340px !important; }
   .alert-cta      { grid-template-columns: 1fr !important; }
   .why-grid       { grid-template-columns: 1fr 1fr !important; }
   .how-header     { grid-template-columns: 1fr !important; gap: 20px !important; }
@@ -168,9 +168,18 @@ select option { background: #ffffff; color: #0a0a08; }
   .dash-nav-tabs   { gap: 0 !important; }
   .dash-nav-tabs button { padding: 0 10px !important; font-size: 0.58rem !important; }
 
-  /* Dashboard list: full width when map hidden */
-  .split-view      { grid-template-columns: 1fr !important; }
-  .list-col        { max-height: 70vh !important; }
+  /* Dashboard: stacked list + map on phones */
+  .split-view      { grid-template-columns: 1fr !important; grid-template-rows: auto 260px !important; }
+  .list-col        { max-height: 55vh !important; }
+  .map-col         { height: 260px !important; }
+
+  /* Selected card: full width at map bottom on mobile */
+  .map-selected-card {
+    width: calc(100% - 24px) !important;
+    left: 12px !important;
+    right: 12px !important;
+    bottom: 12px !important;
+  }
 
   /* Footer */
   .footer-bar      { flex-direction: column !important; gap: 10px !important;
