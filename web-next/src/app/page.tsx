@@ -139,6 +139,8 @@ function TopNav({ active }: { active?: string }) {
           ["/#how-it-works", "How It Works"],
           ["/video", "Videos"],
           ["/tours", "Virtual Tours"],
+          ["/stats", "Stats"],
+          ["/reno", "Reno ROI"],
         ].map(([href, label]) => (
           <li key={href}>
             <Link href={href} style={{ textDecoration: "none", color: active === label ? "var(--accent)" : "var(--text-mute)", transition: "color 0.2s" }}>
