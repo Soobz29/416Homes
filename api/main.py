@@ -566,10 +566,30 @@ async def get_listings(
     try:
         # Treat GTA / empty as no city filter (All GTA).
         city_filter = None if (not city or city.lower() == "gta") else city.strip()
-        # When dashboard selects "Toronto", include boroughs stored as separate cities.
-        TORONTO_BOROUGHS = ("Toronto", "Downtown", "North York", "Scarborough", "Etobicoke")
-        if city_filter and city_filter.lower() == "toronto":
-            cities_filter: Optional[List[str]] = list(TORONTO_BOROUGHS)
+
+        # Map UI city names → DB variants (handles boroughs + scrapers that store region names).
+        CITY_ALIASES: dict[str, list[str]] = {
+            "toronto":       ["Toronto", "Downtown", "North York", "Scarborough", "Etobicoke"],
+            "downtown":      ["Downtown", "Toronto"],
+            "north york":    ["North York", "Toronto"],
+            "scarborough":   ["Scarborough", "Toronto"],
+            "etobicoke":     ["Etobicoke", "Toronto"],
+            "mississauga":   ["Mississauga"],
+            "brampton":      ["Brampton"],
+            "vaughan":       ["Vaughan"],
+            "markham":       ["Markham"],
+            "richmond hill": ["Richmond Hill"],
+            "oakville":      ["Oakville"],
+            "burlington":    ["Burlington"],
+            "ajax":          ["Ajax", "Ajax & Pickering"],
+            "pickering":     ["Pickering", "Ajax & Pickering"],
+            "whitby":        ["Whitby"],
+            "oshawa":        ["Oshawa"],
+            "milton":        ["Milton"],
+            "hamilton":      ["Hamilton"],
+        }
+        if city_filter:
+            cities_filter: Optional[List[str]] = CITY_ALIASES.get(city_filter.lower(), [city_filter])
         else:
             cities_filter = None
 

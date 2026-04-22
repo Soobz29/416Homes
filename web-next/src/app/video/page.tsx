@@ -130,7 +130,10 @@ function ProgressPanel({
 }
 
 /* ── Main page ──────────────────────────────────────────────────────── */
+const VIDEO_NAV: [string, string][] = [["/dashboard","Listings"],["/#how-it-works","How It Works"],["/tours","Virtual Tours"],["/stats","Stats"],["/reno","Reno ROI"]];
+
 export default function VideoPage() {
+  const [menuOpen, setMenuOpen] = useState(false);
   const [tier, setTier] = useState<Tier>("cinematic");
   const [orderFormVisible, setOrderFormVisible] = useState(true);
   const [progressVisible, setProgressVisible] = useState(false);
@@ -283,14 +286,29 @@ export default function VideoPage() {
           </div>
         </Link>
         <ul className="nav-links" style={{ display: "flex", listStyle: "none", gap: 36, margin: 0, padding: 0, ...mono, fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)" }}>
-          <li><Link href="/dashboard" style={{ color: "inherit", textDecoration: "none" }}>Listings</Link></li>
-          <li><Link href="/#how-it-works" style={{ color: "inherit", textDecoration: "none" }}>How It Works</Link></li>
+          {VIDEO_NAV.map(([href, label]) => (
+            <li key={href}><Link href={href} style={{ color: "inherit", textDecoration: "none" }}>{label}</Link></li>
+          ))}
           <li><span style={{ color: "var(--accent)", borderBottom: "1px solid var(--accent)", paddingBottom: 2 }}>Videos</span></li>
-          <li><Link href="/tours" style={{ color: "inherit", textDecoration: "none" }}>Virtual Tours</Link></li>
         </ul>
-        <Link href="/#alert" className="btn-primary nav-cta" style={{ fontSize: "0.72rem", padding: "10px 20px" }}>
-          Set My Alert
-        </Link>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button className="hamburger-btn" onClick={() => setMenuOpen(!menuOpen)}
+            style={{ background: "transparent", border: "none", color: "var(--text)", fontSize: "1.4rem", cursor: "pointer", padding: "4px 8px", lineHeight: 1 }}>
+            {menuOpen ? "✕" : "☰"}
+          </button>
+          <Link href="/#alert" className="btn-primary nav-cta" style={{ fontSize: "0.72rem", padding: "10px 20px" }}>
+            Set My Alert
+          </Link>
+        </div>
+        {menuOpen && (
+          <div style={{ position: "fixed", top: 64, left: 0, right: 0, background: "rgba(5,6,10,0.98)", backdropFilter: "blur(20px)", borderBottom: "1px solid var(--border)", padding: "8px 24px 20px", zIndex: 999 }}>
+            {[...VIDEO_NAV, ["/video","Videos (current)"], ["/#alert","Set My Alert"]].map(([href, label]) => (
+              <Link key={href} href={href} onClick={() => setMenuOpen(false)} style={{ display: "block", padding: "14px 0", borderBottom: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--text-mute)", textDecoration: "none" }}>
+                {label}
+              </Link>
+            ))}
+          </div>
+        )}
       </nav>
 
       {/* ── Hero ─────────────────────────────────────────────────────── */}

@@ -134,6 +134,7 @@ export default function ToursPage() {
   const [paid, setPaid] = useState(false);
   const [progress, setProgress] = useState(0);
   const [tourId] = useState(() => Math.floor(Math.random() * 9000 + 1000));
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!paid) return;
@@ -157,22 +158,40 @@ export default function ToursPage() {
       <nav style={{
         position: "sticky", top: 0, zIndex: 40,
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "20px 56px",
+        padding: "0 56px", height: 64,
         background: "color-mix(in srgb, var(--bg) 82%, transparent)",
         backdropFilter: "blur(20px)",
         borderBottom: "1px solid var(--border)",
       }}>
         <Link href="/" style={{ textDecoration: "none" }}><Logo sub="GTA" /></Link>
-        <ul style={{ display: "flex", listStyle: "none", gap: 36, margin: 0, padding: 0, fontFamily: "var(--mono)", fontSize: "0.68rem", letterSpacing: "0.14em", textTransform: "uppercase" }}>
-          {[["dashboard", "Listings"], ["/video", "Videos"], ["/tours", "Virtual Tours"]].map(([href, label]) => (
+        <ul className="nav-links" style={{ display: "flex", listStyle: "none", gap: 36, margin: 0, padding: 0, fontFamily: "var(--mono)", fontSize: "0.68rem", letterSpacing: "0.14em", textTransform: "uppercase" }}>
+          {[["/dashboard", "Listings"], ["/video", "Videos"], ["/tours", "Virtual Tours"]].map(([href, label]) => (
             <li key={href}>
               <Link href={href} style={{ textDecoration: "none", color: label === "Virtual Tours" ? "var(--accent)" : "var(--text-mute)" }}>{label}</Link>
             </li>
           ))}
         </ul>
-        <Link href="/#alert" style={{ display: "inline-block", padding: "10px 18px", background: "var(--accent)", color: "var(--bg)", fontFamily: "var(--mono)", fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", textDecoration: "none" }}>
-          Set My Alert
-        </Link>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            className="hamburger-btn"
+            onClick={() => setMenuOpen(!menuOpen)}
+            style={{ background: "transparent", border: "none", color: "var(--text)", fontSize: "1.4rem", cursor: "pointer", padding: "4px 8px", lineHeight: 1 }}
+          >
+            {menuOpen ? "✕" : "☰"}
+          </button>
+          <Link href="/#alert" style={{ display: "inline-block", padding: "10px 18px", background: "var(--accent)", color: "var(--bg)", fontFamily: "var(--mono)", fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", textDecoration: "none" }}>
+            Set My Alert
+          </Link>
+        </div>
+        {menuOpen && (
+          <div style={{ position: "fixed", top: 64, left: 0, right: 0, background: "rgba(5,6,10,0.98)", backdropFilter: "blur(20px)", borderBottom: "1px solid var(--border)", padding: "8px 24px 20px", zIndex: 999 }}>
+            {[["/dashboard", "Listings"], ["/video", "Videos"], ["/tours", "Virtual Tours"], ["/#alert", "Set My Alert"]].map(([href, label]) => (
+              <Link key={href} href={href} onClick={() => setMenuOpen(false)} style={{ display: "block", padding: "14px 0", borderBottom: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--text-mute)", textDecoration: "none" }}>
+                {label}
+              </Link>
+            ))}
+          </div>
+        )}
       </nav>
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 56px" }}>

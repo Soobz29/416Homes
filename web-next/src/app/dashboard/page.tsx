@@ -12,6 +12,66 @@ import { DropdownSelect } from "@/components/DropdownSelect";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { ListingCard, ListingCardSkeleton, ListRow } from "@/components/listing-card";
 
+/* ── Reno ROI data (dashboard tab) ─────────────────────────────────── */
+const DASH_RENO_TYPES = [
+  { id: "kitchen_full",   label: "Kitchen — Full Renovation",  roi: 0.90, roiRange: "85–95%",   timeMonths: 18, risk: "Low",      typical: "$40K–$80K" },
+  { id: "kitchen_minor",  label: "Kitchen — Minor Refresh",     roi: 1.05, roiRange: "95–115%",  timeMonths: 6,  risk: "Low",      typical: "$10K–$25K" },
+  { id: "bathroom_prim",  label: "Primary Bathroom",            roi: 0.75, roiRange: "70–82%",   timeMonths: 14, risk: "Medium",   typical: "$20K–$45K" },
+  { id: "bathroom_add",   label: "Add a Bathroom",              roi: 0.70, roiRange: "65–78%",   timeMonths: 24, risk: "Medium",   typical: "$15K–$35K" },
+  { id: "basement",       label: "Basement — Finish & Suite",   roi: 0.65, roiRange: "60–72%",   timeMonths: 30, risk: "Medium",   typical: "$50K–$100K" },
+  { id: "paint_cosmetic", label: "Paint + Cosmetic Updates",    roi: 1.25, roiRange: "100–150%", timeMonths: 4,  risk: "Very Low", typical: "$5K–$15K" },
+  { id: "windows",        label: "New Windows & Doors",         roi: 0.67, roiRange: "60–75%",   timeMonths: 24, risk: "Low",      typical: "$15K–$40K" },
+  { id: "deck_outdoor",   label: "Deck / Outdoor Living",       roi: 0.62, roiRange: "55–70%",   timeMonths: 18, risk: "Low",      typical: "$20K–$60K" },
+  { id: "addition",       label: "Room Addition / Extension",   roi: 0.60, roiRange: "50–70%",   timeMonths: 48, risk: "High",     typical: "$80K–$200K" },
+];
+const DASH_RISK_COLORS: Record<string, string> = {
+  "Very Low": "#2ed573", "Low": "#7bed9f", "Medium": "#ffa502", "High": "#cf6357",
+};
+
+/* ── Virtual tour dollhouse (dashboard tab) ──────────────────────────── */
+const DASH_DEMO_PHOTOS = [
+  "https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=800&q=80",
+  "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&q=80",
+  "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=800&q=80",
+  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80",
+];
+type DashRoomKey = "living" | "kitchen" | "bedroom" | "bath";
+const DASH_ROOM_MAP: Record<DashRoomKey, { name: string; photo: string }> = {
+  living:  { name: "Living Room",     photo: DASH_DEMO_PHOTOS[0] },
+  kitchen: { name: "Kitchen",         photo: DASH_DEMO_PHOTOS[1] },
+  bedroom: { name: "Primary Bedroom", photo: DASH_DEMO_PHOTOS[2] },
+  bath:    { name: "Bathroom",        photo: DASH_DEMO_PHOTOS[3] },
+};
+function DashDollhouse({ selected, onSelect }: { selected: DashRoomKey; onSelect: (r: DashRoomKey) => void }) {
+  return (
+    <svg viewBox="0 0 800 500" style={{ width: "100%", height: "100%", display: "block" }}>
+      <polygon points="100,350 400,200 700,350 400,500" fill="#1A1A18" stroke="rgba(255,191,0,0.2)" strokeWidth="1" />
+      <g onClick={() => onSelect("living")} style={{ cursor: "pointer" }} opacity={selected === "living" ? 1 : 0.65}>
+        <polygon points="100,350 250,275 250,150 100,225" fill="#0F1218" stroke={selected === "living" ? "var(--accent)" : "rgba(255,191,0,0.25)"} strokeWidth={selected === "living" ? 2 : 1} />
+        <text x="175" y="265" fill={selected === "living" ? "var(--accent)" : "#666"} fontSize="10" fontFamily="'JetBrains Mono',monospace" textAnchor="middle" letterSpacing="1">LIVING</text>
+        {selected === "living" && <circle cx="175" cy="240" r="18" fill="none" stroke="var(--accent)" strokeWidth="1.5" opacity="0.6" />}
+      </g>
+      <g onClick={() => onSelect("kitchen")} style={{ cursor: "pointer" }} opacity={selected === "kitchen" ? 1 : 0.65}>
+        <polygon points="250,275 400,200 400,100 250,175" fill="#0F1218" stroke={selected === "kitchen" ? "var(--accent)" : "rgba(255,191,0,0.25)"} strokeWidth={selected === "kitchen" ? 2 : 1} />
+        <text x="325" y="222" fill={selected === "kitchen" ? "var(--accent)" : "#666"} fontSize="10" fontFamily="'JetBrains Mono',monospace" textAnchor="middle" letterSpacing="1">KITCHEN</text>
+        {selected === "kitchen" && <circle cx="325" cy="200" r="18" fill="none" stroke="var(--accent)" strokeWidth="1.5" opacity="0.6" />}
+      </g>
+      <g onClick={() => onSelect("bedroom")} style={{ cursor: "pointer" }} opacity={selected === "bedroom" ? 1 : 0.65}>
+        <polygon points="400,200 550,275 550,150 400,100" fill="#0F1218" stroke={selected === "bedroom" ? "var(--accent)" : "rgba(255,191,0,0.25)"} strokeWidth={selected === "bedroom" ? 2 : 1} />
+        <text x="475" y="222" fill={selected === "bedroom" ? "var(--accent)" : "#666"} fontSize="10" fontFamily="'JetBrains Mono',monospace" textAnchor="middle" letterSpacing="1">BEDROOM</text>
+        {selected === "bedroom" && <circle cx="475" cy="200" r="18" fill="none" stroke="var(--accent)" strokeWidth="1.5" opacity="0.6" />}
+      </g>
+      <g onClick={() => onSelect("bath")} style={{ cursor: "pointer" }} opacity={selected === "bath" ? 1 : 0.65}>
+        <polygon points="550,275 700,350 700,225 550,150" fill="#0F1218" stroke={selected === "bath" ? "var(--accent)" : "rgba(255,191,0,0.25)"} strokeWidth={selected === "bath" ? 2 : 1} />
+        <text x="625" y="262" fill={selected === "bath" ? "var(--accent)" : "#666"} fontSize="10" fontFamily="'JetBrains Mono',monospace" textAnchor="middle" letterSpacing="1">BATH</text>
+        {selected === "bath" && <circle cx="625" cy="240" r="18" fill="none" stroke="var(--accent)" strokeWidth="1.5" opacity="0.6" />}
+      </g>
+      <line x1="400" y1="100" x2="400" y2="500" stroke="rgba(255,255,255,0.04)" strokeWidth="1" strokeDasharray="4 4" />
+      <line x1="250" y1="150" x2="550" y2="150" stroke="rgba(255,255,255,0.04)" strokeWidth="1" strokeDasharray="4 4" />
+    </svg>
+  );
+}
+
 const CITIES = [
   { value: "GTA", label: "All GTA" },
   { value: "Toronto", label: "Toronto" },
@@ -114,7 +174,18 @@ export default function DashboardPage() {
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
   const [emailInput, setEmailInput] = useState("");
   const [authMessage, setAuthMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"listings" | "valuation" | "videos">("listings");
+  const [activeTab, setActiveTab] = useState<"listings" | "valuation" | "videos" | "reno" | "tour">("listings");
+  /* ── Reno tab state ── */
+  const [renoSelectedId, setRenoSelectedId] = useState("kitchen_full");
+  const [renoHomeValue, setRenoHomeValue] = useState("");
+  const [renoBudget, setRenoBudget] = useState("");
+  const [renoResult, setRenoResult] = useState<null | { roiPct: number; addedValue: number; newValue: number; roiDollars: number; risk: string; roiRange: string; timeMonths: number; typical: string }>(null);
+  /* ── Tour tab state ── */
+  const [tourRoom, setTourRoom] = useState<DashRoomKey>("living");
+  const [tourUrl, setTourUrl] = useState("");
+  const [tourEmail, setTourEmail] = useState("");
+  const [tourPaid, setTourPaid] = useState(false);
+  const [tourProgress, setTourProgress] = useState(0);
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
@@ -190,6 +261,15 @@ export default function DashboardPage() {
   useEffect(() => {
     if (activeTab === "listings") void loadListings();
   }, [activeTab, filters, listingsPage]);
+
+  useEffect(() => {
+    if (!tourPaid) return;
+    const t = setInterval(() => setTourProgress(p => {
+      if (p >= 100) { clearInterval(t); return 100; }
+      return p + 5;
+    }), 200);
+    return () => clearInterval(t);
+  }, [tourPaid]);
 
   async function triggerScan() {
     setScanLoading(true);
@@ -390,11 +470,13 @@ export default function DashboardPage() {
         </div>
 
         {/* Tab buttons — mid nav */}
-        <div className="dash-nav-tabs" style={{ display: "flex", gap: 0 }}>
+        <div className="dash-nav-tabs" style={{ display: "flex", gap: 0, overflowX: "auto", WebkitOverflowScrolling: "touch" as any }}>
           {[
             ["listings", "Listings"],
             ["valuation", "Valuation"],
             ["videos", "Videos"],
+            ["reno", "Reno ROI"],
+            ["tour", "Virtual Tour"],
           ].map(([id, label]) => (
             <button
               key={id}
@@ -963,8 +1045,189 @@ export default function DashboardPage() {
               and add music — your polished 30-second video is ready in under 15 minutes.
             </p>
             <Link href="/video" className="btn-primary" style={{ textDecoration: "none", display: "inline-block" }}>
-              Order a Video — $199
+              Order a Video — from $99
             </Link>
+          </div>
+        )}
+        {/* ── RENO ROI TAB ───────────────────────────────────────── */}
+        {activeTab === "reno" && (
+          <div style={{ maxWidth: 960, margin: "0 auto", padding: "48px 40px" }}>
+            <div style={{ fontFamily: "var(--serif)", fontSize: "clamp(1.4rem,2vw,2.2rem)", fontWeight: 500, marginBottom: 8 }}>Renovation ROI Calculator</div>
+            <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", color: "var(--text-dim)", marginBottom: 32 }}>GTA market averages · select a renovation type, enter your numbers</div>
+
+            {/* Reno type grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 8, marginBottom: 28 }}>
+              {DASH_RENO_TYPES.map(rt => (
+                <button key={rt.id} onClick={() => setRenoSelectedId(rt.id)} style={{
+                  padding: "12px 14px", textAlign: "left", cursor: "pointer",
+                  background: renoSelectedId === rt.id ? "rgba(255,191,0,0.08)" : "transparent",
+                  border: `1px solid ${renoSelectedId === rt.id ? "var(--accent)" : "var(--border)"}`,
+                  color: renoSelectedId === rt.id ? "var(--accent)" : "var(--text)",
+                  fontFamily: "var(--mono)", fontSize: "0.68rem", transition: "all 0.15s",
+                }}>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>{rt.label}</div>
+                  <div style={{ fontSize: "0.58rem", color: "var(--text-dim)" }}>ROI: {rt.roiRange} · {rt.typical}</div>
+                </button>
+              ))}
+            </div>
+
+            {/* Inputs */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+              {[
+                { label: "Current home value ($)", val: renoHomeValue, set: setRenoHomeValue, placeholder: "850000" },
+                { label: "Renovation budget ($)", val: renoBudget, set: setRenoBudget, placeholder: "40000" },
+              ].map(({ label, val, set, placeholder }) => (
+                <div key={label}>
+                  <label style={{ display: "block", fontFamily: "var(--mono)", fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)", marginBottom: 6 }}>{label}</label>
+                  <input type="number" placeholder={placeholder} value={val} onChange={e => set(e.target.value)}
+                    style={{ width: "100%", border: "1px solid var(--border)", background: "transparent", padding: "9px 12px", fontFamily: "var(--mono)", fontSize: "0.8rem", color: "var(--text)", outline: "none" }} />
+                </div>
+              ))}
+            </div>
+
+            <button
+              className="btn-primary"
+              style={{ marginBottom: 28 }}
+              onClick={() => {
+                const hv = Number(renoHomeValue.replace(/,/g, ""));
+                const b  = Number(renoBudget.replace(/,/g, ""));
+                if (!hv || !b) return;
+                const rt = DASH_RENO_TYPES.find(r => r.id === renoSelectedId)!;
+                const addedValue = Math.round(b * rt.roi);
+                const roiDollars = addedValue - b;
+                const roiPct     = ((addedValue - b) / b) * 100;
+                setRenoResult({ roiPct, addedValue, newValue: hv + addedValue, roiDollars, risk: rt.risk, roiRange: rt.roiRange, timeMonths: rt.timeMonths, typical: rt.typical });
+              }}
+            >
+              Calculate ROI
+            </button>
+
+            {renoResult && (
+              <div style={{ border: "1px solid var(--border-strong)", background: "var(--bg-elev)", overflow: "hidden" }}>
+                <div style={{ padding: "20px 28px", borderBottom: "1px solid var(--border)", background: "rgba(255,191,0,0.04)" }}>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--text-dim)", marginBottom: 6 }}>
+                    ROI Analysis · {DASH_RENO_TYPES.find(r => r.id === renoSelectedId)?.label}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+                    <span style={{ fontFamily: "var(--mono)", fontSize: "2.8rem", fontWeight: 700, color: renoResult.roiDollars >= 0 ? "var(--accent)" : "#cf6357", lineHeight: 1 }}>
+                      {renoResult.roiPct >= 0 ? "+" : ""}{renoResult.roiPct.toFixed(1)}%
+                    </span>
+                    <span style={{ fontFamily: "var(--mono)", fontSize: "0.72rem", color: "var(--text-mute)" }}>return on renovation spend</span>
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
+                  {[
+                    { label: "Renovation Budget",   value: `$${Number(renoBudget).toLocaleString()}`,            color: "var(--text)" },
+                    { label: "Value Added",          value: `$${renoResult.addedValue.toLocaleString()}`,          color: renoResult.roiDollars >= 0 ? "#2ed573" : "#cf6357" },
+                    { label: "Current Home Value",   value: `$${Number(renoHomeValue).toLocaleString()}`,          color: "var(--text)" },
+                    { label: "Est. Post-Reno Value", value: `$${renoResult.newValue.toLocaleString()}`,            color: "var(--accent)" },
+                    { label: "Net Gain / Loss",      value: `${renoResult.roiDollars >= 0 ? "+" : ""}$${renoResult.roiDollars.toLocaleString()}`, color: renoResult.roiDollars >= 0 ? "#2ed573" : "#cf6357" },
+                    { label: "GTA ROI Range",        value: renoResult.roiRange,                                   color: "var(--text-mute)" },
+                  ].map(({ label, value, color }, i) => (
+                    <div key={label} style={{ padding: "16px 24px", borderBottom: i < 4 ? "1px solid var(--border)" : "none", borderRight: i % 2 === 0 ? "1px solid var(--border)" : "none" }}>
+                      <div style={{ fontFamily: "var(--mono)", fontSize: "0.54rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)", marginBottom: 4 }}>{label}</div>
+                      <div style={{ fontFamily: "var(--mono)", fontSize: "1rem", fontWeight: 600, color }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ padding: "14px 28px", borderTop: "1px solid var(--border)", display: "flex", gap: 24, flexWrap: "wrap" }}>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", color: DASH_RISK_COLORS[renoResult.risk] ?? "var(--text)" }}>Risk: {renoResult.risk}</span>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", color: "var(--text-mute)" }}>Typical: {renoResult.typical}</span>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", color: "var(--text-mute)" }}>Timeline: ~{renoResult.timeMonths} months</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── VIRTUAL TOUR TAB ────────────────────────────────────── */}
+        {activeTab === "tour" && (
+          <div style={{ maxWidth: 1000, margin: "0 auto", padding: "48px 40px" }}>
+            <div style={{ fontFamily: "var(--serif)", fontSize: "clamp(1.4rem,2vw,2.2rem)", fontWeight: 500, marginBottom: 8 }}>Virtual Tour</div>
+            <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", color: "var(--text-dim)", marginBottom: 32 }}>Gemini Vision · listing photos → hosted room-by-room tour in 5 minutes</div>
+
+            {/* 3D Dollhouse demo */}
+            <div style={{ marginBottom: 40, border: "1px solid var(--border-strong)", overflow: "hidden", background: "var(--bg-elev)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 260px", gap: 0 }}>
+                <div style={{ position: "relative", aspectRatio: "16/10", background: "#000", overflow: "hidden" }}>
+                  <DashDollhouse selected={tourRoom} onSelect={setTourRoom} />
+                  <div style={{ position: "absolute", top: 16, left: 16, background: "rgba(5,6,10,0.88)", padding: "10px 14px", border: "1px solid var(--border)" }}>
+                    <div style={{ fontFamily: "var(--mono)", fontSize: "0.56rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)" }}>3D Dollhouse Demo</div>
+                    <div style={{ fontFamily: "var(--mono)", fontSize: "0.95rem", fontWeight: 600, color: "#fff", marginTop: 4 }}>{DASH_ROOM_MAP[tourRoom].name}</div>
+                  </div>
+                  <div style={{ position: "absolute", bottom: 12, left: 12, background: "rgba(5,6,10,0.88)", padding: "7px 12px", border: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.64rem", color: "#fff" }}>
+                    <span style={{ color: "var(--accent)" }}>◆</span> 88 Niagara St, Unit 412 — King West
+                  </div>
+                </div>
+                <div style={{ padding: 24, borderLeft: "1px solid var(--border)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                  <div>
+                    <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 12 }}>Interactive demo</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {(Object.entries(DASH_ROOM_MAP) as [DashRoomKey, { name: string }][]).map(([k, v]) => (
+                        <button key={k} onClick={() => setTourRoom(k)} style={{
+                          padding: "9px 10px", textAlign: "left",
+                          background: tourRoom === k ? "var(--bg-panel)" : "transparent",
+                          border: `1px solid ${tourRoom === k ? "var(--accent)" : "var(--border)"}`,
+                          color: tourRoom === k ? "var(--accent)" : "var(--text)",
+                          fontFamily: "var(--mono)", fontSize: "0.66rem", cursor: "pointer",
+                          display: "flex", alignItems: "center", gap: 8,
+                        }}>
+                          <span style={{ opacity: tourRoom === k ? 1 : 0.4 }}>{tourRoom === k ? "●" : "○"}</span>
+                          {v.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ paddingTop: 14, borderTop: "1px solid var(--border)", marginTop: 12, fontFamily: "var(--mono)", fontSize: "0.56rem", color: "var(--text-dim)", lineHeight: 1.5 }}>
+                    Click any room in the dollhouse to navigate.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Order form */}
+            <div style={{ maxWidth: 480, border: "1px solid var(--border-strong)", padding: 32, background: "var(--bg-elev)" }}>
+              {!tourPaid ? (
+                <>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: "1.2rem", fontWeight: 700, marginBottom: 20 }}>Order a Virtual Tour — $49</div>
+                  {[
+                    { label: "Listing URL", val: tourUrl, set: setTourUrl, placeholder: "https://www.realtor.ca/..." },
+                    { label: "Delivery email", val: tourEmail, set: setTourEmail, placeholder: "you@example.com" },
+                  ].map(({ label, val, set, placeholder }) => (
+                    <div key={label} style={{ marginBottom: 16 }}>
+                      <label style={{ display: "block", fontFamily: "var(--mono)", fontSize: "0.56rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-mute)", marginBottom: 6 }}>{label}</label>
+                      <input value={val} onChange={e => set(e.target.value)} placeholder={placeholder}
+                        style={{ width: "100%", padding: "11px 13px", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", fontFamily: "var(--mono)", fontSize: "0.82rem", outline: "none" }} />
+                    </div>
+                  ))}
+                  <button
+                    className="btn-primary"
+                    style={{ width: "100%", marginTop: 8 }}
+                    onClick={() => { if (tourUrl && tourEmail) { setTourPaid(true); setTourProgress(0); } }}
+                  >
+                    Pay &amp; Generate Tour →
+                  </button>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", color: "var(--text-dim)", textAlign: "center", marginTop: 10 }}>Secure checkout via Stripe</div>
+                </>
+              ) : (
+                <>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--accent)", marginBottom: 10 }}>{tourProgress < 100 ? "◈ Generating" : "◆ Ready"}</div>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: "1.3rem", fontWeight: 700, marginBottom: 16 }}>{tourProgress < 100 ? "Building your tour…" : "Tour is live."}</div>
+                  <div style={{ width: "100%", height: 6, background: "var(--bg)", overflow: "hidden", marginBottom: 12 }}>
+                    <div style={{ width: `${tourProgress}%`, height: "100%", background: "var(--accent)", transition: "width 0.2s" }} />
+                  </div>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: "0.7rem", color: "var(--text-mute)" }}>
+                    {tourProgress < 30 ? "Fetching listing photos…" : tourProgress < 60 ? "Classifying rooms with Gemini Vision…" : tourProgress < 100 ? "Assembling hosted manifest…" : "Tour live at 416homes.ca/tours/demo"}
+                  </div>
+                  {tourProgress >= 100 && (
+                    <button onClick={() => { setTourPaid(false); setTourProgress(0); setTourUrl(""); setTourEmail(""); }}
+                      style={{ marginTop: 20, padding: "9px 18px", background: "transparent", border: "1px solid var(--border-strong)", color: "var(--accent)", fontFamily: "var(--mono)", fontSize: "0.66rem", letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer" }}>
+                      Order another →
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         )}
       </main>
