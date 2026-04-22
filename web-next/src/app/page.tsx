@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { fetchListings } from "@/lib/api";
 
 /* ─── Shared primitives ─────────────────────────────────────────────── */
 
@@ -122,7 +123,17 @@ function fmtPriceFull(n: number) {
 
 /* ─── Nav ───────────────────────────────────────────────────────────── */
 
+const TOP_NAV_LINKS: [string, string][] = [
+  ["/dashboard", "Listings"],
+  ["/#how-it-works", "How It Works"],
+  ["/video", "Videos"],
+  ["/tours", "Virtual Tours"],
+  ["/stats", "Stats"],
+  ["/reno", "Reno ROI"],
+];
+
 function TopNav({ active }: { active?: string }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   return (
     <nav className="nav-bar" style={{
       position: "sticky", top: 0, zIndex: 40,
@@ -134,12 +145,7 @@ function TopNav({ active }: { active?: string }) {
     }}>
       <Link href="/" style={{ textDecoration: "none" }}><Logo sub="GTA" /></Link>
       <ul className="nav-links" style={{ display: "flex", listStyle: "none", gap: 36, margin: 0, padding: 0, fontFamily: "var(--mono)", fontSize: "0.68rem", letterSpacing: "0.14em", textTransform: "uppercase" }}>
-        {[
-          ["/dashboard", "Listings"],
-          ["/#how-it-works", "How It Works"],
-          ["/video", "Videos"],
-          ["/tours", "Virtual Tours"],
-        ].map(([href, label]) => (
+        {TOP_NAV_LINKS.map(([href, label]) => (
           <li key={href}>
             <Link href={href} style={{ textDecoration: "none", color: active === label ? "var(--accent)" : "var(--text-mute)", transition: "color 0.2s" }}>
               {label}
@@ -147,7 +153,25 @@ function TopNav({ active }: { active?: string }) {
           </li>
         ))}
       </ul>
-      <PrimaryBtn href="/#alert" small>Set My Alert</PrimaryBtn>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button
+          className="hamburger-btn"
+          onClick={() => setMenuOpen(!menuOpen)}
+          style={{ background: "transparent", border: "none", color: "var(--text)", fontSize: "1.4rem", cursor: "pointer", padding: "4px 8px", lineHeight: 1 }}
+        >
+          {menuOpen ? "✕" : "☰"}
+        </button>
+        <PrimaryBtn href="/#alert" small>Set My Alert</PrimaryBtn>
+      </div>
+      {menuOpen && (
+        <div style={{ position: "fixed", top: 64, left: 0, right: 0, background: "rgba(5,6,10,0.98)", backdropFilter: "blur(20px)", borderBottom: "1px solid var(--border)", padding: "8px 24px 20px", zIndex: 999 }}>
+          {[...TOP_NAV_LINKS, ["/#alert", "Set My Alert"]].map(([href, label]) => (
+            <Link key={href} href={href} onClick={() => setMenuOpen(false)} style={{ display: "block", padding: "14px 0", borderBottom: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--text-mute)", textDecoration: "none" }}>
+              {label}
+            </Link>
+          ))}
+        </div>
+      )}
     </nav>
   );
 }
@@ -174,7 +198,11 @@ function FooterBar() {
 
 function AlertForm() {
   const [email, setEmail] = useState("");
-  const [cities, setCities] = useState({ Toronto: true, Mississauga: true });
+  const [cities, setCities] = useState({
+    Toronto: true, Mississauga: true, Brampton: false, Vaughan: false,
+    Markham: false, "Richmond Hill": false, Oakville: false, Burlington: false,
+    Ajax: false, Pickering: false, Whitby: false, Oshawa: false,
+  });
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -219,14 +247,14 @@ function AlertForm() {
     <div id="alert" style={{ border: "1px solid var(--border)", padding: 40, background: "var(--bg-elev)" }}>
       <div style={{ fontFamily: "var(--mono)", fontSize: "1.3rem", fontWeight: 700, marginBottom: 8 }}>Create your alert</div>
       <p style={{ fontFamily: "var(--mono)", fontSize: "0.72rem", color: "var(--text-mute)", lineHeight: 1.6, marginBottom: 28 }}>
-        We&apos;ll watch Toronto and Mississauga every thirty minutes and send you matches every morning.
+        We&apos;ll watch the entire GTA every thirty minutes and send you matches every morning.
       </p>
 
       <FormField label="Email address">
         <input value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" style={inputStyle} />
       </FormField>
       <FormField label="Cities to monitor">
-        <div style={{ display: "flex", gap: 20, fontFamily: "var(--mono)", fontSize: "0.78rem", color: "var(--text)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "10px 20px", fontFamily: "var(--mono)", fontSize: "0.76rem", color: "var(--text)" }}>
           {(Object.keys(cities) as Array<keyof typeof cities>).map(c => (
             <label key={c} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
               <input type="checkbox" checked={cities[c]} onChange={e => setCities({ ...cities, [c]: e.target.checked })} style={{ accentColor: "var(--accent)" }} />
@@ -262,6 +290,26 @@ function AlertForm() {
 
 export default function HomePage() {
   const ticker = [...TICKER_ITEMS, ...TICKER_ITEMS];
+  const [featured, setFeatured] = useState(FEATURED);
+
+  useEffect(() => {
+    fetchListings({ limit: 20 }).then(({ listings }) => {
+      if (!listings || listings.length === 0) return;
+      const idx = Math.floor(Date.now() / 86_400_000) % listings.length;
+      const l = listings[idx];
+      setFeatured({
+        neighbourhood: l.neighbourhood || l.city || "GTA",
+        city: l.city || "Toronto",
+        source: l.source || "realtor.ca",
+        address: l.address || "Featured Listing",
+        price: l.price || 0,
+        beds: l.beds || 0,
+        baths: l.baths || 0,
+        sqft: l.sqft || 0,
+        photo: l.photos?.[0] || FEATURED.photo,
+      });
+    }).catch(() => { /* keep fallback */ });
+  }, []);
 
   return (
     <div style={{ minHeight: "100vh", color: "var(--text)", background: "var(--bg)" }}>
@@ -340,12 +388,12 @@ export default function HomePage() {
         <div className="hero-right" style={{ paddingLeft: 48, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ width: "100%", maxWidth: 460 }}>
             <div style={{ position: "relative", aspectRatio: "4/5", overflow: "hidden", border: "1px solid var(--border)" }}>
-              <img src={FEATURED.photo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+              <img src={featured.photo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
               <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.9) 100%)" }} />
               {/* Top badges */}
               <div style={{ position: "absolute", top: 16, left: 16, right: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", color: "var(--accent)", letterSpacing: "0.12em", textTransform: "uppercase" }}>
-                  Live · {FEATURED.source}
+                  Live · {featured.source}
                 </span>
                 <span style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", color: "var(--accent)", letterSpacing: "0.12em", textTransform: "uppercase" }}>
                   Featured
@@ -354,20 +402,20 @@ export default function HomePage() {
               {/* Bottom info */}
               <div style={{ position: "absolute", left: 20, right: 20, bottom: 22, color: "#fff" }}>
                 <div style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.16em", textTransform: "uppercase", opacity: 0.7 }}>
-                  {FEATURED.neighbourhood}, {FEATURED.city}
+                  {featured.neighbourhood}, {featured.city}
                 </div>
                 <div style={{ fontFamily: "var(--mono)", fontSize: "1.3rem", fontWeight: 500, margin: "4px 0 10px" }}>
-                  {FEATURED.address}
+                  {featured.address}
                 </div>
                 <div style={{ fontFamily: "var(--mono)", fontSize: "2.4rem", fontWeight: 700, lineHeight: 1, color: "var(--accent)" }}>
-                  {fmtPriceFull(FEATURED.price)}
+                  {fmtPriceFull(featured.price)}
                 </div>
                 <div style={{ display: "flex", gap: 14, marginTop: 12, fontFamily: "var(--mono)", fontSize: "0.7rem", letterSpacing: "0.05em" }}>
-                  <span>{FEATURED.beds} BD</span>
+                  <span>{featured.beds} BD</span>
                   <span style={{ opacity: 0.4 }}>·</span>
-                  <span>{FEATURED.baths} BA</span>
+                  <span>{featured.baths} BA</span>
                   <span style={{ opacity: 0.4 }}>·</span>
-                  <span>{FEATURED.sqft.toLocaleString()} SF</span>
+                  <span>{featured.sqft.toLocaleString()} SF</span>
                 </div>
               </div>
             </div>

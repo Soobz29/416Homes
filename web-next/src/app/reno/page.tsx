@@ -23,8 +23,11 @@ const RISK_COLORS: Record<string, string> = {
   "High":     "#cf6357",
 };
 
+const RENO_NAV: [string, string][] = [["/#listings","LISTINGS"],["/#how","HOW IT WORKS"],["/video","VIDEOS"],["/tours","TOURS"],["/stats","STATS"],["/reno","RENO ROI"]];
+
 /* ── Nav ────────────────────────────────────────────────────────────── */
 function NavBar() {
+  const [menuOpen, setMenuOpen] = useState(false);
   return (
     <nav className="nav-bar" style={{
       position: "sticky", top: 0, zIndex: 100,
@@ -41,7 +44,7 @@ function NavBar() {
         </div>
       </Link>
       <ul className="nav-links" style={{ display: "flex", gap: 32, listStyle: "none", margin: 0, padding: 0 }}>
-        {[["/#listings","LISTINGS"],["/#how","HOW IT WORKS"],["/stats","STATS"],["/reno","RENO ROI"]].map(([href,label]) => (
+        {RENO_NAV.map(([href,label]) => (
           <li key={href}>
             <Link href={href} style={{ fontFamily: "var(--mono)", fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.14em", color: href === "/reno" ? "var(--accent)" : "var(--text-mute)", textDecoration: "none" }}>
               {label}
@@ -49,13 +52,28 @@ function NavBar() {
           </li>
         ))}
       </ul>
-      <Link className="nav-cta" href="/dashboard" style={{
-        padding: "10px 20px", background: "var(--accent)", color: "var(--bg)",
-        fontFamily: "var(--mono)", fontSize: "0.68rem", fontWeight: 700,
-        textTransform: "uppercase", letterSpacing: "0.08em", textDecoration: "none",
-      }}>
-        Dashboard →
-      </Link>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button className="hamburger-btn" onClick={() => setMenuOpen(!menuOpen)}
+          style={{ background: "transparent", border: "none", color: "var(--text)", fontSize: "1.4rem", cursor: "pointer", padding: "4px 8px", lineHeight: 1 }}>
+          {menuOpen ? "✕" : "☰"}
+        </button>
+        <Link className="nav-cta" href="/dashboard" style={{
+          padding: "10px 20px", background: "var(--accent)", color: "var(--bg)",
+          fontFamily: "var(--mono)", fontSize: "0.68rem", fontWeight: 700,
+          textTransform: "uppercase", letterSpacing: "0.08em", textDecoration: "none",
+        }}>
+          Dashboard →
+        </Link>
+      </div>
+      {menuOpen && (
+        <div style={{ position: "fixed", top: 64, left: 0, right: 0, background: "rgba(5,6,10,0.98)", backdropFilter: "blur(20px)", borderBottom: "1px solid var(--border)", padding: "8px 24px 20px", zIndex: 999 }}>
+          {[...RENO_NAV, ["/dashboard", "DASHBOARD"]].map(([href, label]) => (
+            <Link key={href} href={href} onClick={() => setMenuOpen(false)} style={{ display: "block", padding: "14px 0", borderBottom: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--text-mute)", textDecoration: "none" }}>
+              {label}
+            </Link>
+          ))}
+        </div>
+      )}
     </nav>
   );
 }
