@@ -27,7 +27,7 @@ const jetbrains = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "416Homes — Toronto Real Estate Intelligence",
   description:
-    "AI-powered listing aggregation for Toronto & Mississauga. Stop chasing listings — let them chase you.",
+    "AI-powered listing aggregation for the Greater Toronto Area. Stop chasing listings — let them chase you.",
 };
 
 export default function RootLayout({

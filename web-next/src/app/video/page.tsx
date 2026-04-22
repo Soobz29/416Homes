@@ -153,7 +153,14 @@ export default function VideoPage() {
   const [revisionMessage, setRevisionMessage] = useState<string | null>(null);
   const [revisionSuccess, setRevisionSuccess] = useState(false);
   const [revisionVisible, setRevisionVisible] = useState(false);
-  const [demoPlaying, setDemoPlaying] = useState(true);
+  const [demoPlaying, setDemoPlaying] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (demoPlaying && videoRef.current) {
+      videoRef.current.play().catch(() => {/* browser may still block, that's ok */});
+    }
+  }, [demoPlaying]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const price = TIERS.find(t => t.id === tier)?.price ?? 249;
@@ -337,12 +344,11 @@ export default function VideoPage() {
           {/* Left: video */}
           <div className="demo-video-col" style={{ position: "relative", background: "#060606", overflow: "hidden", minHeight: 340 }}>
             <video
+              ref={videoRef}
               src="https://upwkbeyzmdfdkwoaayub.supabase.co/storage/v1/object/sign/416homevideo/5314533739356475027.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8zYTEyZTQyMC1mMGZiLTQ4YzEtYTQ1OC00NjRkZTQ0MTdkMTciLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiI0MTZob21ldmlkZW8vNTMxNDUzMzczOTM1NjQ3NTAyNy5tcDQiLCJpYXQiOjE3NzY3MDA5NzgsImV4cCI6MTgwODIzNjk3OH0.GipcwNQCMjJkRZyFJlhlLbyiciHFW0-k47odpXpdBKg"
-              autoPlay
-              muted
               loop
               playsInline
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: demoPlaying ? "block" : "none" }}
               onError={() => setDemoPlaying(false)}
             />
             {!demoPlaying && (
@@ -375,7 +381,7 @@ export default function VideoPage() {
               Sample Output
             </div>
             <h2 style={{ ...mono, fontSize: "1.35rem", fontWeight: 500, color: "var(--text)", lineHeight: 1.25, marginBottom: 16 }}>
-              Leslieville Semi —<br />Cinematic tier
+              2962 Brandon Gate Drive, Mississauga —<br />Cinematic tier
             </h2>
             <p style={{ ...mono, fontSize: "0.72rem", color: "var(--text-mute)", lineHeight: 1.75, marginBottom: 20 }}>
               Generated from 3 listing photos in 14 minutes. Script written by Gemini,
@@ -559,7 +565,7 @@ export default function VideoPage() {
           <span style={{ color: "var(--text)" }}> Homes</span>
         </div>
         <div style={{ ...mono, fontSize: "0.6rem", color: "var(--text-dim)" }}>
-          Covering Toronto & Mississauga · Built on real sold data
+          Covering the Greater Toronto Area · Built on real sold data
         </div>
         <div style={{ ...mono, fontSize: "0.6rem", color: "var(--text-dim)" }}>
           © 2026 416Homes · Early Access

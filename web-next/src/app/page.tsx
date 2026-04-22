@@ -188,7 +188,7 @@ function FooterBar() {
       fontFamily: "var(--mono)", fontSize: "0.62rem", color: "var(--text-mute)",
     }}>
       <Logo />
-      <span>Covering Toronto &amp; Mississauga · Built on real sold data</span>
+      <span>Covering the Greater Toronto Area · Built on real sold data</span>
       <span>© 2026 416Homes · Early Access</span>
     </footer>
   );
@@ -236,7 +236,7 @@ function AlertForm() {
           You&apos;re set.
         </div>
         <p style={{ fontFamily: "var(--mono)", fontSize: "0.78rem", lineHeight: 1.7, color: "var(--text-mute)" }}>
-          We&apos;re watching Toronto and Mississauga every thirty minutes.<br />
+          We&apos;re watching the GTA every thirty minutes.<br />
           First matches arrive tomorrow morning at {email}.
         </p>
       </div>
@@ -343,7 +343,7 @@ export default function HomePage() {
       }} className="hero-split">
         {/* Left */}
         <div className="hero-left" style={{ paddingRight: 48, borderRight: "1px solid var(--border)" }}>
-          <Eyebrow line>Toronto · Mississauga · GTA 2026</Eyebrow>
+          <Eyebrow line>Greater Toronto Area · GTA 2026</Eyebrow>
           <h1 style={{
             fontFamily: "var(--mono)",
             fontSize: "clamp(3rem, 5.4vw, 6.2rem)",
@@ -542,7 +542,7 @@ export default function HomePage() {
             We handle <span className="accent-highlight">the rest.</span>
           </h2>
           <p style={{ fontFamily: "var(--mono)", fontSize: "0.85rem", lineHeight: 1.8, color: "var(--text-mute)", maxWidth: "44ch", marginBottom: 32 }}>
-            Tell us what you&apos;re looking for. We&apos;ll check Toronto and Mississauga every thirty minutes
+            Tell us what you&apos;re looking for. We&apos;ll scan the GTA every thirty minutes
             and send you only the listings worth a look — with the price check included.
           </p>
           <div style={{ borderTop: "1px solid var(--border)" }}>

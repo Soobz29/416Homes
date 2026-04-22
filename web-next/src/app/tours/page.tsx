@@ -214,16 +214,27 @@ export default function ToursPage() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 0 }}>
             {/* Dollhouse */}
             <div style={{ position: "relative", aspectRatio: "16/10", background: "#000", overflow: "hidden" }}>
-              <Dollhouse selected={selectedRoom} onSelect={setSelectedRoom} />
+              {/* Room photo background */}
+              <img
+                key={selectedRoom}
+                src={ROOM_MAP[selectedRoom].photo}
+                alt=""
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.45, transition: "opacity 0.4s" }}
+              />
+              {/* Dark gradient overlay */}
+              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(5,6,10,0.35) 0%, rgba(5,6,10,0.6) 100%)", zIndex: 1 }} />
+              <div style={{ position: "relative", zIndex: 2 }}>
+                <Dollhouse selected={selectedRoom} onSelect={setSelectedRoom} />
+              </div>
 
               {/* Top chrome */}
-              <div style={{ position: "absolute", top: 20, left: 20, background: "rgba(5,6,10,0.88)", padding: "10px 16px", border: "1px solid var(--border)" }}>
+              <div style={{ position: "absolute", top: 20, left: 20, background: "rgba(5,6,10,0.88)", padding: "10px 16px", border: "1px solid var(--border)", zIndex: 3 }}>
                 <div style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)" }}>3D Dollhouse</div>
                 <div style={{ fontFamily: "var(--mono)", fontSize: "1.05rem", fontWeight: 600, color: "#fff", marginTop: 4 }}>{ROOM_MAP[selectedRoom].name}</div>
               </div>
 
               {/* Bottom bar */}
-              <div style={{ position: "absolute", bottom: 16, left: 16, right: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ position: "absolute", bottom: 16, left: 16, right: 16, display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 3 }}>
                 <div style={{ background: "rgba(5,6,10,0.88)", padding: "8px 14px", border: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.68rem", color: "#fff" }}>
                   <span style={{ color: "var(--accent)" }}>◆</span> 88 Niagara St, Unit 412 — King West · 2BR 2BA
                 </div>
@@ -358,7 +369,7 @@ export default function ToursPage() {
       {/* Footer */}
       <footer style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 56px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: "var(--mono)", fontSize: "0.62rem", color: "var(--text-mute)" }}>
         <Logo />
-        <span>Covering Toronto &amp; Mississauga · Built on real sold data</span>
+        <span>Covering the Greater Toronto Area · Built on real sold data</span>
         <span>© 2026 416Homes · Early Access</span>
       </footer>
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { fetchListings } from "@/lib/api";
 import { Listing } from "@/types";
@@ -131,19 +131,23 @@ export default function StatsPage() {
   const [loading, setLoading]       = useState(true);
   const [scanTime, setScanTime]     = useState<string | null>(null);
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        // Fetch 200 listings across GTA for computing stats
-        const data = await fetchListings({ limit: 200 });
-        setListings(data.listings);
-        setTotal(data.total);
-        setScanTime(data.scan_time);
-      } finally {
-        setLoading(false);
-      }
-    })();
+  const loadStats = useCallback(async () => {
+    try {
+      const data = await fetchListings({ limit: 1000 });
+      setListings(data.listings);
+      setTotal(data.total);
+      setScanTime(data.scan_time);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadStats();
+    // Auto-refresh every 5 minutes
+    const interval = setInterval(() => { void loadStats(); }, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [loadStats]);
 
   /* ── Compute stats ── */
   const prices   = listings.filter(l => l.price > 0).map(l => l.price);
