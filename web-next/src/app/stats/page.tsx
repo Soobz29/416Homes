@@ -130,13 +130,17 @@ export default function StatsPage() {
   const [total, setTotal]           = useState(0);
   const [loading, setLoading]       = useState(true);
   const [scanTime, setScanTime]     = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState(false);
 
   const loadStats = useCallback(async () => {
     try {
+      setFetchError(false);
       const data = await fetchListings({ limit: 1000 });
       setListings(data.listings);
       setTotal(data.total);
       setScanTime(data.scan_time);
+    } catch {
+      setFetchError(true);
     } finally {
       setLoading(false);
     }
@@ -217,6 +221,14 @@ export default function StatsPage() {
       {loading ? (
         <div style={{ padding: "80px 80px", textAlign: "center", ...mono, fontSize: "0.72rem", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
           ◆ Loading market data...
+        </div>
+      ) : fetchError ? (
+        <div style={{ padding: "80px 80px", textAlign: "center" }}>
+          <div style={{ ...mono, fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "#cf6357", marginBottom: 12 }}>◆ Could not reach the listings API</div>
+          <div style={{ ...mono, fontSize: "0.78rem", color: "var(--text-mute)", marginBottom: 24 }}>The backend may be starting up — please try again in a moment.</div>
+          <button onClick={() => { setLoading(true); void loadStats(); }} style={{ padding: "12px 28px", background: "var(--accent)", color: "#000", border: "none", fontFamily: "var(--mono)", fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer" }}>
+            Retry
+          </button>
         </div>
       ) : (
         <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 80px 80px" }} className="sec-wrap">

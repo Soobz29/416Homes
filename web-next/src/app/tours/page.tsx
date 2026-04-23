@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
+
+const PanoramaViewer = dynamic(() => import("@/components/PanoramaViewer"), { ssr: false });
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://fouronesixhomes-mcr6b.ondigitalocean.app").replace(/\/$/, "");
 
@@ -58,31 +61,22 @@ function FormField({ label, children }: { label: string; children: React.ReactNo
   );
 }
 
-/* ── Room map for the 3D dollhouse demo ─────────────────────────────── */
-const DEMO_PHOTOS = [
-  "https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=800&q=80",
-  "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&q=80",
-  "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=800&q=80",
-  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80",
-];
-
+/* ── Room map for the 360° demo ─────────────────────────────────────── */
 type RoomKey = "living" | "kitchen" | "bedroom" | "bath";
 const ROOM_NAMES: Record<RoomKey, string> = {
   living: "Living Room", kitchen: "Kitchen", bedroom: "Primary Bedroom", bath: "Bathroom",
 };
-// Fallback demo photos — overridden at runtime with real listing photos from API
-const FALLBACK_PHOTOS: Record<RoomKey, string> = {
-  living:  DEMO_PHOTOS[0],
-  kitchen: DEMO_PHOTOS[1],
-  bedroom: DEMO_PHOTOS[2],
-  bath:    DEMO_PHOTOS[3],
+// CC0 equirectangular panoramas from Poly Haven (2:1 ratio, 3D-render quality)
+const ROOM_PANORAMAS: Record<RoomKey, string> = {
+  living:  "https://dl.polyhaven.org/file/ph-assets/HDRIs/jpg/1k/photo_studio_loft_hall_1k.jpg",
+  kitchen: "https://dl.polyhaven.org/file/ph-assets/HDRIs/jpg/1k/studio_small_09_1k.jpg",
+  bedroom: "https://dl.polyhaven.org/file/ph-assets/HDRIs/jpg/1k/wooden_lounge_2_1k.jpg",
+  bath:    "https://dl.polyhaven.org/file/ph-assets/HDRIs/jpg/1k/vintage_measuring_lab_1k.jpg",
 };
 
 /* ── Page ───────────────────────────────────────────────────────────── */
 export default function ToursPage() {
   const [selectedRoom, setSelectedRoom] = useState<RoomKey>("living");
-  const [demoPhotos, setDemoPhotos] = useState<Record<RoomKey, string>>(FALLBACK_PHOTOS);
-  const [demoImgKey, setDemoImgKey] = useState(0);
   const [url, setUrl] = useState("");
   const [email, setEmail] = useState("");
   const [inputMode, setInputMode] = useState<"url" | "upload">("url");
@@ -94,26 +88,6 @@ export default function ToursPage() {
   const [tourId] = useState(() => Math.floor(Math.random() * 9000 + 1000));
   const [menuOpen, setMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Fetch real listing photos from API for demo
-  useEffect(() => {
-    fetch(`${API_BASE}/api/listings?limit=20`)
-      .then(r => r.json())
-      .then(data => {
-        const withPhotos = (data.listings || []).filter(
-          (l: { photo_url?: string }) => l.photo_url
-        );
-        if (withPhotos.length >= 4) {
-          setDemoPhotos({
-            living:  withPhotos[0].photo_url,
-            kitchen: withPhotos[1].photo_url,
-            bedroom: withPhotos[2].photo_url,
-            bath:    withPhotos[3].photo_url,
-          });
-        }
-      })
-      .catch(() => {}); // keep FALLBACK_PHOTOS
-  }, []);
 
   useEffect(() => {
     if (!paid) return;
@@ -222,39 +196,27 @@ export default function ToursPage() {
         {/* Demo — dollhouse + sidebar */}
         <div style={{ marginBottom: 48, border: "1px solid var(--border-strong)", overflow: "hidden", background: "var(--bg-elev)" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 0 }}>
-            {/* Real listing photo with Ken Burns — no distortion */}
+            {/* 360° equirectangular panorama sphere viewer */}
             <div style={{ position: "relative", aspectRatio: "16/10", background: "#060606", overflow: "hidden" }}>
-              <style>{`
-                @keyframes tourKB { 0%{transform:scale(1) translate(0,0)} 100%{transform:scale(1.06) translate(-0.8%,-0.4%)} }
-                @keyframes tourFI { from{opacity:0} to{opacity:1} }
-              `}</style>
-              <img
-                key={`${selectedRoom}-${demoImgKey}`}
-                src={demoPhotos[selectedRoom]}
-                alt={ROOM_NAMES[selectedRoom]}
-                style={{
-                  position: "absolute", inset: 0, width: "100%", height: "100%",
-                  objectFit: "cover",
-                  animation: "tourKB 9s ease-out forwards, tourFI 0.4s ease",
-                  transformOrigin: "center center",
-                }}
+              <PanoramaViewer
+                key={selectedRoom}
+                url={ROOM_PANORAMAS[selectedRoom]}
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
               />
-              {/* Gradient overlay */}
-              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(5,6,10,0.25) 0%, rgba(5,6,10,0.65) 100%)", pointerEvents: "none" }} />
 
               {/* Top chrome */}
-              <div style={{ position: "absolute", top: 20, left: 20, background: "rgba(5,6,10,0.88)", padding: "10px 16px", border: "1px solid var(--border)", zIndex: 3 }}>
-                <div style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)" }}>Real GTA Listing</div>
+              <div style={{ position: "absolute", top: 20, left: 20, background: "rgba(5,6,10,0.88)", padding: "10px 16px", border: "1px solid var(--border)", zIndex: 3, pointerEvents: "none" }}>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)" }}>360° Demo</div>
                 <div style={{ fontFamily: "var(--mono)", fontSize: "1.05rem", fontWeight: 600, color: "#fff", marginTop: 4 }}>{ROOM_NAMES[selectedRoom]}</div>
               </div>
 
               {/* Bottom bar */}
-              <div style={{ position: "absolute", bottom: 16, left: 16, right: 16, display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 3 }}>
+              <div style={{ position: "absolute", bottom: 16, left: 16, right: 16, display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 3, pointerEvents: "none" }}>
                 <div style={{ background: "rgba(5,6,10,0.88)", padding: "8px 14px", border: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.68rem", color: "#fff" }}>
                   <span style={{ color: "var(--accent)" }}>◆</span> 88 Niagara St, Unit 412 — King West · 2BR 2BA
                 </div>
                 <div style={{ background: "rgba(5,6,10,0.88)", padding: "8px 12px", border: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.64rem", color: "var(--accent)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
-                  ◉ 360° on delivery
+                  ⟳ Drag · Scroll to zoom
                 </div>
               </div>
             </div>
@@ -269,7 +231,7 @@ export default function ToursPage() {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {(Object.keys(ROOM_NAMES) as RoomKey[]).map(k => (
-                    <button key={k} onClick={() => { setSelectedRoom(k); setDemoImgKey(n => n + 1); }} style={{
+                    <button key={k} onClick={() => setSelectedRoom(k)} style={{
                       padding: "10px 12px", textAlign: "left",
                       background: selectedRoom === k ? "var(--bg-panel)" : "transparent",
                       border: `1px solid ${selectedRoom === k ? "var(--accent)" : "var(--border)"}`,
@@ -285,7 +247,7 @@ export default function ToursPage() {
                 </div>
               </div>
               <div style={{ paddingTop: 16, borderTop: "1px solid var(--border)", marginTop: 16, fontFamily: "var(--mono)", fontSize: "0.58rem", color: "var(--text-dim)", lineHeight: 1.6, letterSpacing: "0.06em" }}>
-                Gemini Vision classifies photos → room-by-room tour + 360° panoramas generated per room.
+                Drag to look around · scroll to zoom. Gemini Vision classifies your listing photos into rooms and generates a 360° panorama per room.
               </div>
             </div>
           </div>

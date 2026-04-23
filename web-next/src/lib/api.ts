@@ -1,6 +1,6 @@
 const API_BASE = (
   process.env.NEXT_PUBLIC_API_URL ||
-  (typeof window !== "undefined" ? window.location.origin : "http://localhost:8000")
+  "https://fouronesixhomes-mcr6b.ondigitalocean.app"
 ).replace(/\/$/, "");
 
 /** Undo bad https://cdn.zoocasa.com/https://images.expcloud.com/...-1.jpg URLs from older scrapes. */
