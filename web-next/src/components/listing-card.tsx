@@ -31,8 +31,7 @@ export function StatusBadge({ fairValue, dom }: { fairValue?: number | null; dom
                : isStale       ? "var(--border-strong)"
                : "var(--border)";
 
-  if (fairValue == null && !isStale) return null;
-
+  // Always render — "Fair value" is the neutral fallback when no model data exists
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 5,
