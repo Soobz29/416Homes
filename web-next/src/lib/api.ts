@@ -1,7 +1,15 @@
+// For direct DO backend calls (valuate, video, tour endpoints)
 const API_BASE = (
   process.env.NEXT_PUBLIC_API_URL ||
   "https://fouronesixhomes-mcr6b.ondigitalocean.app"
 ).replace(/\/$/, "");
+
+// Listings go through the Next.js proxy (/api/listings) to avoid browser CORS.
+// On the server side (SSR) we hit the backend directly.
+const LISTINGS_BASE =
+  typeof window !== "undefined"
+    ? "" // relative → /api/listings proxy on Vercel
+    : API_BASE;
 
 /** Undo bad https://cdn.zoocasa.com/https://images.expcloud.com/...-1.jpg URLs from older scrapes. */
 function fixZoocasaWrappedPhotoUrl(url: string): string {
@@ -109,7 +117,7 @@ export async function fetchListings(params?: {
   queryParams.append("limit", String(params?.limit ?? 20));
   queryParams.append("offset", String(params?.offset ?? 0));
 
-  const url = `${API_BASE}/api/listings?${queryParams.toString()}`;
+  const url = `${LISTINGS_BASE}/api/listings?${queryParams.toString()}`;
 
   const response = await fetch(url);
 

@@ -2,9 +2,6 @@
 
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
-import dynamic from "next/dynamic";
-
-const PanoramaViewer = dynamic(() => import("@/components/PanoramaViewer"), { ssr: false });
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://fouronesixhomes-mcr6b.ondigitalocean.app").replace(/\/$/, "");
 
@@ -61,17 +58,17 @@ function FormField({ label, children }: { label: string; children: React.ReactNo
   );
 }
 
-/* ── Room map for the 360° demo ─────────────────────────────────────── */
+/* ── Room map for the demo ──────────────────────────────────────────── */
 type RoomKey = "living" | "kitchen" | "bedroom" | "bath";
 const ROOM_NAMES: Record<RoomKey, string> = {
   living: "Living Room", kitchen: "Kitchen", bedroom: "Primary Bedroom", bath: "Bathroom",
 };
-// CC0 equirectangular panoramas from Poly Haven (2:1 ratio, 3D-render quality)
-const ROOM_PANORAMAS: Record<RoomKey, string> = {
-  living:  "https://dl.polyhaven.org/file/ph-assets/HDRIs/jpg/1k/photo_studio_loft_hall_1k.jpg",
-  kitchen: "https://dl.polyhaven.org/file/ph-assets/HDRIs/jpg/1k/studio_small_09_1k.jpg",
-  bedroom: "https://dl.polyhaven.org/file/ph-assets/HDRIs/jpg/1k/wooden_lounge_2_1k.jpg",
-  bath:    "https://dl.polyhaven.org/file/ph-assets/HDRIs/jpg/1k/vintage_measuring_lab_1k.jpg",
+// High-quality Unsplash room photos for the interactive demo
+const ROOM_PHOTOS: Record<RoomKey, string> = {
+  living:  "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=1400&q=85",
+  kitchen: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=1400&q=85",
+  bedroom: "https://images.unsplash.com/photo-1540518614846-7eded433c457?w=1400&q=85",
+  bath:    "https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=1400&q=85",
 };
 
 /* ── Page ───────────────────────────────────────────────────────────── */
@@ -196,17 +193,28 @@ export default function ToursPage() {
         {/* Demo — dollhouse + sidebar */}
         <div style={{ marginBottom: 48, border: "1px solid var(--border-strong)", overflow: "hidden", background: "var(--bg-elev)" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 0 }}>
-            {/* 360° equirectangular panorama sphere viewer */}
+            {/* Interactive room photo with Ken Burns animation */}
             <div style={{ position: "relative", aspectRatio: "16/10", background: "#060606", overflow: "hidden" }}>
-              <PanoramaViewer
+              <style>{`
+                @keyframes tourKB { 0%{transform:scale(1) translate(0,0)} 100%{transform:scale(1.07) translate(-1%,-0.5%)} }
+                @keyframes tourFI { from{opacity:0} to{opacity:1} }
+              `}</style>
+              <img
                 key={selectedRoom}
-                url={ROOM_PANORAMAS[selectedRoom]}
-                style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+                src={ROOM_PHOTOS[selectedRoom]}
+                alt={ROOM_NAMES[selectedRoom]}
+                style={{
+                  position: "absolute", inset: 0, width: "100%", height: "100%",
+                  objectFit: "cover",
+                  animation: "tourKB 9s ease-out forwards, tourFI 0.35s ease",
+                  transformOrigin: "center center",
+                }}
               />
+              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(5,6,10,0.18) 0%, rgba(5,6,10,0.6) 100%)", pointerEvents: "none" }} />
 
               {/* Top chrome */}
               <div style={{ position: "absolute", top: 20, left: 20, background: "rgba(5,6,10,0.88)", padding: "10px 16px", border: "1px solid var(--border)", zIndex: 3, pointerEvents: "none" }}>
-                <div style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)" }}>360° Demo</div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)" }}>Live Demo</div>
                 <div style={{ fontFamily: "var(--mono)", fontSize: "1.05rem", fontWeight: 600, color: "#fff", marginTop: 4 }}>{ROOM_NAMES[selectedRoom]}</div>
               </div>
 
@@ -216,7 +224,7 @@ export default function ToursPage() {
                   <span style={{ color: "var(--accent)" }}>◆</span> 88 Niagara St, Unit 412 — King West · 2BR 2BA
                 </div>
                 <div style={{ background: "rgba(5,6,10,0.88)", padding: "8px 12px", border: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.64rem", color: "var(--accent)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
-                  ⟳ Drag · Scroll to zoom
+                  ◉ 360° on delivery
                 </div>
               </div>
             </div>
@@ -247,7 +255,7 @@ export default function ToursPage() {
                 </div>
               </div>
               <div style={{ paddingTop: 16, borderTop: "1px solid var(--border)", marginTop: 16, fontFamily: "var(--mono)", fontSize: "0.58rem", color: "var(--text-dim)", lineHeight: 1.6, letterSpacing: "0.06em" }}>
-                Drag to look around · scroll to zoom. Gemini Vision classifies your listing photos into rooms and generates a 360° panorama per room.
+                Gemini Vision classifies your listing photos into rooms. Each room gets a hosted 360° panorama — shareable link + embed code delivered in under 5 minutes.
               </div>
             </div>
           </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Listing } from "@/types";
@@ -171,6 +172,7 @@ const GTAMap = dynamic(() => import("@/components/GTAMap"), { ssr: false });
 
 /* ── Main page ──────────────────────────────────────────────────────── */
 export default function DashboardPage() {
+  const searchParams = useSearchParams();
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
   const [emailInput, setEmailInput] = useState("");
   const [authMessage, setAuthMessage] = useState<string | null>(null);
@@ -189,12 +191,12 @@ export default function DashboardPage() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
-    city: "GTA",
-    minPrice: "",
-    maxPrice: "",
-    bedrooms: "",
-    bathrooms: "",
-    propertyType: "",
+    city:         searchParams.get("city")         || "GTA",
+    minPrice:     searchParams.get("minPrice")     || "",
+    maxPrice:     searchParams.get("maxPrice")     || "",
+    bedrooms:     searchParams.get("bedrooms")     || "",
+    bathrooms:    "",
+    propertyType: searchParams.get("propertyType") || "",
   });
   const [listingsError, setListingsError] = useState<string | null>(null);
   const [listingsPage, setListingsPage] = useState(0);

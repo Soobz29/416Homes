@@ -2,23 +2,11 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { fetchListings } from "@/lib/api";
+import HouseLogo from "@/components/HouseLogo";
 
 /* ─── Shared primitives ─────────────────────────────────────────────── */
-
-function Logo({ sub }: { sub?: string }) {
-  return (
-    <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontFamily: "var(--mono)", fontWeight: 800, fontSize: "1.2rem", letterSpacing: "0.02em" }}>
-      <span style={{ color: "var(--accent)" }}>416</span>
-      <span style={{ color: "var(--text)" }}>Homes</span>
-      {sub && (
-        <span style={{ fontFamily: "var(--mono)", fontSize: "0.56rem", color: "var(--text-dim)", letterSpacing: "0.14em", textTransform: "uppercase", paddingLeft: 4, fontWeight: 400 }}>
-          {sub}
-        </span>
-      )}
-    </div>
-  );
-}
 
 function Eyebrow({ children, line }: { children: React.ReactNode; line?: boolean }) {
   return (
@@ -143,7 +131,7 @@ function TopNav({ active }: { active?: string }) {
       backdropFilter: "blur(20px)",
       borderBottom: "1px solid var(--border)",
     }}>
-      <Link href="/" style={{ textDecoration: "none" }}><Logo sub="GTA" /></Link>
+      <Link href="/" style={{ textDecoration: "none" }}><HouseLogo size={32} sub /></Link>
       <ul className="nav-links" style={{ display: "flex", listStyle: "none", gap: 36, margin: 0, padding: 0, fontFamily: "var(--mono)", fontSize: "0.68rem", letterSpacing: "0.14em", textTransform: "uppercase" }}>
         {TOP_NAV_LINKS.map(([href, label]) => (
           <li key={href}>
@@ -187,7 +175,7 @@ function FooterBar() {
       display: "flex", justifyContent: "space-between", alignItems: "center",
       fontFamily: "var(--mono)", fontSize: "0.62rem", color: "var(--text-mute)",
     }}>
-      <Logo />
+      <HouseLogo size={28} />
       <span>Covering the Greater Toronto Area · Built on real sold data</span>
       <span>© 2026 416Homes · Early Access</span>
     </footer>
@@ -290,7 +278,12 @@ function AlertForm() {
 
 export default function HomePage() {
   const ticker = [...TICKER_ITEMS, ...TICKER_ITEMS];
+  const router = useRouter();
   const [featured, setFeatured] = useState(FEATURED);
+  const [searchCity, setSearchCity] = useState("");
+  const [searchType, setSearchType] = useState("");
+  const [searchPrice, setSearchPrice] = useState("");
+  const [searchBeds, setSearchBeds] = useState("");
 
   useEffect(() => {
     fetchListings({ limit: 20 }).then(({ listings }) => {
@@ -310,6 +303,19 @@ export default function HomePage() {
       });
     }).catch(() => { /* keep fallback */ });
   }, []);
+
+  function handleSearch() {
+    const p = new URLSearchParams();
+    if (searchCity.trim()) p.set("city", searchCity.trim());
+    if (searchType) p.set("propertyType", searchType);
+    if (searchPrice) {
+      const [min, max] = searchPrice.split("-");
+      if (min) p.set("minPrice", min);
+      if (max) p.set("maxPrice", max);
+    }
+    if (searchBeds) p.set("bedrooms", searchBeds);
+    router.push("/dashboard" + (p.toString() ? "?" + p.toString() : ""));
+  }
 
   return (
     <div style={{ minHeight: "100vh", color: "var(--text)", background: "var(--bg)" }}>
@@ -335,103 +341,147 @@ export default function HomePage() {
       </div>
 
       {/* ── Hero ── */}
-      <section style={{
-        maxWidth: 1320, margin: "0 auto",
-        display: "grid", gridTemplateColumns: "1.1fr 1fr",
-        gap: 0, padding: "80px 56px 56px",
-        borderBottom: "1px solid var(--border)",
-      }} className="hero-split">
-        {/* Left */}
-        <div className="hero-left" style={{ paddingRight: 48, borderRight: "1px solid var(--border)" }}>
-          <Eyebrow line>Greater Toronto Area · GTA 2026</Eyebrow>
-          <h1 style={{
-            fontFamily: "var(--mono)",
-            fontSize: "clamp(3rem, 5.4vw, 6.2rem)",
-            lineHeight: 0.94, letterSpacing: "-0.02em",
-            fontWeight: 500, margin: "28px 0 24px",
-          }}>
-            Stop chasing.<br />
-            Let listings<br />
-            <span className="accent-highlight">chase you.</span>
-          </h1>
-          <p style={{
-            maxWidth: "52ch",
-            fontFamily: "var(--mono)", fontSize: "0.88rem", lineHeight: 1.75,
-            color: "var(--text-mute)", margin: "0 0 40px",
-          }}>
-            416Homes watches four listing platforms around the clock, checks every property
-            against what homes actually sold for in that neighbourhood, and reaches out to
-            listing agents on your behalf — so you don&apos;t have to.
-          </p>
-          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-            <PrimaryBtn href="/#alert">Set My Alert — Free</PrimaryBtn>
-            <GhostBtn href="/dashboard">Browse Listings →</GhostBtn>
+      <section style={{ position: "relative", width: "100%", minHeight: 580, overflow: "hidden", borderBottom: "1px solid var(--border)" }}>
+        {/* Background photo */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="https://images.unsplash.com/photo-1517090186835-e348b621c820?w=1920&q=80"
+          alt=""
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 40%" }}
+        />
+        {/* Dark gradient overlay */}
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, rgba(5,6,10,0.93) 0%, rgba(5,6,10,0.72) 55%, rgba(5,6,10,0.38) 100%)" }} />
+
+        {/* Hero content */}
+        <div style={{ position: "relative", zIndex: 2, maxWidth: 1320, margin: "0 auto", padding: "80px 56px 72px" }}>
+          {/* Eyebrow */}
+          <div style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 24 }}>
+            Toronto · Mississauga · Brampton · Vaughan + More
           </div>
 
-          {/* Stats strip */}
-          <div className="stats-strip" style={{ marginTop: 64, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 0, borderTop: "1px solid var(--border)" }}>
-            {[
-              ["2,847", "Active listings"],
-              ["50+", "Neighbourhoods"],
-              ["Q30m", "Scan cadence"],
-              ["$0", "To start"],
-            ].map(([n, l]) => (
-              <div key={l} style={{ padding: "20px 16px 0 0", borderRight: "1px solid var(--border)" }}>
-                <div style={{ fontFamily: "var(--mono)", fontSize: "1.8rem", fontWeight: 700, color: "var(--accent)", lineHeight: 1 }}>{n}</div>
-                <div style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--text-mute)", marginTop: 6 }}>{l}</div>
+          {/* Headline */}
+          <h1 style={{ fontFamily: "var(--mono)", fontSize: "clamp(2.6rem, 5vw, 5.4rem)", fontWeight: 700, lineHeight: 0.96, letterSpacing: "-0.02em", margin: "0 0 24px", color: "#fff" }}>
+            Find Your Perfect<br />
+            <span style={{ background: "var(--accent)", color: "var(--bg)", padding: "4px 14px", display: "inline-block", marginTop: 10, lineHeight: 1.1 }}>Home in the GTA</span>
+          </h1>
+
+          {/* Subtext */}
+          <p style={{ fontFamily: "var(--mono)", fontSize: "0.88rem", lineHeight: 1.8, color: "rgba(255,255,255,0.65)", maxWidth: "50ch", margin: "0 0 28px" }}>
+            Discover verified listings for sale and rent across Toronto, Mississauga,
+            Brampton and the entire Greater Toronto Area — with AI-powered valuations.
+          </p>
+
+          {/* Trust badges */}
+          <div style={{ display: "flex", gap: 28, marginBottom: 32, flexWrap: "wrap" }}>
+            {([["✓", "Verified Listings"], ["↻", "Updated Daily"], ["◎", "Local GTA Experts"]] as [string, string][]).map(([icon, label]) => (
+              <div key={label} style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--mono)", fontSize: "0.68rem", letterSpacing: "0.08em", color: "rgba(255,255,255,0.60)" }}>
+                <span style={{ color: "var(--accent)", fontSize: "0.8rem" }}>{icon}</span> {label}
               </div>
             ))}
           </div>
-        </div>
 
-        {/* Right — featured listing card */}
-        <div className="hero-right" style={{ paddingLeft: 48, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ width: "100%", maxWidth: 460 }}>
-            <div style={{ position: "relative", aspectRatio: "4/5", overflow: "hidden", border: "1px solid var(--border)" }}>
-              <img src={featured.photo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.9) 100%)" }} />
-              {/* Top badges */}
-              <div style={{ position: "absolute", top: 16, left: 16, right: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", color: "var(--accent)", letterSpacing: "0.12em", textTransform: "uppercase" }}>
-                  Live · {featured.source}
-                </span>
-                <span style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", color: "var(--accent)", letterSpacing: "0.12em", textTransform: "uppercase" }}>
-                  Featured
-                </span>
-              </div>
-              {/* Bottom info */}
-              <div style={{ position: "absolute", left: 20, right: 20, bottom: 22, color: "#fff" }}>
-                <div style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.16em", textTransform: "uppercase", opacity: 0.7 }}>
-                  {featured.neighbourhood}, {featured.city}
-                </div>
-                <div style={{ fontFamily: "var(--mono)", fontSize: "1.3rem", fontWeight: 500, margin: "4px 0 10px" }}>
-                  {featured.address}
-                </div>
-                <div style={{ fontFamily: "var(--mono)", fontSize: "2.4rem", fontWeight: 700, lineHeight: 1, color: "var(--accent)" }}>
-                  {fmtPriceFull(featured.price)}
-                </div>
-                <div style={{ display: "flex", gap: 14, marginTop: 12, fontFamily: "var(--mono)", fontSize: "0.7rem", letterSpacing: "0.05em" }}>
-                  <span>{featured.beds} BD</span>
-                  <span style={{ opacity: 0.4 }}>·</span>
-                  <span>{featured.baths} BA</span>
-                  <span style={{ opacity: 0.4 }}>·</span>
-                  <span>{featured.sqft.toLocaleString()} SF</span>
-                </div>
-              </div>
-            </div>
-            <Link href="/dashboard" style={{
-              display: "block", width: "100%", marginTop: 12, padding: "14px 16px",
-              background: "transparent", border: "1px solid var(--border-strong)",
-              color: "var(--accent)", fontFamily: "var(--mono)",
-              fontSize: "0.72rem", letterSpacing: "0.14em", textTransform: "uppercase",
-              textDecoration: "none", textAlign: "center",
-              transition: "all 0.2s",
-            }}>
-              View this listing →
-            </Link>
+          {/* Search bar */}
+          <div className="hero-search-bar" style={{
+            display: "grid",
+            gridTemplateColumns: "1fr auto auto auto auto",
+            gap: 0,
+            background: "rgba(5,6,10,0.75)",
+            backdropFilter: "blur(16px)",
+            border: "1px solid rgba(255,176,0,0.40)",
+            maxWidth: 880,
+            overflow: "hidden",
+          }}>
+            <input
+              value={searchCity}
+              onChange={e => setSearchCity(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleSearch()}
+              placeholder="City or neighbourhood (e.g. Yorkville, Mississauga...)"
+              style={{
+                padding: "16px 18px",
+                background: "transparent",
+                border: "none",
+                color: "#fff",
+                fontFamily: "var(--mono)",
+                fontSize: "0.82rem",
+                outline: "none",
+                minWidth: 0,
+              }}
+            />
+            <select
+              value={searchType}
+              onChange={e => setSearchType(e.target.value)}
+              style={{ padding: "16px 14px", background: "rgba(5,6,10,0.90)", border: "none", borderLeft: "1px solid rgba(255,176,0,0.22)", color: "#fff", fontFamily: "var(--mono)", fontSize: "0.76rem", cursor: "pointer", outline: "none", whiteSpace: "nowrap" }}
+            >
+              <option value="">Type</option>
+              <option value="Detached">Detached</option>
+              <option value="Semi-Detached">Semi-Detached</option>
+              <option value="Condo">Condo</option>
+              <option value="Townhouse">Townhouse</option>
+            </select>
+            <select
+              value={searchPrice}
+              onChange={e => setSearchPrice(e.target.value)}
+              style={{ padding: "16px 14px", background: "rgba(5,6,10,0.90)", border: "none", borderLeft: "1px solid rgba(255,176,0,0.22)", color: "#fff", fontFamily: "var(--mono)", fontSize: "0.76rem", cursor: "pointer", outline: "none", whiteSpace: "nowrap" }}
+            >
+              <option value="">Price</option>
+              <option value="300000-600000">$300K – $600K</option>
+              <option value="600000-900000">$600K – $900K</option>
+              <option value="900000-1300000">$900K – $1.3M</option>
+              <option value="1300000-2000000">$1.3M – $2M</option>
+              <option value="2000000-99999999">$2M+</option>
+            </select>
+            <select
+              value={searchBeds}
+              onChange={e => setSearchBeds(e.target.value)}
+              style={{ padding: "16px 14px", background: "rgba(5,6,10,0.90)", border: "none", borderLeft: "1px solid rgba(255,176,0,0.22)", color: "#fff", fontFamily: "var(--mono)", fontSize: "0.76rem", cursor: "pointer", outline: "none" }}
+            >
+              <option value="">Beds</option>
+              <option value="1">1+</option>
+              <option value="2">2+</option>
+              <option value="3">3+</option>
+              <option value="4">4+</option>
+              <option value="5">5+</option>
+            </select>
+            <button
+              onClick={handleSearch}
+              style={{ padding: "16px 26px", background: "var(--accent)", border: "none", color: "var(--bg)", fontFamily: "var(--mono)", fontWeight: 700, fontSize: "0.82rem", letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer", whiteSpace: "nowrap" }}
+            >
+              Search →
+            </button>
+          </div>
+
+          {/* Popular searches */}
+          <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", marginRight: 4 }}>Popular:</span>
+            {["Downtown Toronto", "Mississauga", "Vaughan", "Etobicoke", "North York", "Scarborough"].map(city => (
+              <Link
+                key={city}
+                href={`/dashboard?city=${encodeURIComponent(city)}`}
+                style={{ fontFamily: "var(--mono)", fontSize: "0.68rem", color: "rgba(255,255,255,0.60)", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", padding: "5px 12px", textDecoration: "none", borderRadius: 2 }}
+              >
+                {city}
+              </Link>
+            ))}
           </div>
         </div>
       </section>
+
+      {/* ── Stats strip ── */}
+      <div style={{ borderBottom: "1px solid var(--border)", background: "var(--bg-elev)" }}>
+        <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 56px", display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }} className="stats-strip">
+          {[
+            ["2,847+", "Active GTA Listings"],
+            ["50+", "Neighbourhoods Tracked"],
+            ["Every 30 min", "Scan Cadence"],
+            ["$0", "To Get Started"],
+          ].map(([n, l], i) => (
+            <div key={l} style={{ padding: "28px 16px 28px 0", borderRight: i < 3 ? "1px solid var(--border)" : "none" }}>
+              <div style={{ fontFamily: "var(--mono)", fontSize: "1.8rem", fontWeight: 700, color: "var(--accent)", lineHeight: 1 }}>{n}</div>
+              <div style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--text-mute)", marginTop: 6 }}>{l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* ── How It Works ── */}
       <section id="how-it-works" className="sec-wrap sec-pad-lg" style={{ maxWidth: 1320, margin: "0 auto", padding: "96px 56px", borderBottom: "1px solid var(--border)" }}>
