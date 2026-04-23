@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import dynamic from "next/dynamic";
+import dynamicImport from "next/dynamic";
 import Link from "next/link";
 import { Listing } from "@/types";
 import { fetchListings, fetchValuation } from "@/lib/api";
@@ -170,7 +170,7 @@ function MarketInsightsBar({ listings, total }: { listings: Listing[]; total: nu
 }
 
 
-const GTAMap = dynamic(() => import("@/components/GTAMap"), { ssr: false });
+const GTAMap = dynamicImport(() => import("@/components/GTAMap"), { ssr: false });
 
 /* ── Main page ──────────────────────────────────────────────────────── */
 export default function DashboardPage() {
