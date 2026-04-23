@@ -131,7 +131,7 @@ function ProgressPanel({
 }
 
 /* ── Main page ──────────────────────────────────────────────────────── */
-const VIDEO_NAV: [string, string][] = [["/dashboard","Listings"],["/#how-it-works","How It Works"],["/tours","Virtual Tours"],["/stats","Stats"],["/reno","Reno ROI"]];
+const VIDEO_NAV: [string, string][] = [["/dashboard","Listings"],["/#how-it-works","How It Works"],["/tours","Virtual Tours"],["/stats","Stats"],["/reno","Reno ROI"],["/faq","FAQ"]];
 
 export default function VideoPage() {
   const [menuOpen, setMenuOpen] = useState(false);

@@ -135,15 +135,16 @@ export function ValueBadge({ pct }: { pct: number }) {
 /* ── TransitChip ────────────────────────────────────────────────────── */
 export function TransitChip({ score }: { score: number }) {
   const label = score >= 9 ? "Elite" : score >= 7 ? "Excellent" : score >= 5 ? "Good" : "Fair";
+  const color = score >= 9 ? "#2ed573" : score >= 7 ? "#FFB000" : score >= 5 ? "#8A8876" : "#5A5848";
   return (
     <span style={{
       fontFamily: "var(--mono)", fontSize: "0.58rem",
       letterSpacing: "0.1em", textTransform: "uppercase" as const,
-      color: "var(--text)", background: "var(--bg-elev)",
-      border: "1px solid var(--border)", padding: "3px 8px",
+      color, background: "var(--bg-elev)",
+      border: `1px solid ${color}40`, padding: "3px 8px",
       display: "inline-flex", alignItems: "center", gap: 5,
     }}>
-      <span style={{ color: "var(--accent)" }}>▸</span>{score}/10 {label}
+      <span style={{ color }}>▸</span>{score}/10 {label}
     </span>
   );
 }
@@ -318,7 +319,11 @@ export function ListingCard({ listing, index = 0, onValuate }: ListingCardProps)
           <span style={{ fontFamily: "var(--mono)", fontSize: "1.4rem", fontWeight: 600 }}>{formatPrice(listing.price)}</span>
           {listing.sqft > 0 && <PricePsfChip price={listing.price} sqft={listing.sqft} />}
         </div>
-        {listing.fair_value != null && <div style={{ marginBottom: 6 }}><ValueBadge pct={listing.fair_value} /></div>}
+        {(listing.fair_value != null || (listing.dom != null && listing.dom > 45)) && (
+          <div style={{ marginBottom: 6 }}>
+            <StatusBadge fairValue={listing.fair_value} dom={listing.dom} />
+          </div>
+        )}
         {metaParts.length > 0 && (
           <p style={{ fontFamily: "var(--mono)", fontSize: "0.7rem", color: "var(--text-mute)", marginBottom: 4, textTransform: "uppercase" as const, letterSpacing: "0.06em" }}>
             {metaParts.join(" · ")}

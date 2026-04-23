@@ -24,7 +24,7 @@ const RISK_COLORS: Record<string, string> = {
   "High":     "#cf6357",
 };
 
-const RENO_NAV: [string, string][] = [["/#listings","LISTINGS"],["/#how","HOW IT WORKS"],["/video","VIDEOS"],["/tours","TOURS"],["/stats","STATS"],["/reno","RENO ROI"]];
+const RENO_NAV: [string, string][] = [["/#listings","LISTINGS"],["/#how","HOW IT WORKS"],["/video","VIDEOS"],["/tours","TOURS"],["/stats","STATS"],["/reno","RENO ROI"],["/faq","FAQ"]];
 
 /* ── Nav ────────────────────────────────────────────────────────────── */
 function NavBar() {

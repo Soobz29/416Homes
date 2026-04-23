@@ -118,6 +118,7 @@ const TOP_NAV_LINKS: [string, string][] = [
   ["/tours", "Virtual Tours"],
   ["/stats", "Stats"],
   ["/reno", "Reno ROI"],
+  ["/faq", "FAQ"],
 ];
 
 function TopNav({ active }: { active?: string }) {

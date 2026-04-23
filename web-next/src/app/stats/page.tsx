@@ -6,7 +6,7 @@ import HouseLogo from "@/components/HouseLogo";
 import { fetchListings } from "@/lib/api";
 import { Listing } from "@/types";
 
-const STATS_NAV: [string, string][] = [["/#listings","LISTINGS"],["/#how","HOW IT WORKS"],["/video","VIDEOS"],["/tours","TOURS"],["/reno","RENO ROI"],["/stats","STATS"]];
+const STATS_NAV: [string, string][] = [["/#listings","LISTINGS"],["/#how","HOW IT WORKS"],["/video","VIDEOS"],["/tours","TOURS"],["/reno","RENO ROI"],["/stats","STATS"],["/faq","FAQ"]];
 
 /* ── Shared nav (same as other pages) ──────────────────────────────── */
 function NavBar() {

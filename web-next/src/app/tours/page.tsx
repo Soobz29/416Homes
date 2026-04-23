@@ -136,7 +136,7 @@ export default function ToursPage() {
       }}>
         <Link href="/" style={{ textDecoration: "none" }}><HouseLogo size={28} /></Link>
         <ul className="nav-links" style={{ display: "flex", listStyle: "none", gap: 36, margin: 0, padding: 0, fontFamily: "var(--mono)", fontSize: "0.68rem", letterSpacing: "0.14em", textTransform: "uppercase" }}>
-          {[["/dashboard", "Listings"], ["/video", "Videos"], ["/tours", "Virtual Tours"]].map(([href, label]) => (
+          {[["/dashboard", "Listings"], ["/video", "Videos"], ["/tours", "Virtual Tours"], ["/faq", "FAQ"]].map(([href, label]) => (
             <li key={href}>
               <Link href={href} style={{ textDecoration: "none", color: label === "Virtual Tours" ? "var(--accent)" : "var(--text-mute)" }}>{label}</Link>
             </li>
@@ -156,7 +156,7 @@ export default function ToursPage() {
         </div>
         {menuOpen && (
           <div style={{ position: "fixed", top: 64, left: 0, right: 0, background: "rgba(5,6,10,0.98)", backdropFilter: "blur(20px)", borderBottom: "1px solid var(--border)", padding: "8px 24px 20px", zIndex: 999 }}>
-            {[["/dashboard", "Listings"], ["/video", "Videos"], ["/tours", "Virtual Tours"], ["/#alert", "Set My Alert"]].map(([href, label]) => (
+            {[["/dashboard", "Listings"], ["/video", "Videos"], ["/tours", "Virtual Tours"], ["/faq", "FAQ"], ["/#alert", "Set My Alert"]].map(([href, label]) => (
               <Link key={href} href={href} onClick={() => setMenuOpen(false)} style={{ display: "block", padding: "14px 0", borderBottom: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--text-mute)", textDecoration: "none" }}>
                 {label}
               </Link>
