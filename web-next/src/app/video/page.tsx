@@ -155,6 +155,11 @@ export default function VideoPage() {
   const [revisionVisible, setRevisionVisible] = useState(false);
   const [demoPlaying, setDemoPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoInputMode, setVideoInputMode] = useState<"url" | "upload">("url");
+  const [videoFiles, setVideoFiles] = useState<File[]>([]);
+  const [videoFilePreviews, setVideoFilePreviews] = useState<string[]>([]);
+  const [videoUploading, setVideoUploading] = useState(false);
+  const videoFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (demoPlaying && videoRef.current) {
@@ -225,11 +230,33 @@ export default function VideoPage() {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [currentJobId, progressVisible, updateProgressFromApi]);
 
+  const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []).slice(0, 9);
+    setVideoFiles(files);
+    setVideoFilePreviews(files.map(f => URL.createObjectURL(f)));
+  };
+
   const handleSubmit = useCallback(async () => {
     if (!formEmail.trim() || !formEmail.includes("@")) { alert("Valid email required"); return; }
     let url = formListingUrl.trim();
-    if (!url) { alert("Listing URL required"); return; }
-    if (!url.startsWith("http")) url = "https://" + url;
+    if (videoInputMode === "upload") {
+      if (videoFiles.length === 0) { alert("Please select at least one photo"); return; }
+      setVideoUploading(true);
+      try {
+        const formData = new FormData();
+        videoFiles.forEach(f => formData.append("files", f));
+        const res = await fetch(`${API_BASE}/api/upload-photos`, { method: "POST", body: formData });
+        if (res.ok) {
+          const data = await res.json();
+          url = "upload://" + JSON.stringify(data.urls);
+        }
+      } catch { /* fall through */ }
+      finally { setVideoUploading(false); }
+      if (!url) url = "https://416-homes.vercel.app";
+    } else {
+      if (!url) { alert("Listing URL required"); return; }
+      if (!url.startsWith("http")) url = "https://" + url;
+    }
     setSubmitLoading(true);
     try {
       const res = await fetch(`${API_BASE}/api/video-jobs`, {
@@ -269,7 +296,7 @@ export default function VideoPage() {
         setDownloadVisible(true); setDownloadSubtitle("Demo mode — connect API for real video generation");
       }, 15000);
     } finally { setSubmitLoading(false); }
-  }, [formListingUrl, formEmail, tier, price, showProgress]);
+  }, [formListingUrl, formEmail, tier, price, showProgress, videoInputMode, videoFiles]);
 
   /* ── Shared styles ── */
   const mono: React.CSSProperties = { fontFamily: "var(--mono)" };
@@ -419,26 +446,72 @@ export default function VideoPage() {
       {orderFormVisible && (
         <section style={{ maxWidth: 1320, margin: "0 auto", padding: "72px 56px 64px", borderBottom: "1px solid var(--border)" }}>
 
-          {/* Listing URL */}
-          <div style={{ marginBottom: 8 }}>
-            <label style={{ display: "block", ...mono, fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: "0.13em", color: "var(--text-dim)", marginBottom: 8 }}>
-              Listing URL
-            </label>
-            <input
-              type="text"
-              value={formListingUrl}
-              onChange={e => setFormListingUrl(e.target.value)}
-              placeholder="https://www.realtor.ca/real-estate/..."
-              style={{
-                width: "100%", padding: "14px 16px",
-                border: "1px solid var(--border)", background: "rgba(255,255,255,0.03)",
-                ...mono, fontSize: "0.85rem", color: "var(--text)", outline: "none",
-                transition: "border-color 0.2s",
-              }}
-              onFocus={e => { e.currentTarget.style.borderColor = "var(--border-strong)"; }}
-              onBlur={e => { e.currentTarget.style.borderColor = "var(--border)"; }}
-            />
+          {/* Input mode toggle */}
+          <div style={{ display: "flex", marginBottom: 16, border: "1px solid var(--border)" }}>
+            {(["url", "upload"] as const).map(mode => (
+              <button key={mode} onClick={() => setVideoInputMode(mode)} style={{
+                flex: 1, padding: "10px 6px", border: "none",
+                background: videoInputMode === mode ? "var(--accent)" : "transparent",
+                color: videoInputMode === mode ? "#000" : "var(--text-dim)",
+                ...mono, fontSize: "0.6rem", fontWeight: 700,
+                letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer",
+              }}>
+                {mode === "url" ? "Listing URL" : "Upload Photos"}
+              </button>
+            ))}
           </div>
+
+          {videoInputMode === "url" ? (
+            /* Listing URL */
+            <div style={{ marginBottom: 8 }}>
+              <label style={{ display: "block", ...mono, fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: "0.13em", color: "var(--text-dim)", marginBottom: 8 }}>
+                Listing URL
+              </label>
+              <input
+                type="text"
+                value={formListingUrl}
+                onChange={e => setFormListingUrl(e.target.value)}
+                placeholder="https://www.realtor.ca/real-estate/..."
+                style={{
+                  width: "100%", padding: "14px 16px",
+                  border: "1px solid var(--border)", background: "rgba(255,255,255,0.03)",
+                  ...mono, fontSize: "0.85rem", color: "var(--text)", outline: "none",
+                  transition: "border-color 0.2s",
+                }}
+                onFocus={e => { e.currentTarget.style.borderColor = "var(--border-strong)"; }}
+                onBlur={e => { e.currentTarget.style.borderColor = "var(--border)"; }}
+              />
+            </div>
+          ) : (
+            /* Photo upload */
+            <div style={{ marginBottom: 8 }}>
+              <label style={{ display: "block", ...mono, fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: "0.13em", color: "var(--text-dim)", marginBottom: 8 }}>
+                Upload listing photos (up to 9)
+              </label>
+              <label style={{
+                display: "block", border: "2px dashed var(--border)", padding: "24px 16px",
+                textAlign: "center", cursor: "pointer",
+                ...mono, fontSize: "0.78rem", color: "var(--text-dim)",
+                transition: "border-color 0.2s", lineHeight: 1.7,
+              }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = "var(--accent)")}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = "var(--border)")}
+              >
+                <input ref={videoFileRef} type="file" accept="image/*" multiple
+                  onChange={handleVideoFileChange} style={{ display: "none" }} />
+                {videoFiles.length === 0
+                  ? <>📸 Click to select photos<br /><span style={{ fontSize: "0.62rem" }}>JPG · PNG · WEBP · up to 9</span></>
+                  : `${videoFiles.length} photo${videoFiles.length !== 1 ? "s" : ""} selected ✓`}
+              </label>
+              {videoFilePreviews.length > 0 && (
+                <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+                  {videoFilePreviews.map((src, i) => (
+                    <img key={i} src={src} alt="" style={{ width: 52, height: 52, objectFit: "cover", border: "1px solid var(--border)" }} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Email */}
           <div style={{ marginBottom: 40 }}>

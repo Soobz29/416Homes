@@ -1142,9 +1142,10 @@ async def _handle_stripe_webhook(body: bytes, sig_header: str) -> None:
 _TOUR_PRICE_CAD = 49
 
 class TourJobRequest(BaseModel):
-    listing_url: str
+    listing_url: str = ""        # empty when photo_urls provided
     customer_email: str
     customer_name: Optional[str] = ""
+    photo_urls: Optional[List[str]] = None   # pre-uploaded photos (skips scraping)
 
 class TourCheckoutRequest(BaseModel):
     listing_url: str
@@ -1161,15 +1162,25 @@ class TourJobResponse(BaseModel):
 
 @app.post("/api/tour-jobs")
 async def create_tour_job(request: TourJobRequest, background_tasks: BackgroundTasks):
-    """Create a tour job directly (dev/internal use — bypasses Stripe)."""
+    """Create a tour job directly (dev/internal use — bypasses Stripe).
+    If photo_urls is provided, encodes them in listing_url as upload://[json] so
+    the pipeline skips scraping and uses them directly."""
     if not supabase_client:
         raise HTTPException(status_code=503, detail="Database unavailable")
+    import json as _json
+    # Encode pre-uploaded photos into listing_url so no schema change needed
+    if request.photo_urls:
+        listing_url = "upload://" + _json.dumps(request.photo_urls)
+    elif request.listing_url:
+        listing_url = request.listing_url
+    else:
+        raise HTTPException(status_code=422, detail="Either listing_url or photo_urls is required")
     jid = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
     try:
         supabase_client.table("tour_jobs").insert({
             "id": jid,
-            "listing_url": request.listing_url,
+            "listing_url": listing_url,
             "customer_email": request.customer_email,
             "customer_name": request.customer_name or request.customer_email.split("@")[0],
             "status": "pending",
@@ -1200,6 +1211,35 @@ async def get_tour_job(job_id: str):
         )
     except Exception:
         raise HTTPException(status_code=404, detail="Tour job not found")
+
+@app.post("/api/upload-photos")
+async def upload_photos(files: List[UploadFile] = File(...)):
+    """Upload up to 9 listing photos to Supabase storage. Returns public URLs.
+    Bucket 'listing-uploads' must exist in Supabase dashboard (set to public)."""
+    if not supabase_client:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    BUCKET = "listing-uploads"
+    urls: list[str] = []
+    for f in files[:9]:
+        try:
+            data = await f.read()
+            name = f.filename or "photo.jpg"
+            ext = name.rsplit(".", 1)[-1].lower()
+            if ext not in ("jpg", "jpeg", "png", "webp", "avif"):
+                ext = "jpg"
+            path = f"uploads/{uuid.uuid4()}.{ext}"
+            supabase_client.storage.from_(BUCKET).upload(
+                path, data,
+                file_options={"content-type": f.content_type or "image/jpeg"},
+            )
+            pub = supabase_client.storage.from_(BUCKET).get_public_url(path)
+            urls.append(pub)
+        except Exception as e:
+            logger.warning("Photo upload failed (%s): %s", f.filename, e)
+    if not urls:
+        raise HTTPException(status_code=422, detail="No photos could be uploaded — check Supabase bucket 'listing-uploads' exists and is public")
+    return {"urls": urls, "count": len(urls)}
+
 
 async def _run_tour_job(job_id: str) -> None:
     try:

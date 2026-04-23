@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
-import dynamic from "next/dynamic";
+import { useState, useEffect, useRef } from "react";
 
-const PanoramaViewer = dynamic(() => import("@/components/PanoramaViewer"), { ssr: false });
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://fouronesixhomes-mcr6b.ondigitalocean.app").replace(/\/$/, "");
 
 /* ── Shared nav primitives ──────────────────────────────────────────── */
 function Logo({ sub }: { sub?: string }) {
@@ -68,40 +67,53 @@ const DEMO_PHOTOS = [
 ];
 
 type RoomKey = "living" | "kitchen" | "bedroom" | "bath";
-// panorama: wide 2:1 Unsplash interiors used as sphere demo images
-// (real product generates true equirectangular 360° via fal.ai + GPT-image-2)
-const ROOM_MAP: Record<RoomKey, { name: string; photo: string; panorama: string }> = {
-  living: {
-    name: "Living Room",
-    photo: DEMO_PHOTOS[0],
-    panorama: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=3840&h=1920&fit=crop&q=80",
-  },
-  kitchen: {
-    name: "Kitchen",
-    photo: DEMO_PHOTOS[1],
-    panorama: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=3840&h=1920&fit=crop&q=80",
-  },
-  bedroom: {
-    name: "Primary Bedroom",
-    photo: DEMO_PHOTOS[2],
-    panorama: "https://images.unsplash.com/photo-1566665797739-1674de7a421a?w=3840&h=1920&fit=crop&q=80",
-  },
-  bath: {
-    name: "Bathroom",
-    photo: DEMO_PHOTOS[3],
-    panorama: "https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=3840&h=1920&fit=crop&q=80",
-  },
+const ROOM_NAMES: Record<RoomKey, string> = {
+  living: "Living Room", kitchen: "Kitchen", bedroom: "Primary Bedroom", bath: "Bathroom",
+};
+// Fallback demo photos — overridden at runtime with real listing photos from API
+const FALLBACK_PHOTOS: Record<RoomKey, string> = {
+  living:  DEMO_PHOTOS[0],
+  kitchen: DEMO_PHOTOS[1],
+  bedroom: DEMO_PHOTOS[2],
+  bath:    DEMO_PHOTOS[3],
 };
 
 /* ── Page ───────────────────────────────────────────────────────────── */
 export default function ToursPage() {
   const [selectedRoom, setSelectedRoom] = useState<RoomKey>("living");
+  const [demoPhotos, setDemoPhotos] = useState<Record<RoomKey, string>>(FALLBACK_PHOTOS);
+  const [demoImgKey, setDemoImgKey] = useState(0);
   const [url, setUrl] = useState("");
   const [email, setEmail] = useState("");
+  const [inputMode, setInputMode] = useState<"url" | "upload">("url");
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [filePreviewUrls, setFilePreviewUrls] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [paid, setPaid] = useState(false);
   const [progress, setProgress] = useState(0);
   const [tourId] = useState(() => Math.floor(Math.random() * 9000 + 1000));
   const [menuOpen, setMenuOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch real listing photos from API for demo
+  useEffect(() => {
+    fetch(`${API_BASE}/api/listings?limit=20`)
+      .then(r => r.json())
+      .then(data => {
+        const withPhotos = (data.listings || []).filter(
+          (l: { photo_url?: string }) => l.photo_url
+        );
+        if (withPhotos.length >= 4) {
+          setDemoPhotos({
+            living:  withPhotos[0].photo_url,
+            kitchen: withPhotos[1].photo_url,
+            bedroom: withPhotos[2].photo_url,
+            bath:    withPhotos[3].photo_url,
+          });
+        }
+      })
+      .catch(() => {}); // keep FALLBACK_PHOTOS
+  }, []);
 
   useEffect(() => {
     if (!paid) return;
@@ -111,6 +123,37 @@ export default function ToursPage() {
     }), 200);
     return () => clearInterval(t);
   }, [paid]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []).slice(0, 9);
+    setSelectedFiles(files);
+    setFilePreviewUrls(files.map(f => URL.createObjectURL(f)));
+  };
+
+  const handlePay = async () => {
+    if (!email.includes("@")) { alert("Valid email required"); return; }
+    if (inputMode === "upload") {
+      if (selectedFiles.length === 0) { alert("Please select at least one photo"); return; }
+      setUploading(true);
+      try {
+        const formData = new FormData();
+        selectedFiles.forEach(f => formData.append("files", f));
+        const res = await fetch(`${API_BASE}/api/upload-photos`, { method: "POST", body: formData });
+        if (res.ok) {
+          const data = await res.json();
+          // Create real tour job with uploaded photos
+          await fetch(`${API_BASE}/api/tour-jobs`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ customer_email: email, photo_urls: data.urls }),
+          });
+        }
+      } catch { /* silently fall through to demo mode */ }
+      finally { setUploading(false); }
+    } else {
+      if (!url.trim()) { alert("Listing URL required"); return; }
+    }
+    setPaid(true);
+  };
 
   const progressLabel =
     progress < 30  ? "Fetching listing photos…" :
@@ -179,17 +222,30 @@ export default function ToursPage() {
         {/* Demo — dollhouse + sidebar */}
         <div style={{ marginBottom: 48, border: "1px solid var(--border-strong)", overflow: "hidden", background: "var(--bg-elev)" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 0 }}>
-            {/* 360° Panorama sphere viewer */}
-            <div style={{ position: "relative", aspectRatio: "16/10", background: "#000", overflow: "hidden" }}>
-              <PanoramaViewer
-                url={ROOM_MAP[selectedRoom].panorama}
-                style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+            {/* Real listing photo with Ken Burns — no distortion */}
+            <div style={{ position: "relative", aspectRatio: "16/10", background: "#060606", overflow: "hidden" }}>
+              <style>{`
+                @keyframes tourKB { 0%{transform:scale(1) translate(0,0)} 100%{transform:scale(1.06) translate(-0.8%,-0.4%)} }
+                @keyframes tourFI { from{opacity:0} to{opacity:1} }
+              `}</style>
+              <img
+                key={`${selectedRoom}-${demoImgKey}`}
+                src={demoPhotos[selectedRoom]}
+                alt={ROOM_NAMES[selectedRoom]}
+                style={{
+                  position: "absolute", inset: 0, width: "100%", height: "100%",
+                  objectFit: "cover",
+                  animation: "tourKB 9s ease-out forwards, tourFI 0.4s ease",
+                  transformOrigin: "center center",
+                }}
               />
+              {/* Gradient overlay */}
+              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(5,6,10,0.25) 0%, rgba(5,6,10,0.65) 100%)", pointerEvents: "none" }} />
 
               {/* Top chrome */}
               <div style={{ position: "absolute", top: 20, left: 20, background: "rgba(5,6,10,0.88)", padding: "10px 16px", border: "1px solid var(--border)", zIndex: 3 }}>
-                <div style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)" }}>360° Virtual Tour</div>
-                <div style={{ fontFamily: "var(--mono)", fontSize: "1.05rem", fontWeight: 600, color: "#fff", marginTop: 4 }}>{ROOM_MAP[selectedRoom].name}</div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)" }}>Real GTA Listing</div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "1.05rem", fontWeight: 600, color: "#fff", marginTop: 4 }}>{ROOM_NAMES[selectedRoom]}</div>
               </div>
 
               {/* Bottom bar */}
@@ -198,13 +254,8 @@ export default function ToursPage() {
                   <span style={{ color: "var(--accent)" }}>◆</span> 88 Niagara St, Unit 412 — King West · 2BR 2BA
                 </div>
                 <div style={{ background: "rgba(5,6,10,0.88)", padding: "8px 12px", border: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.64rem", color: "var(--accent)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
-                  ◉ 360°
+                  ◉ 360° on delivery
                 </div>
-              </div>
-
-              {/* Interaction cue */}
-              <div style={{ position: "absolute", top: 20, right: 20, background: "rgba(5,6,10,0.75)", padding: "6px 10px", border: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.52rem", color: "var(--text-mute)", letterSpacing: "0.1em", textTransform: "uppercase", zIndex: 3 }}>
-                Drag · Scroll to zoom
               </div>
             </div>
 
@@ -217,8 +268,8 @@ export default function ToursPage() {
                   Matterport-style 3D dollhouse. Click rooms in the model to navigate through the property.
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {(Object.entries(ROOM_MAP) as [RoomKey, { name: string }][]).map(([k, v]) => (
-                    <button key={k} onClick={() => setSelectedRoom(k)} style={{
+                  {(Object.keys(ROOM_NAMES) as RoomKey[]).map(k => (
+                    <button key={k} onClick={() => { setSelectedRoom(k); setDemoImgKey(n => n + 1); }} style={{
                       padding: "10px 12px", textAlign: "left",
                       background: selectedRoom === k ? "var(--bg-panel)" : "transparent",
                       border: `1px solid ${selectedRoom === k ? "var(--accent)" : "var(--border)"}`,
@@ -228,13 +279,13 @@ export default function ToursPage() {
                       display: "flex", alignItems: "center", gap: 8,
                     }}>
                       <span style={{ opacity: selectedRoom === k ? 1 : 0.4 }}>{selectedRoom === k ? "●" : "○"}</span>
-                      {v.name}
+                      {ROOM_NAMES[k]}
                     </button>
                   ))}
                 </div>
               </div>
               <div style={{ paddingTop: 16, borderTop: "1px solid var(--border)", marginTop: 16, fontFamily: "var(--mono)", fontSize: "0.58rem", color: "var(--text-dim)", lineHeight: 1.6, letterSpacing: "0.06em" }}>
-                Gemini Vision classifies photos → auto-generates 3D dollhouse + room-by-room gallery.
+                Gemini Vision classifies photos → room-by-room tour + 360° panoramas generated per room.
               </div>
             </div>
           </div>
@@ -283,9 +334,55 @@ export default function ToursPage() {
             {!paid ? (
               <>
                 <div style={{ fontFamily: "var(--mono)", fontSize: "1.3rem", fontWeight: 700, marginBottom: 20 }}>Order a tour</div>
-                <FormField label="Listing URL">
-                  <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://www.realtor.ca/..." style={inputStyle} />
-                </FormField>
+
+                {/* Input mode toggle */}
+                <div style={{ display: "flex", marginBottom: 16, border: "1px solid var(--border)" }}>
+                  {(["url", "upload"] as const).map(mode => (
+                    <button key={mode} onClick={() => setInputMode(mode)} style={{
+                      flex: 1, padding: "9px 6px", border: "none",
+                      background: inputMode === mode ? "var(--accent)" : "transparent",
+                      color: inputMode === mode ? "var(--bg)" : "var(--text-mute)",
+                      fontFamily: "var(--mono)", fontSize: "0.6rem", fontWeight: 700,
+                      letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer",
+                    }}>
+                      {mode === "url" ? "Listing URL" : "Upload Photos"}
+                    </button>
+                  ))}
+                </div>
+
+                {inputMode === "url" ? (
+                  <FormField label="Listing URL">
+                    <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://www.realtor.ca/..." style={inputStyle} />
+                  </FormField>
+                ) : (
+                  <FormField label={`Upload listing photos (up to 9)`}>
+                    <div>
+                      <label style={{
+                        display: "block", border: "2px dashed var(--border)", padding: "20px 12px",
+                        textAlign: "center", cursor: "pointer", fontFamily: "var(--mono)",
+                        fontSize: "0.72rem", color: "var(--text-mute)", transition: "border-color 0.2s",
+                        lineHeight: 1.7,
+                      }}
+                        onMouseEnter={e => (e.currentTarget.style.borderColor = "var(--accent)")}
+                        onMouseLeave={e => (e.currentTarget.style.borderColor = "var(--border)")}
+                      >
+                        <input ref={fileInputRef} type="file" accept="image/*" multiple
+                          onChange={handleFileChange} style={{ display: "none" }} />
+                        {selectedFiles.length === 0
+                          ? <>📸 Click to select photos<br /><span style={{ fontSize: "0.58rem" }}>JPG · PNG · WEBP · up to 9</span></>
+                          : `${selectedFiles.length} photo${selectedFiles.length !== 1 ? "s" : ""} selected ✓`}
+                      </label>
+                      {filePreviewUrls.length > 0 && (
+                        <div style={{ display: "flex", gap: 4, marginTop: 8, flexWrap: "wrap" }}>
+                          {filePreviewUrls.map((src, i) => (
+                            <img key={i} src={src} alt="" style={{ width: 44, height: 44, objectFit: "cover", border: "1px solid var(--border)" }} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </FormField>
+                )}
+
                 <FormField label="Delivery email">
                   <input value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" style={inputStyle} />
                 </FormField>
@@ -297,8 +394,8 @@ export default function ToursPage() {
                   </div>
                 </div>
 
-                <PrimaryBtn onClick={() => { if (url && email) setPaid(true); }}>
-                  Pay &amp; generate →
+                <PrimaryBtn onClick={handlePay} disabled={uploading}>
+                  {uploading ? "Uploading…" : "Pay & generate →"}
                 </PrimaryBtn>
                 <div style={{ fontFamily: "var(--mono)", fontSize: "0.6rem", color: "var(--text-dim)", textAlign: "center", marginTop: 12 }}>
                   Secure checkout via Stripe

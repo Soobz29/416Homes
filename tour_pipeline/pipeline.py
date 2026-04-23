@@ -337,35 +337,51 @@ async def process_tour_job(job_id: str) -> None:
     try:
         row = db.table("tour_jobs").select("*").eq("id", job_id).single().execute()
         job = row.data
-        listing_url = job.get("listing_url", "")
+        raw_url = job.get("listing_url", "")
         customer_email = job.get("customer_email", "")
         customer_name = job.get("customer_name", "") or customer_email.split("@")[0]
 
         _update(status="processing")
 
+        # Check for pre-uploaded photos (listing_url = "upload://[json_array]")
+        pre_uploaded: list[str] = []
+        listing_url = raw_url
+        if raw_url.startswith("upload://"):
+            import json as _json
+            try:
+                pre_uploaded = _json.loads(raw_url[9:])
+                listing_url = "direct-upload"
+                logger.info("Tour job %s: using %d pre-uploaded photos", job_id, len(pre_uploaded))
+            except Exception:
+                logger.warning("Tour job %s: failed to parse uploaded photo URLs", job_id)
+
         # Look up floor_plan_url (Matterport / 3D tour embed) for this listing
         embed_url: str = ""
-        try:
-            lr = db.table("listings").select("floor_plan_url").eq("url", listing_url).limit(1).execute()
-            if lr.data:
-                fp = (lr.data[0].get("floor_plan_url") or "").strip()
-                if fp.startswith("http"):
-                    embed_url = fp
-                    logger.info("Tour job %s: found embed URL %s", job_id, embed_url)
-        except Exception as e:
-            logger.warning("Tour job %s: floor_plan_url lookup failed: %s", job_id, e)
+        if listing_url not in ("", "direct-upload"):
+            try:
+                lr = db.table("listings").select("floor_plan_url").eq("url", listing_url).limit(1).execute()
+                if lr.data:
+                    fp = (lr.data[0].get("floor_plan_url") or "").strip()
+                    if fp.startswith("http"):
+                        embed_url = fp
+                        logger.info("Tour job %s: found embed URL %s", job_id, embed_url)
+            except Exception as e:
+                logger.warning("Tour job %s: floor_plan_url lookup failed: %s", job_id, e)
 
-        # Step 1: Fetch photos (3-tier fallback: scrape → DB lookup → stock)
-        logger.info("Tour job %s: fetching photos from %s", job_id, listing_url)
-        photo_urls = await _fetch_listing_photos(listing_url)
+        # Step 1: Fetch photos (pre-uploaded → 3-tier fallback: scrape → DB lookup → stock)
         used_stock = False
-        if not photo_urls:
-            logger.info("Tour job %s: direct scrape empty, trying DB lookup", job_id)
-            photo_urls = await _fetch_photos_from_db(listing_url)
-        if not photo_urls:
-            logger.warning("Tour job %s: no photos found anywhere — using stock photos", job_id)
-            photo_urls = STOCK_PHOTOS
-            used_stock = True
+        if pre_uploaded:
+            photo_urls = pre_uploaded
+        else:
+            logger.info("Tour job %s: fetching photos from %s", job_id, listing_url)
+            photo_urls = await _fetch_listing_photos(listing_url)
+            if not photo_urls:
+                logger.info("Tour job %s: direct scrape empty, trying DB lookup", job_id)
+                photo_urls = await _fetch_photos_from_db(listing_url)
+            if not photo_urls:
+                logger.warning("Tour job %s: no photos found anywhere — using stock photos", job_id)
+                photo_urls = STOCK_PHOTOS
+                used_stock = True
         _update(status="classifying", progress=30)
 
         # Step 2: Classify with Gemini
