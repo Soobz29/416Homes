@@ -226,6 +226,48 @@ async def _classify_photos_gemini(photo_urls: list[str]) -> list[dict[str, Any]]
         return [{"url": u, "room_type": labels[i % len(labels)]} for i, u in enumerate(photo_urls)]
 
 
+async def _generate_panoramas(rooms: list[dict]) -> list[dict]:
+    """Convert each room's primary photo(s) into a 360° equirectangular panorama via fal.ai.
+    Silently skips any room that fails — viewer falls back to flat photo."""
+    fal_key = os.getenv("FAL_KEY")
+    if not fal_key:
+        logger.debug("[tour] FAL_KEY not set — skipping 360° panorama generation")
+        return rooms
+    try:
+        import fal_client  # lazy import — only loaded when FAL_KEY is set
+    except ImportError:
+        logger.warning("[tour] fal-client not installed — skipping panorama generation")
+        return rooms
+
+    for room in rooms:
+        photos = room.get("photos", [])
+        if not photos:
+            continue
+        slug_label = room.get("slug", "room").replace("_", " ")
+        try:
+            result = await fal_client.run_async(
+                "openai/gpt-image-2/edit",
+                arguments={
+                    "prompt": (
+                        f"Convert this into a 360 equirectangular panoramic image of a {slug_label}. "
+                        "The output must be a seamless equirectangular panorama suitable for virtual tour viewing."
+                    ),
+                    "image_urls": photos[:3],
+                    "image_size": {"width": 3840, "height": 1920},
+                    "quality": "low",
+                    "num_images": 1,
+                    "output_format": "png",
+                },
+            )
+            pano_url = (result.get("images") or [{}])[0].get("url")
+            if pano_url:
+                room["panorama_url"] = pano_url
+                logger.info("[tour] panorama generated for %s: %s", slug_label, pano_url[:60])
+        except Exception as e:
+            logger.warning("[tour] panorama skip for %s: %s", slug_label, e)
+    return rooms
+
+
 def _build_manifest(classified: list[dict]) -> dict:
     """Group classified photos into rooms, sorted by display priority."""
     PRIORITY = ["exterior", "living_room", "kitchen", "dining_room", "bedroom", "bathroom", "backyard", "basement", "garage", "other"]
@@ -338,6 +380,11 @@ async def process_tour_job(job_id: str) -> None:
             manifest["embed_url"] = embed_url
         if used_stock:
             manifest["stock_photos"] = True  # viewer can show a "sample photos" notice
+
+        # Step 3b: Generate 360° panoramas (requires FAL_KEY — silently skipped otherwise)
+        logger.info("Tour job %s: generating 360° panoramas", job_id)
+        manifest["rooms"] = await _generate_panoramas(manifest["rooms"])
+
         tour_url = f"{APP_URL}/tours/{job_id}"
 
         _update(

@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
+
+const PanoramaViewer = dynamic(() => import("@/components/PanoramaViewer"), { ssr: false });
 
 /* ── Shared nav primitives ──────────────────────────────────────────── */
 function Logo({ sub }: { sub?: string }) {
@@ -65,66 +68,30 @@ const DEMO_PHOTOS = [
 ];
 
 type RoomKey = "living" | "kitchen" | "bedroom" | "bath";
-const ROOM_MAP: Record<RoomKey, { name: string; photo: string }> = {
-  living:  { name: "Living Room",      photo: DEMO_PHOTOS[0] },
-  kitchen: { name: "Kitchen",          photo: DEMO_PHOTOS[1] },
-  bedroom: { name: "Primary Bedroom",  photo: DEMO_PHOTOS[2] },
-  bath:    { name: "Bathroom",         photo: DEMO_PHOTOS[3] },
+// panorama: wide 2:1 Unsplash interiors used as sphere demo images
+// (real product generates true equirectangular 360° via fal.ai + GPT-image-2)
+const ROOM_MAP: Record<RoomKey, { name: string; photo: string; panorama: string }> = {
+  living: {
+    name: "Living Room",
+    photo: DEMO_PHOTOS[0],
+    panorama: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=3840&h=1920&fit=crop&q=80",
+  },
+  kitchen: {
+    name: "Kitchen",
+    photo: DEMO_PHOTOS[1],
+    panorama: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=3840&h=1920&fit=crop&q=80",
+  },
+  bedroom: {
+    name: "Primary Bedroom",
+    photo: DEMO_PHOTOS[2],
+    panorama: "https://images.unsplash.com/photo-1566665797739-1674de7a421a?w=3840&h=1920&fit=crop&q=80",
+  },
+  bath: {
+    name: "Bathroom",
+    photo: DEMO_PHOTOS[3],
+    panorama: "https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=3840&h=1920&fit=crop&q=80",
+  },
 };
-
-/* ── 3D Dollhouse SVG ───────────────────────────────────────────────── */
-function Dollhouse({ selected, onSelect }: { selected: RoomKey; onSelect: (r: RoomKey) => void }) {
-  return (
-    <svg viewBox="0 0 800 500" style={{ width: "100%", height: "100%", display: "block" }}>
-      {/* Isometric floor */}
-      <polygon points="100,350 400,200 700,350 400,500" fill="#1A1A18" stroke="rgba(255,191,0,0.2)" strokeWidth="1" />
-
-      {/* Living room */}
-      <g onClick={() => onSelect("living")} style={{ cursor: "pointer" }} opacity={selected === "living" ? 1 : 0.65}>
-        <polygon points="100,350 250,275 250,150 100,225"
-          fill="#0F1218" stroke={selected === "living" ? "var(--accent)" : "rgba(255,191,0,0.25)"}
-          strokeWidth={selected === "living" ? 2 : 1} />
-        <text x="175" y="265" fill={selected === "living" ? "var(--accent)" : "#666"}
-          fontSize="10" fontFamily="'JetBrains Mono',monospace" textAnchor="middle" letterSpacing="1">LIVING</text>
-        {selected === "living" && <circle cx="175" cy="240" r="18" fill="none" stroke="var(--accent)" strokeWidth="1.5" opacity="0.6" />}
-      </g>
-
-      {/* Kitchen */}
-      <g onClick={() => onSelect("kitchen")} style={{ cursor: "pointer" }} opacity={selected === "kitchen" ? 1 : 0.65}>
-        <polygon points="250,275 400,200 400,100 250,175"
-          fill="#0F1218" stroke={selected === "kitchen" ? "var(--accent)" : "rgba(255,191,0,0.25)"}
-          strokeWidth={selected === "kitchen" ? 2 : 1} />
-        <text x="325" y="222" fill={selected === "kitchen" ? "var(--accent)" : "#666"}
-          fontSize="10" fontFamily="'JetBrains Mono',monospace" textAnchor="middle" letterSpacing="1">KITCHEN</text>
-        {selected === "kitchen" && <circle cx="325" cy="200" r="18" fill="none" stroke="var(--accent)" strokeWidth="1.5" opacity="0.6" />}
-      </g>
-
-      {/* Bedroom */}
-      <g onClick={() => onSelect("bedroom")} style={{ cursor: "pointer" }} opacity={selected === "bedroom" ? 1 : 0.65}>
-        <polygon points="400,200 550,275 550,150 400,100"
-          fill="#0F1218" stroke={selected === "bedroom" ? "var(--accent)" : "rgba(255,191,0,0.25)"}
-          strokeWidth={selected === "bedroom" ? 2 : 1} />
-        <text x="475" y="222" fill={selected === "bedroom" ? "var(--accent)" : "#666"}
-          fontSize="10" fontFamily="'JetBrains Mono',monospace" textAnchor="middle" letterSpacing="1">BEDROOM</text>
-        {selected === "bedroom" && <circle cx="475" cy="200" r="18" fill="none" stroke="var(--accent)" strokeWidth="1.5" opacity="0.6" />}
-      </g>
-
-      {/* Bathroom */}
-      <g onClick={() => onSelect("bath")} style={{ cursor: "pointer" }} opacity={selected === "bath" ? 1 : 0.65}>
-        <polygon points="550,275 700,350 700,225 550,150"
-          fill="#0F1218" stroke={selected === "bath" ? "var(--accent)" : "rgba(255,191,0,0.25)"}
-          strokeWidth={selected === "bath" ? 2 : 1} />
-        <text x="625" y="262" fill={selected === "bath" ? "var(--accent)" : "#666"}
-          fontSize="10" fontFamily="'JetBrains Mono',monospace" textAnchor="middle" letterSpacing="1">BATH</text>
-        {selected === "bath" && <circle cx="625" cy="240" r="18" fill="none" stroke="var(--accent)" strokeWidth="1.5" opacity="0.6" />}
-      </g>
-
-      {/* Grid guides */}
-      <line x1="400" y1="100" x2="400" y2="500" stroke="rgba(255,255,255,0.04)" strokeWidth="1" strokeDasharray="4 4" />
-      <line x1="250" y1="150" x2="550" y2="150" stroke="rgba(255,255,255,0.04)" strokeWidth="1" strokeDasharray="4 4" />
-    </svg>
-  );
-}
 
 /* ── Page ───────────────────────────────────────────────────────────── */
 export default function ToursPage() {
@@ -212,24 +179,16 @@ export default function ToursPage() {
         {/* Demo — dollhouse + sidebar */}
         <div style={{ marginBottom: 48, border: "1px solid var(--border-strong)", overflow: "hidden", background: "var(--bg-elev)" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 0 }}>
-            {/* Dollhouse */}
+            {/* 360° Panorama sphere viewer */}
             <div style={{ position: "relative", aspectRatio: "16/10", background: "#000", overflow: "hidden" }}>
-              {/* Room photo background */}
-              <img
-                key={selectedRoom}
-                src={ROOM_MAP[selectedRoom].photo}
-                alt=""
-                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.45, transition: "opacity 0.4s" }}
+              <PanoramaViewer
+                url={ROOM_MAP[selectedRoom].panorama}
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
               />
-              {/* Dark gradient overlay */}
-              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(5,6,10,0.35) 0%, rgba(5,6,10,0.6) 100%)", zIndex: 1 }} />
-              <div style={{ position: "relative", zIndex: 2 }}>
-                <Dollhouse selected={selectedRoom} onSelect={setSelectedRoom} />
-              </div>
 
               {/* Top chrome */}
               <div style={{ position: "absolute", top: 20, left: 20, background: "rgba(5,6,10,0.88)", padding: "10px 16px", border: "1px solid var(--border)", zIndex: 3 }}>
-                <div style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)" }}>3D Dollhouse</div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)" }}>360° Virtual Tour</div>
                 <div style={{ fontFamily: "var(--mono)", fontSize: "1.05rem", fontWeight: 600, color: "#fff", marginTop: 4 }}>{ROOM_MAP[selectedRoom].name}</div>
               </div>
 
@@ -239,8 +198,13 @@ export default function ToursPage() {
                   <span style={{ color: "var(--accent)" }}>◆</span> 88 Niagara St, Unit 412 — King West · 2BR 2BA
                 </div>
                 <div style={{ background: "rgba(5,6,10,0.88)", padding: "8px 12px", border: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.64rem", color: "var(--accent)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
-                  ⬡ 3D View
+                  ◉ 360°
                 </div>
+              </div>
+
+              {/* Interaction cue */}
+              <div style={{ position: "absolute", top: 20, right: 20, background: "rgba(5,6,10,0.75)", padding: "6px 10px", border: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.52rem", color: "var(--text-mute)", letterSpacing: "0.1em", textTransform: "uppercase", zIndex: 3 }}>
+                Drag · Scroll to zoom
               </div>
             </div>
 

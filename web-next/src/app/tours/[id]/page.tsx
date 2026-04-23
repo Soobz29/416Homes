@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
+import dynamic from "next/dynamic";
+
+const PanoramaViewer = dynamic(() => import("@/components/PanoramaViewer"), { ssr: false });
 
 const API_BASE = (
   process.env.NEXT_PUBLIC_API_URL ||
@@ -12,6 +15,7 @@ interface Room {
   slug: string;
   name: string;
   photos: string[];
+  panorama_url?: string;
 }
 
 interface Manifest {
@@ -323,9 +327,16 @@ export default function TourViewerPage() {
                     {room.name.slice(0, 2).toUpperCase()}
                   </div>
                 )}
-                <div>
-                  <div style={{ fontFamily: FONT_MONO, fontSize: "0.68rem", fontWeight: active ? 700 : 400, color: active ? GOLD : TEXT, textTransform: "uppercase", letterSpacing: "0.08em", lineHeight: 1.2 }}>
-                    {room.name}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                    <div style={{ fontFamily: FONT_MONO, fontSize: "0.68rem", fontWeight: active ? 700 : 400, color: active ? GOLD : TEXT, textTransform: "uppercase", letterSpacing: "0.08em", lineHeight: 1.2 }}>
+                      {room.name}
+                    </div>
+                    {room.panorama_url && (
+                      <span style={{ fontFamily: FONT_MONO, fontSize: "0.46rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "#c8a96e", background: "rgba(200,169,110,0.12)", border: "1px solid rgba(200,169,110,0.3)", padding: "1px 4px", borderRadius: 2, flexShrink: 0 }}>
+                        ◉ 360°
+                      </span>
+                    )}
                   </div>
                   <div style={{ fontFamily: FONT_MONO, fontSize: "0.55rem", color: SUBTEXT, marginTop: "0.15rem" }}>
                     {room.photos.length} photo{room.photos.length !== 1 ? "s" : ""}
@@ -339,22 +350,31 @@ export default function TourViewerPage() {
         {/* ── Main photo viewport ── */}
         <main style={{ flex: 1, position: "relative", overflow: "hidden", background: "#000" }}>
 
-          {/* Background photo with Ken Burns */}
-          {currentPhoto && (
-            <img
-              key={imgKey}
-              src={currentPhoto}
-              alt={`${currentRoom.name} — photo ${photoIdx + 1}`}
-              style={{
-                position: "absolute",
-                inset: 0,
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-                animation: "kenBurns 9s ease-out forwards, fadeIn 0.35s ease",
-                transformOrigin: "center center",
-              }}
+          {/* 360° panorama sphere — shown when panorama_url is available */}
+          {currentRoom?.panorama_url ? (
+            <PanoramaViewer
+              key={`pano-${roomIdx}`}
+              url={currentRoom.panorama_url}
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
             />
+          ) : (
+            /* Flat photo with Ken Burns fallback */
+            currentPhoto && (
+              <img
+                key={imgKey}
+                src={currentPhoto}
+                alt={`${currentRoom.name} — photo ${photoIdx + 1}`}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  animation: "kenBurns 9s ease-out forwards, fadeIn 0.35s ease",
+                  transformOrigin: "center center",
+                }}
+              />
+            )
           )}
 
           {/* Bottom gradient for HUD legibility */}

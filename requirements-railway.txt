@@ -38,3 +38,6 @@ python-jose[cryptography]==3.3.0
 python-multipart==0.0.9
 aiohttp==3.9.3
 Pillow>=10.0.0
+
+# 360° panorama generation (lazy-imported — only when FAL_KEY is set)
+fal-client>=0.10.0
