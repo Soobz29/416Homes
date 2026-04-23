@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
+import HouseLogo from "@/components/HouseLogo";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || (typeof window !== "undefined" ? window.location.origin : "http://localhost:8000")).replace(/\/$/, "");
 const STEP_ORDER = ["scrape", "script", "audio", "animate", "assemble"] as const;
@@ -313,11 +314,7 @@ export default function VideoPage() {
         borderBottom: "1px solid var(--border)",
       }}>
         <Link href="/" style={{ textDecoration: "none" }}>
-          <div style={{ ...mono, fontSize: "1.1rem", fontWeight: 800, letterSpacing: "0.02em" }}>
-            <span style={{ color: "var(--accent)" }}>416</span>
-            <span style={{ color: "var(--text)" }}> Homes</span>
-            <span style={{ color: "var(--text-dim)", fontSize: "0.56rem", marginLeft: 6, letterSpacing: "0.14em", textTransform: "uppercase" }}>GTA</span>
-          </div>
+          <HouseLogo size={28} />
         </Link>
         <ul className="nav-links" style={{ display: "flex", listStyle: "none", gap: 36, margin: 0, padding: 0, ...mono, fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)" }}>
           {VIDEO_NAV.map(([href, label]) => (
@@ -633,10 +630,7 @@ export default function VideoPage() {
         borderTop: "1px solid var(--border)",
         display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
-        <div style={{ ...mono, fontSize: "1rem", fontWeight: 700 }}>
-          <span style={{ color: "var(--accent)" }}>416</span>
-          <span style={{ color: "var(--text)" }}> Homes</span>
-        </div>
+        <HouseLogo size={22} />
         <div style={{ ...mono, fontSize: "0.6rem", color: "var(--text-dim)" }}>
           Covering the Greater Toronto Area · Built on real sold data
         </div>

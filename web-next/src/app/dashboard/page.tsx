@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import dynamicImport from "next/dynamic";
+import HouseLogo from "@/components/HouseLogo";
 import Link from "next/link";
 import { Listing } from "@/types";
 import { fetchListings, fetchValuation } from "@/lib/api";
@@ -483,11 +484,9 @@ export default function DashboardPage() {
         borderBottom: "1px solid var(--border)",
       }}>
         {/* Logo */}
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontFamily: "var(--mono)", fontWeight: 800, fontSize: "1.2rem", letterSpacing: "0.02em" }}>
-          <span style={{ color: "var(--accent)" }}>416</span>
-          <span style={{ color: "var(--text)" }}>Homes</span>
-          <span style={{ fontFamily: "var(--mono)", fontSize: "0.52rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--text-dim)", fontWeight: 400 }}>Dashboard</span>
-        </div>
+        <Link href="/" style={{ textDecoration: "none" }}>
+          <HouseLogo size={28} />
+        </Link>
 
         {/* Tab buttons — mid nav */}
         <div className="dash-nav-tabs" style={{ display: "flex", gap: 0, overflowX: "auto", WebkitOverflowScrolling: "touch" as any }}>
@@ -1169,14 +1168,34 @@ export default function DashboardPage() {
             {/* 3D Dollhouse demo */}
             <div style={{ marginBottom: 40, border: "1px solid var(--border-strong)", overflow: "hidden", background: "var(--bg-elev)" }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 260px", gap: 0 }}>
-                <div style={{ position: "relative", aspectRatio: "16/10", background: "#000", overflow: "hidden" }}>
-                  <DashDollhouse selected={tourRoom} onSelect={setTourRoom} />
-                  <div style={{ position: "absolute", top: 16, left: 16, background: "rgba(5,6,10,0.88)", padding: "10px 14px", border: "1px solid var(--border)" }}>
-                    <div style={{ fontFamily: "var(--mono)", fontSize: "0.56rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)" }}>3D Dollhouse Demo</div>
+                <div style={{ position: "relative", aspectRatio: "16/10", background: "#060606", overflow: "hidden" }}>
+                  <style>{`
+                    @keyframes dashKB { 0%{transform:scale(1) translate(0,0)} 100%{transform:scale(1.07) translate(-1%,-0.5%)} }
+                    @keyframes dashFI { from{opacity:0} to{opacity:1} }
+                  `}</style>
+                  <img
+                    key={tourRoom}
+                    src={DASH_ROOM_MAP[tourRoom].photo}
+                    alt={DASH_ROOM_MAP[tourRoom].name}
+                    style={{
+                      position: "absolute", inset: 0, width: "100%", height: "100%",
+                      objectFit: "cover",
+                      animation: "dashKB 9s ease-out forwards, dashFI 0.35s ease",
+                      transformOrigin: "center center",
+                    }}
+                  />
+                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(5,6,10,0.18) 0%, rgba(5,6,10,0.62) 100%)", pointerEvents: "none" }} />
+                  <div style={{ position: "absolute", top: 16, left: 16, background: "rgba(5,6,10,0.88)", padding: "10px 14px", border: "1px solid var(--border)", zIndex: 3 }}>
+                    <div style={{ fontFamily: "var(--mono)", fontSize: "0.56rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)" }}>Live Demo</div>
                     <div style={{ fontFamily: "var(--mono)", fontSize: "0.95rem", fontWeight: 600, color: "#fff", marginTop: 4 }}>{DASH_ROOM_MAP[tourRoom].name}</div>
                   </div>
-                  <div style={{ position: "absolute", bottom: 12, left: 12, background: "rgba(5,6,10,0.88)", padding: "7px 12px", border: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.64rem", color: "#fff" }}>
-                    <span style={{ color: "var(--accent)" }}>◆</span> 88 Niagara St, Unit 412 — King West
+                  <div style={{ position: "absolute", bottom: 12, left: 12, right: 12, display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 3 }}>
+                    <div style={{ background: "rgba(5,6,10,0.88)", padding: "7px 12px", border: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.64rem", color: "#fff" }}>
+                      <span style={{ color: "var(--accent)" }}>◆</span> 88 Niagara St, Unit 412 — King West
+                    </div>
+                    <div style={{ background: "rgba(5,6,10,0.88)", padding: "7px 10px", border: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.58rem", color: "var(--accent)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                      ◉ 360° on delivery
+                    </div>
                   </div>
                 </div>
                 <div style={{ padding: 24, borderLeft: "1px solid var(--border)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
@@ -1254,11 +1273,7 @@ export default function DashboardPage() {
 
       {/* ── Footer ───────────────────────────────────────────────────── */}
       <footer style={{ borderTop: "1px solid var(--border)", padding: "24px 40px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-        <div style={{ fontFamily: "var(--serif)", fontSize: "1rem", fontWeight: 500 }}>
-          <span style={{ color: "var(--accent)" }}>416</span>
-          <span style={{ color: "var(--text-mute)" }}>homes</span>
-          <span style={{ fontFamily: "var(--mono)", fontSize: "0.5rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)", marginLeft: 8 }}>Dashboard</span>
-        </div>
+        <HouseLogo size={24} />
         <div style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)" }}>
           © 2026 416Homes · Toronto Real Estate Intelligence
         </div>

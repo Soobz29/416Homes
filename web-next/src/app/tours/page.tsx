@@ -2,19 +2,9 @@
 
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
+import HouseLogo from "@/components/HouseLogo";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://fouronesixhomes-mcr6b.ondigitalocean.app").replace(/\/$/, "");
-
-/* ── Shared nav primitives ──────────────────────────────────────────── */
-function Logo({ sub }: { sub?: string }) {
-  return (
-    <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontFamily: "var(--mono)", fontWeight: 800, fontSize: "1.2rem", letterSpacing: "0.02em" }}>
-      <span style={{ color: "var(--accent)" }}>416</span>
-      <span style={{ color: "var(--text)" }}>Homes</span>
-      {sub && <span style={{ fontFamily: "var(--mono)", fontSize: "0.56rem", color: "var(--text-dim)", letterSpacing: "0.14em", textTransform: "uppercase", paddingLeft: 4, fontWeight: 400 }}>{sub}</span>}
-    </div>
-  );
-}
 
 function Eyebrow({ children, line }: { children: React.ReactNode; line?: boolean }) {
   return (
@@ -144,7 +134,7 @@ export default function ToursPage() {
         backdropFilter: "blur(20px)",
         borderBottom: "1px solid var(--border)",
       }}>
-        <Link href="/" style={{ textDecoration: "none" }}><Logo sub="GTA" /></Link>
+        <Link href="/" style={{ textDecoration: "none" }}><HouseLogo size={28} /></Link>
         <ul className="nav-links" style={{ display: "flex", listStyle: "none", gap: 36, margin: 0, padding: 0, fontFamily: "var(--mono)", fontSize: "0.68rem", letterSpacing: "0.14em", textTransform: "uppercase" }}>
           {[["/dashboard", "Listings"], ["/video", "Videos"], ["/tours", "Virtual Tours"]].map(([href, label]) => (
             <li key={href}>
@@ -399,7 +389,7 @@ export default function ToursPage() {
 
       {/* Footer */}
       <footer style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 56px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: "var(--mono)", fontSize: "0.62rem", color: "var(--text-mute)" }}>
-        <Logo />
+        <HouseLogo size={22} />
         <span>Covering the Greater Toronto Area · Built on real sold data</span>
         <span>© 2026 416Homes · Early Access</span>
       </footer>

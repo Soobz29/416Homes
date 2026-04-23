@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import HouseLogo from "@/components/HouseLogo";
 import { fetchListings } from "@/lib/api";
 import { Listing } from "@/types";
 
@@ -19,11 +20,7 @@ function NavBar() {
       borderBottom: "1px solid var(--border)",
     }}>
       <Link href="/" style={{ textDecoration: "none" }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontFamily: "var(--mono)", fontWeight: 800, fontSize: "1.2rem" }}>
-          <span style={{ color: "var(--accent)" }}>416</span>
-          <span style={{ color: "var(--text)" }}>Homes</span>
-          <span style={{ fontFamily: "var(--mono)", fontSize: "0.52rem", color: "var(--text-dim)", letterSpacing: "0.14em", textTransform: "uppercase", fontWeight: 400 }}>GTA</span>
-        </div>
+        <HouseLogo size={28} />
       </Link>
       <ul className="nav-links" style={{ display: "flex", gap: 32, listStyle: "none", margin: 0, padding: 0 }}>
         {STATS_NAV.map(([href,label]) => (
@@ -341,10 +338,7 @@ export default function StatsPage() {
 
       {/* ── Footer ── */}
       <footer className="footer-bar" style={{ borderTop: "1px solid var(--border)", padding: "20px 80px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-        <div style={{ ...mono, fontWeight: 700, fontSize: "0.9rem" }}>
-          <span style={{ color: "var(--accent)" }}>416</span>
-          <span style={{ color: "var(--text-mute)" }}>Homes</span>
-        </div>
+        <HouseLogo size={22} />
         <div style={{ ...mono, fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)" }}>
           © 2026 416Homes · GTA Real Estate Intelligence
         </div>
