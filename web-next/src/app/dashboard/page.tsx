@@ -1,9 +1,6 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import dynamicImport from "next/dynamic";
 import Link from "next/link";
 import { Listing } from "@/types";
@@ -174,7 +171,6 @@ const GTAMap = dynamicImport(() => import("@/components/GTAMap"), { ssr: false }
 
 /* ── Main page ──────────────────────────────────────────────────────── */
 export default function DashboardPage() {
-  const searchParams = useSearchParams();
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
   const [emailInput, setEmailInput] = useState("");
   const [authMessage, setAuthMessage] = useState<string | null>(null);
@@ -193,13 +189,33 @@ export default function DashboardPage() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
-    city:         searchParams.get("city")         || "GTA",
-    minPrice:     searchParams.get("minPrice")     || "",
-    maxPrice:     searchParams.get("maxPrice")     || "",
-    bedrooms:     searchParams.get("bedrooms")     || "",
+    city:         "GTA",
+    minPrice:     "",
+    maxPrice:     "",
+    bedrooms:     "",
     bathrooms:    "",
-    propertyType: searchParams.get("propertyType") || "",
+    propertyType: "",
   });
+
+  // Read URL search params on client mount (avoids useSearchParams + Suspense requirement)
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const city = p.get("city");
+    const minPrice = p.get("minPrice");
+    const maxPrice = p.get("maxPrice");
+    const bedrooms = p.get("bedrooms");
+    const propertyType = p.get("propertyType");
+    if (city || minPrice || maxPrice || bedrooms || propertyType) {
+      setFilters(prev => ({
+        ...prev,
+        city:         city         || prev.city,
+        minPrice:     minPrice     || prev.minPrice,
+        maxPrice:     maxPrice     || prev.maxPrice,
+        bedrooms:     bedrooms     || prev.bedrooms,
+        propertyType: propertyType || prev.propertyType,
+      }));
+    }
+  }, []);
   const [listingsError, setListingsError] = useState<string | null>(null);
   const [listingsPage, setListingsPage] = useState(0);
   const [totalListings, setTotalListings] = useState(0);
