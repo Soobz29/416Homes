@@ -128,18 +128,40 @@ export default function StatsPage() {
   const [loading, setLoading]       = useState(true);
   const [scanTime, setScanTime]     = useState<string | null>(null);
   const [fetchError, setFetchError] = useState(false);
+  const [retryIn, setRetryIn]       = useState<number | null>(null);
 
-  const loadStats = useCallback(async () => {
+  const loadStats = useCallback(async (attempt = 0) => {
+    setFetchError(false);
+    setRetryIn(null);
+    let willRetry = false;
     try {
-      setFetchError(false);
-      const data = await fetchListings({ limit: 1000 });
+      const data = await fetchListings({ limit: 200 });
       setListings(data.listings);
       setTotal(data.total);
       setScanTime(data.scan_time);
     } catch {
-      setFetchError(true);
+      if (attempt < 2) {
+        // Auto-retry — backend may be cold-starting (~30s on DO basic tier)
+        willRetry = true;
+        const delay = attempt === 0 ? 8 : 15;
+        setRetryIn(delay);
+        const tick = setInterval(() => {
+          setRetryIn(prev => {
+            if (prev == null || prev <= 1) { clearInterval(tick); return null; }
+            return prev - 1;
+          });
+        }, 1000);
+        setTimeout(() => {
+          clearInterval(tick);
+          void loadStats(attempt + 1);
+        }, delay * 1000);
+      } else {
+        setFetchError(true);
+        setRetryIn(null);
+      }
     } finally {
-      setLoading(false);
+      // Only stop the top-level spinner when we won't auto-retry
+      if (!willRetry) setLoading(false);
     }
   }, []);
 
@@ -217,12 +239,19 @@ export default function StatsPage() {
 
       {loading ? (
         <div style={{ padding: "80px 80px", textAlign: "center", ...mono, fontSize: "0.72rem", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-          ◆ Loading market data...
+          {retryIn != null ? (
+            <>
+              <div style={{ color: "#cf6357", marginBottom: 8 }}>◆ Backend is starting up…</div>
+              <div style={{ color: "var(--text-mute)" }}>Retrying in {retryIn}s</div>
+            </>
+          ) : (
+            <>◆ Loading market data…</>
+          )}
         </div>
       ) : fetchError ? (
         <div style={{ padding: "80px 80px", textAlign: "center" }}>
           <div style={{ ...mono, fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "#cf6357", marginBottom: 12 }}>◆ Could not reach the listings API</div>
-          <div style={{ ...mono, fontSize: "0.78rem", color: "var(--text-mute)", marginBottom: 24 }}>The backend may be starting up — please try again in a moment.</div>
+          <div style={{ ...mono, fontSize: "0.78rem", color: "var(--text-mute)", marginBottom: 24 }}>The backend may still be starting up — please try again in a moment.</div>
           <button onClick={() => { setLoading(true); void loadStats(); }} style={{ padding: "12px 28px", background: "var(--accent)", color: "#000", border: "none", fontFamily: "var(--mono)", fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer" }}>
             Retry
           </button>
