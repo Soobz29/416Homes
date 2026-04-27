@@ -183,10 +183,7 @@ export default function DashboardPage() {
   const [renoResult, setRenoResult] = useState<null | { roiPct: number; addedValue: number; newValue: number; roiDollars: number; risk: string; roiRange: string; timeMonths: number; typical: string }>(null);
   /* ── Tour tab state ── */
   const [tourRoom, setTourRoom] = useState<DashRoomKey>("living");
-  const [tourUrl, setTourUrl] = useState("");
-  const [tourEmail, setTourEmail] = useState("");
-  const [tourPaid, setTourPaid] = useState(false);
-  const [tourProgress, setTourProgress] = useState(0);
+  const [scanTime, setScanTime] = useState<string | null>(null);
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
@@ -314,6 +311,7 @@ export default function DashboardPage() {
       });
       setListings(data.listings || []);
       setTotalListings(typeof data.total === "number" ? data.total : 0);
+      if (data.scan_time) setScanTime(data.scan_time);
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Failed to load listings.";
       setListingsError(msg);
@@ -543,6 +541,48 @@ export default function DashboardPage() {
         </div>
       </nav>
 
+      {/* ── Action strip (logged-in only) ───────────────────────────────── */}
+      {sessionEmail && (
+        <div style={{
+          background: "var(--bg-panel)", borderBottom: "1px solid var(--border)",
+          padding: "10px 40px", display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap",
+        }}>
+          <span style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", color: "var(--text-dim)", letterSpacing: "0.08em" }}>
+            ◆ {alerts.length} alert{alerts.length !== 1 ? "s" : ""} active
+            {" · "}
+            <button onClick={() => setActiveTab("listings")} style={{ background: "none", border: "none", color: "var(--accent)", fontFamily: "var(--mono)", fontSize: "0.62rem", cursor: "pointer", padding: 0, letterSpacing: "0.08em", textDecoration: "underline" }}>
+              Add alert
+            </button>
+          </span>
+          <span style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", color: telegramLinked ? "#2ed573" : "var(--accent)", letterSpacing: "0.08em" }}>
+            {telegramLinked ? "● Telegram connected" : "● Telegram not connected"}
+          </span>
+          {scanTime && (
+            <span style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", color: "var(--text-dim)", letterSpacing: "0.08em", marginLeft: "auto" }}>
+              Last scan: {new Date(scanTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* ── Telegram nudge (if logged in but not connected) ─────────────── */}
+      {sessionEmail && !telegramLinked && (
+        <div style={{
+          background: "rgba(255,176,0,0.06)", borderBottom: "1px solid rgba(255,176,0,0.2)",
+          padding: "10px 40px", display: "flex", alignItems: "center", gap: 12,
+        }}>
+          <span style={{ fontFamily: "var(--mono)", fontSize: "0.72rem", color: "var(--accent)" }}>
+            ◆ Telegram not connected — you won&apos;t receive match alerts in real time.
+          </span>
+          <button
+            onClick={() => { setActiveTab("listings"); setTimeout(() => { document.getElementById("telegram-section")?.scrollIntoView({ behavior: "smooth" }); }, 100); }}
+            style={{ background: "none", border: "1px solid rgba(255,176,0,0.4)", color: "var(--accent)", fontFamily: "var(--mono)", fontSize: "0.62rem", padding: "4px 12px", cursor: "pointer", letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap" }}
+          >
+            Connect Telegram →
+          </button>
+        </div>
+      )}
+
       {/* ── Filter bar (listings tab only) ────────────────────────────── */}
       {activeTab === "listings" && (
         <div className="filter-bar" style={{
@@ -611,12 +651,43 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* ── Active filter chips ─────────────────────────────────────────── */}
+      {activeTab === "listings" && (() => {
+        const chips: { label: string; key: keyof typeof filters; reset: string }[] = [];
+        if (filters.city && filters.city !== "GTA") chips.push({ label: filters.city, key: "city", reset: "GTA" });
+        if (filters.minPrice) chips.push({ label: `Min $${Number(filters.minPrice).toLocaleString()}`, key: "minPrice", reset: "" });
+        if (filters.maxPrice) chips.push({ label: `Max $${Number(filters.maxPrice).toLocaleString()}`, key: "maxPrice", reset: "" });
+        if (filters.bedrooms) chips.push({ label: `${filters.bedrooms}+ beds`, key: "bedrooms", reset: "" });
+        if (filters.bathrooms) chips.push({ label: `${filters.bathrooms}+ baths`, key: "bathrooms", reset: "" });
+        if (filters.propertyType) chips.push({ label: filters.propertyType, key: "propertyType", reset: "" });
+        if (!chips.length) return null;
+        return (
+          <div style={{ padding: "8px 24px", display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", borderBottom: "1px solid var(--border)", background: "rgba(255,176,0,0.03)" }}>
+            {chips.map(c => (
+              <button
+                key={c.key}
+                onClick={() => setFilters(prev => ({ ...prev, [c.key]: c.reset }))}
+                style={{ display: "flex", alignItems: "center", gap: 5, padding: "3px 10px", background: "rgba(255,176,0,0.1)", border: "1px solid rgba(255,176,0,0.25)", color: "var(--accent)", fontFamily: "var(--mono)", fontSize: "0.62rem", cursor: "pointer", letterSpacing: "0.06em" }}
+              >
+                {c.label} <span style={{ opacity: 0.7 }}>×</span>
+              </button>
+            ))}
+            <button
+              onClick={() => setFilters({ city: "GTA", minPrice: "", maxPrice: "", bedrooms: "", bathrooms: "", propertyType: "" })}
+              style={{ padding: "3px 10px", background: "transparent", border: "1px solid var(--border)", color: "var(--text-dim)", fontFamily: "var(--mono)", fontSize: "0.62rem", cursor: "pointer", letterSpacing: "0.06em" }}
+            >
+              Reset all
+            </button>
+          </div>
+        );
+      })()}
+
       {/* ── Main content ──────────────────────────────────────────────── */}
       <main>
 
         {/* ── LISTINGS TAB ──────────────────────────────────────────── */}
         {activeTab === "listings" && (
-          <>
+<>
             {/* My alerts + Telegram card */}
             <div style={{ borderBottom: "1px solid var(--border)", padding: "20px 40px", background: "var(--bg-panel)" }}>
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 24 }}>
@@ -744,7 +815,7 @@ export default function DashboardPage() {
 
                 {/* Telegram connect */}
                 {sessionEmail && (
-                  <div style={{ flex: "0 0 260px" }}>
+                  <div id="telegram-section" style={{ flex: "0 0 260px" }}>
                     <div style={{ fontFamily: "var(--mono)", fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--accent)", marginBottom: 10 }}>
                       ✈️ Telegram Alerts
                     </div>
@@ -829,8 +900,23 @@ export default function DashboardPage() {
                 ) : listings.length === 0 ? (
                   <div style={{ padding: "60px 24px", textAlign: "center" }}>
                     <div style={{ fontSize: "2rem", color: "var(--border)", marginBottom: 12 }}>◎</div>
-                    <div style={{ fontFamily: "var(--serif)", fontSize: "1.1rem", color: "var(--text-mute)" }}>No listings match your filters</div>
-                    <div style={{ fontFamily: "var(--sans)", fontSize: "0.82rem", color: "var(--text-dim)", marginTop: 6 }}>Try a broader area or price range</div>
+                    <div style={{ fontFamily: "var(--mono)", fontSize: "0.95rem", fontWeight: 600, color: "var(--text-mute)", marginBottom: 8 }}>No listings match your filters</div>
+                    <div style={{ fontFamily: "var(--mono)", fontSize: "0.72rem", color: "var(--text-dim)", marginBottom: 20 }}>Try widening your city, price range, or property type.</div>
+                    <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+                      <button
+                        onClick={() => setFilters({ city: "GTA", minPrice: "", maxPrice: "", bedrooms: "", bathrooms: "", propertyType: "" })}
+                        style={{ padding: "7px 14px", background: "transparent", border: "1px solid var(--border-strong)", color: "var(--accent)", fontFamily: "var(--mono)", fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.08em", cursor: "pointer" }}
+                      >
+                        Reset filters
+                      </button>
+                      <button
+                        onClick={() => void triggerScan()}
+                        disabled={scanLoading}
+                        style={{ padding: "7px 14px", background: "var(--accent)", color: "#000", border: "none", fontFamily: "var(--mono)", fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.08em", cursor: "pointer", fontWeight: 700 }}
+                      >
+                        Scan now
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   listings.map(l => (
