@@ -33,6 +33,7 @@ async def run() -> None:
 
     while True:
         try:
+            # 1) Pending jobs (initial creation).
             rows = (
                 sb.table("video_jobs")
                 .select("id, listing_url, customer_email")
@@ -52,6 +53,32 @@ async def run() -> None:
                     logger.info("Completed job %s", job_id)
                 except Exception as exc:
                     logger.error("Job %s failed: %s", job_id, exc)
+                    sb.table("video_jobs").update({
+                        "status": "failed",
+                        "error_message": str(exc),
+                    }).eq("id", job_id).execute()
+
+            # 2) Revision-requested jobs (customer asked for a redo).
+            rev_rows = (
+                sb.table("video_jobs")
+                .select("id")
+                .eq("status", "revision_requested")
+                .order("updated_at")
+                .limit(1)
+                .execute()
+            )
+            if rev_rows.data:
+                job_id = rev_rows.data[0]["id"]
+                logger.info("Picked up revision job %s", job_id)
+                sb.table("video_jobs").update({
+                    "status": "generating_script",
+                    "progress": 0,
+                }).eq("id", job_id).execute()
+                try:
+                    await process_pending_job(job_id)
+                    logger.info("Completed revision job %s", job_id)
+                except Exception as exc:
+                    logger.error("Revision job %s failed: %s", job_id, exc)
                     sb.table("video_jobs").update({
                         "status": "failed",
                         "error_message": str(exc),

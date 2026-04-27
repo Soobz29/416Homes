@@ -31,3 +31,17 @@ services:
     envs:
       - key: PYTHONPATH
         value: /workspace
+
+  - name: video-worker
+    github:
+      repo: Soobz29/416Homes
+      branch: main
+      deploy_on_push: true
+    build_command: pip install --no-cache-dir --retries 5 --timeout 60 -r requirements-railway.txt
+    run_command: python video_pipeline/worker.py
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    kind: WORKER
+    envs:
+      - key: PYTHONPATH
+        value: /workspace

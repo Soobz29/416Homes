@@ -63,73 +63,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_VIDEO_WORKER_POLL = int(os.getenv("VIDEO_WORKER_POLL_SECONDS", "30"))
-
-async def _video_worker_loop() -> None:
-    """Background polling loop — picks up pending video jobs and processes them.
-    Runs inside the FastAPI process. AI imports are lazy so they don't bloat
-    startup memory — they only load when the first job is actually picked up.
-    """
-    logger.info("Video worker loop started (poll every %ds)", _VIDEO_WORKER_POLL)
-    while True:
-        await asyncio.sleep(_VIDEO_WORKER_POLL)
-        if not supabase_client:
-            continue
-        try:
-            rows = (
-                supabase_client.table("video_jobs")
-                .select("id, customer_email")
-                .eq("status", "pending")
-                .order("created_at")
-                .limit(1)
-                .execute()
-            )
-            if rows.data:
-                job = rows.data[0]
-                jid = job["id"]
-                logger.info("Video worker: processing job %s", jid)
-                supabase_client.table("video_jobs").update({"status": "generating_script"}).eq("id", jid).execute()
-                from video_pipeline.pipeline import process_pending_job  # lazy — loads AI stack on demand
-
-                async def _run_job(job_id: str) -> None:
-                    try:
-                        await process_pending_job(job_id)
-                    except Exception as job_exc:
-                        logger.error("Video job %s failed: %s", job_id, job_exc)
-                        try:
-                            supabase_client.table("video_jobs").update({
-                                "status": "failed",
-                                "error_message": str(job_exc),
-                            }).eq("id", job_id).execute()
-                        except Exception:
-                            pass
-
-                asyncio.create_task(_run_job(jid))
-
-            # Also pick up revision_requested jobs
-            rev_rows = (
-                supabase_client.table("video_jobs")
-                .select("id")
-                .eq("status", "revision_requested")
-                .order("updated_at")
-                .limit(1)
-                .execute()
-            )
-            if rev_rows.data:
-                jid = rev_rows.data[0]["id"]
-                logger.info("Video worker: re-processing revision job %s", jid)
-                supabase_client.table("video_jobs").update({
-                    "status": "generating_script",
-                    "progress": 0,
-                }).eq("id", jid).execute()
-                asyncio.create_task(_run_job(jid))
-        except Exception as exc:
-            logger.error("Video worker poll error: %s", exc)
-
-
-@app.on_event("startup")
-async def _start_video_worker():
-    asyncio.create_task(_video_worker_loop())
+# Video job processing is owned by the dedicated worker at
+# video_pipeline/worker.py (defined in Procfile / DO worker component).
+# The API process intentionally does NOT poll the video_jobs queue — running
+# two pollers caused job-status races. To re-enable an in-process fallback,
+# uncomment a startup hook here, but only if the dedicated worker is removed.
 
 
 # Static + HTML pages
