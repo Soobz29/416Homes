@@ -975,13 +975,14 @@ async def delete_alert(
 
 @app.get("/api/agent-matches")
 async def get_agent_matches(
+    authorization: Optional[str] = Header(None, alias="Authorization"),
     x_user_email: Optional[str] = Header(None, alias="x-user-email"),
 ):
     """
     Return agent_matches rows for the current user's alerts.
     Used by the dashboard to show how many emails have been sent on the user's behalf.
     """
-    user_id = _get_user_id_from_header(x_user_email)
+    user_id = _auth_user_id(authorization, x_user_email)
     client = _ensure_supabase()
     try:
         alerts_resp = (
