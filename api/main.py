@@ -321,6 +321,17 @@ class AlertUpdate(BaseModel):
     keywords: Optional[str] = None
     is_active: Optional[bool] = None
 
+
+class PublicAlertCreate(BaseModel):
+    email: str
+    min_price: Optional[int] = None
+    max_price: Optional[int] = None
+    min_beds: Optional[float] = None
+    property_types: Optional[List[str]] = None
+    neighbourhoods: Optional[List[str]] = None
+    cities: Optional[List[str]] = None
+    keywords: Optional[str] = None
+
 try:
     from listing_agent import get_last_scan_listings
 except ImportError:
@@ -894,6 +905,58 @@ async def create_alert(
         raise
     except Exception as e:
         logger.error(f"Error creating alert: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create alert")
+
+
+@app.post("/api/public-alerts", response_model=Alert)
+async def create_public_alert(payload: PublicAlertCreate):
+    """
+    Public lead-capture endpoint for the homepage CTA. No JWT required: a
+    visitor leaves their email and we create (or upsert) the user + alert.
+
+    This is intentionally minimal — it only accepts email + alert filters,
+    no telegram-link or account-mutation actions. Spam should be rate-limited
+    upstream (CDN / WAF).
+    """
+    email = (payload.email or "").strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="Valid email required")
+    try:
+        user = _get_or_create_user_by_email(email)
+        _, user_id = _user_pk(user)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Public alert: user lookup failed for %s: %s", email, e)
+        raise HTTPException(status_code=500, detail="Failed to register email")
+
+    client = _ensure_supabase()
+    data = payload.model_dump(exclude_unset=True, exclude={"email"})
+    data["user_id"] = str(user_id)
+    data["is_active"] = True
+    try:
+        resp = client.table("alerts").insert(data).execute()
+        rows = getattr(resp, "data", None) or []
+        if not rows:
+            raise RuntimeError("Insert returned no rows")
+        r = rows[0]
+        logger.info("Public alert created for %s (alert_id=%s)", email, r.get("id"))
+        return Alert(
+            id=str(r.get("id")),
+            min_price=r.get("min_price"),
+            max_price=r.get("max_price"),
+            min_beds=r.get("min_beds"),
+            property_types=r.get("property_types"),
+            neighbourhoods=r.get("neighbourhoods"),
+            cities=r.get("cities"),
+            keywords=r.get("keywords"),
+            is_active=bool(r.get("is_active", True)),
+            created_at=str(r.get("created_at")) if r.get("created_at") else None,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Public alert insert failed for %s: %s", email, e)
         raise HTTPException(status_code=500, detail="Failed to create alert")
 
 

@@ -195,11 +195,21 @@ function AlertForm() {
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit() {
-    if (!email) return;
+    if (!email || submitting) return;
+    setSubmitError(null);
+    setSubmitting(true);
+    const apiBase = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
+    if (!apiBase) {
+      setSubmitting(false);
+      setSubmitError("Alerts service is not configured. Please try again later.");
+      return;
+    }
     try {
-      const res = await fetch("/api/alerts", {
+      const res = await fetch(`${apiBase}/api/public-alerts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -209,9 +219,22 @@ function AlertForm() {
           max_price: maxPrice ? Number(maxPrice.replace(/\D/g, "")) : null,
         }),
       });
-      if (res.ok) setSubmitted(true);
-    } catch {
-      setSubmitted(true); // show success even on network error in demo
+      if (!res.ok) {
+        let msg = `Couldn't save your alert (${res.status}).`;
+        try {
+          const body = await res.json();
+          if (body?.detail && typeof body.detail === "string") msg = body.detail;
+        } catch {}
+        setSubmitError(msg);
+        return;
+      }
+      setSubmitted(true);
+    } catch (err) {
+      setSubmitError(
+        err instanceof Error ? err.message : "Network error. Please try again."
+      );
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -262,15 +285,27 @@ function AlertForm() {
       </div>
       <button
         onClick={handleSubmit}
+        disabled={submitting || !email}
         style={{
           width: "100%", marginTop: 16, padding: "16px",
           background: "var(--accent)", border: "none", color: "var(--bg)",
           fontFamily: "var(--mono)", fontSize: "0.88rem", fontWeight: 700,
-          letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer",
+          letterSpacing: "0.08em", textTransform: "uppercase",
+          cursor: submitting || !email ? "not-allowed" : "pointer",
+          opacity: submitting || !email ? 0.6 : 1,
           boxShadow: "0 0 22px rgba(255,176,0,0.35), inset 0 1px 0 rgba(255,255,255,0.16)",
         }}>
-        Activate My Alert →
+        {submitting ? "Activating…" : "Activate My Alert →"}
       </button>
+      {submitError && (
+        <div style={{
+          marginTop: 14, padding: "12px 14px",
+          border: "1px solid #cf6357", background: "rgba(207,99,87,0.08)",
+          color: "#ffb4a8", fontFamily: "var(--mono)", fontSize: "0.74rem", lineHeight: 1.5,
+        }}>
+          {submitError}
+        </div>
+      )}
     </div>
   );
 }
