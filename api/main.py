@@ -502,6 +502,76 @@ def _get_user_id_from_header(x_user_email: str | None) -> str:
     return str(user_id)
 
 
+SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
+_LEGACY_EMAIL_AUTH = os.getenv("LEGACY_EMAIL_AUTH", "").strip() in ("1", "true", "yes", "on")
+
+
+def _verified_email_from_bearer(authorization: str | None) -> str | None:
+    """Parse and verify a Supabase access token from the Authorization header.
+
+    Returns the verified email or None if no Bearer token was supplied. Raises
+    HTTPException(401) if a token is supplied but invalid/expired.
+    """
+    if not authorization:
+        return None
+    parts = authorization.split(None, 1)
+    if len(parts) != 2 or parts[0].lower() != "bearer" or not parts[1].strip():
+        return None
+    token = parts[1].strip()
+    if not SUPABASE_JWT_SECRET:
+        logger.error("SUPABASE_JWT_SECRET is not set; rejecting Bearer token")
+        raise HTTPException(status_code=401, detail="Server auth not configured")
+    try:
+        from jose import jwt as _jose_jwt  # type: ignore
+        from jose.exceptions import JWTError, ExpiredSignatureError  # type: ignore
+    except Exception as e:  # pragma: no cover
+        logger.error("python-jose not available: %s", e)
+        raise HTTPException(status_code=500, detail="Auth library missing")
+    try:
+        claims = _jose_jwt.decode(
+            token,
+            SUPABASE_JWT_SECRET,
+            algorithms=["HS256"],
+            audience="authenticated",
+        )
+    except ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except JWTError as e:
+        logger.info("JWT verification failed: %s", e)
+        raise HTTPException(status_code=401, detail="Invalid token")
+    email = claims.get("email")
+    if not email:
+        meta = claims.get("user_metadata") or {}
+        if isinstance(meta, dict):
+            email = meta.get("email")
+    if not email:
+        raise HTTPException(status_code=401, detail="Token missing email claim")
+    return str(email).strip().lower()
+
+
+def _auth_email(authorization: str | None, x_user_email: str | None) -> str:
+    """Resolve the authenticated user's email. Verified Bearer JWT preferred.
+
+    Falls back to x-user-email only when LEGACY_EMAIL_AUTH=1 is set, to give a
+    one-release transition window. After cutover, callers without a Bearer
+    token receive 401.
+    """
+    verified = _verified_email_from_bearer(authorization)
+    if verified:
+        return verified
+    if _LEGACY_EMAIL_AUTH and x_user_email:
+        logger.warning("Legacy x-user-email auth used for %s", x_user_email)
+        return x_user_email.strip().lower()
+    raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+
+
+def _auth_user_id(authorization: str | None, x_user_email: str | None) -> str:
+    email = _auth_email(authorization, x_user_email)
+    user = _get_or_create_user_by_email(email)
+    _, user_id = _user_pk(user)
+    return str(user_id)
+
+
 def _generate_link_code(length: int = 6) -> str:
     """Generate a short human-typed code like TG-A1B2C3 (6 chars, 30 min expiry)."""
     chars = string.ascii_uppercase + string.digits
@@ -696,11 +766,14 @@ async def get_listings(
 
 
 @app.get("/api/alerts", response_model=List[Alert])
-async def get_alerts(x_user_email: Optional[str] = Header(None, alias="x-user-email")):
+async def get_alerts(
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    x_user_email: Optional[str] = Header(None, alias="x-user-email"),
+):
     """
-    List alerts for the current user. The web app should pass x-user-email header.
+    List alerts for the current user. Requires a Supabase Bearer access token.
     """
-    user_id = _get_user_id_from_header(x_user_email)
+    user_id = _auth_user_id(authorization, x_user_email)
     client = _ensure_supabase()
     try:
         resp = (
@@ -736,14 +809,16 @@ async def get_alerts(x_user_email: Optional[str] = Header(None, alias="x-user-em
 
 
 @app.get("/api/me")
-async def get_me(x_user_email: Optional[str] = Header(None, alias="x-user-email")):
+async def get_me(
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    x_user_email: Optional[str] = Header(None, alias="x-user-email"),
+):
     """
     Return current user profile (id, email, telegram_chat_id) for dashboard.
     Used to show "Connected!" when Telegram is linked and for "Check status" button.
     """
-    if not x_user_email:
-        raise HTTPException(status_code=401, detail="Missing x-user-email header")
-    user = _get_or_create_user_by_email(x_user_email)
+    email = _auth_email(authorization, x_user_email)
+    user = _get_or_create_user_by_email(email)
     _, uid = _user_pk(user)
     return {
         "id": str(uid),
@@ -754,13 +829,14 @@ async def get_me(x_user_email: Optional[str] = Header(None, alias="x-user-email"
 
 
 @app.post("/api/link-code")
-async def create_link_code(x_user_email: Optional[str] = Header(None, alias="x-user-email")):
+async def create_link_code(
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+    x_user_email: Optional[str] = Header(None, alias="x-user-email"),
+):
     """
     Generate a short one-time link code for connecting a Telegram chat to this user.
     """
-    email = (x_user_email or "").strip()
-    if not email:
-        raise HTTPException(status_code=401, detail="Missing x-user-email header")
+    email = _auth_email(authorization, x_user_email)
     user = _get_or_create_user_by_email(email)
     client = _ensure_supabase()
     code = _generate_link_code()
@@ -786,12 +862,13 @@ async def create_link_code(x_user_email: Optional[str] = Header(None, alias="x-u
 @app.post("/api/alerts", response_model=Alert)
 async def create_alert(
     payload: AlertCreate,
+    authorization: Optional[str] = Header(None, alias="Authorization"),
     x_user_email: Optional[str] = Header(None, alias="x-user-email"),
 ):
     """
     Create a new alert for the current user.
     """
-    user_id = _get_user_id_from_header(x_user_email)
+    user_id = _auth_user_id(authorization, x_user_email)
     client = _ensure_supabase()
     data = payload.model_dump(exclude_unset=True)
     data["user_id"] = user_id
@@ -824,12 +901,13 @@ async def create_alert(
 async def update_alert(
     alert_id: str,
     payload: AlertUpdate,
+    authorization: Optional[str] = Header(None, alias="Authorization"),
     x_user_email: Optional[str] = Header(None, alias="x-user-email"),
 ):
     """
     Update an existing alert owned by the current user.
     """
-    user_id = _get_user_id_from_header(x_user_email)
+    user_id = _auth_user_id(authorization, x_user_email)
     client = _ensure_supabase()
     data = payload.model_dump(exclude_unset=True)
     if not data:
@@ -868,12 +946,13 @@ async def update_alert(
 @app.delete("/api/alerts/{alert_id}", status_code=204)
 async def delete_alert(
     alert_id: str,
+    authorization: Optional[str] = Header(None, alias="Authorization"),
     x_user_email: Optional[str] = Header(None, alias="x-user-email"),
 ):
     """
     Delete an alert owned by the current user.
     """
-    user_id = _get_user_id_from_header(x_user_email)
+    user_id = _auth_user_id(authorization, x_user_email)
     client = _ensure_supabase()
     try:
         resp = (

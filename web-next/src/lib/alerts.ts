@@ -1,3 +1,5 @@
+import { supabase } from "@/lib/supabase";
+
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
 
 export interface Alert {
@@ -29,11 +31,17 @@ async function requestAlerts<T>(
   options: RequestInit & { email: string },
 ): Promise<T> {
   const { email, ...init } = options;
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  const authHeaders: Record<string, string> = {
+    "Content-Type": "application/json",
+    "x-user-email": email,
+  };
+  if (token) authHeaders["Authorization"] = `Bearer ${token}`;
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
-      "Content-Type": "application/json",
-      "x-user-email": email,
+      ...authHeaders,
       ...(init.headers || {}),
     },
   });
