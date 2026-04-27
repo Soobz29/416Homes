@@ -16,11 +16,11 @@ const TIERS: { id: Tier; price: number; label: string; delivery: string; badge?:
   },
   {
     id: "cinematic", price: 249, label: "Cinematic", delivery: "delivered in 15 min", badge: "Most Popular",
-    features: ["30-second film", "ElevenLabs voiceover", "Custom script from listing copy", "4K + vertical"],
+    features: ["30-second film", "Narration included", "Custom script from listing copy", "4K + vertical"],
   },
   {
     id: "premium", price: 299, label: "Premium", delivery: "delivered in 12 min",
-    features: ["Everything in Cinematic", "Veo-rendered b-roll", "Aerial drone-style sweeps", "Priority queue"],
+    features: ["Everything in Cinematic", "AI-generated b-roll", "Aerial-style shots", "Priority queue"],
   },
 ];
 
@@ -276,8 +276,8 @@ export default function VideoPage() {
       showProgress(jobId, url.length > 60 ? url.slice(0, 60) + "…" : url);
       const demoSteps = [
         { step: "scrape", msg: "Found 6 photos · GTA listing", delay: 1500 },
-        { step: "script", msg: "Script complete · Cinematic narration ready", delay: 3500 },
-        { step: "audio",  msg: "Voiceover recorded · Cinematic music generated", delay: 6000 },
+        { step: "script", msg: "Script complete · Narration ready", delay: 3500 },
+        { step: "audio",  msg: "Narration recorded · Music generated", delay: 6000 },
         { step: "animate", msg: "All 6 clips animated with dolly shots", delay: 10000 },
         { step: "assemble", msg: "Final video assembled · 4K MP4", delay: 13000 },
       ];
@@ -347,20 +347,19 @@ export default function VideoPage() {
         {/* Eyebrow */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, ...mono, fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.18em", color: "var(--accent)", marginBottom: 24 }}>
           <span style={{ height: 1, width: 28, background: "var(--accent)", flexShrink: 0 }} />
-          Cinematic Video
+          Listing Video
         </div>
 
         {/* Headline */}
         <h1 style={{ ...mono, fontSize: "clamp(2.4rem, 4.5vw, 5rem)", fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.02em", marginBottom: 20 }}>
           Any listing URL,{" "}
-          <span style={{ color: "var(--accent)" }}>cinematic in minutes.</span>
+          <span style={{ color: "var(--accent)" }}>ready in minutes.</span>
         </h1>
 
         {/* Description */}
         <p style={{ ...mono, fontSize: "0.85rem", color: "var(--text-mute)", maxWidth: "56ch", lineHeight: 1.75, marginBottom: 56 }}>
           Paste a Realtor.ca, Zillow, or HouseSigma URL. We pull the photos, write the script,
-          record the voiceover, cut the film, and deliver an MP4 to your inbox —
-          typically faster than making coffee.
+          record narration, and deliver an MP4 to your inbox.
         </p>
 
         {/* Demo card — 2 col */}
@@ -405,12 +404,11 @@ export default function VideoPage() {
               Sample Output
             </div>
             <h2 style={{ ...mono, fontSize: "1.35rem", fontWeight: 500, color: "var(--text)", lineHeight: 1.25, marginBottom: 16 }}>
-              2962 Brandon Gate Drive, Mississauga —<br />Cinematic tier
+              Sample listing — Mississauga<br />Cinematic tier
             </h2>
             <p style={{ ...mono, fontSize: "0.72rem", color: "var(--text-mute)", lineHeight: 1.75, marginBottom: 20 }}>
               Generated from 3 listing photos in 14 minutes. Script written by Gemini,
-              voiceover by ElevenLabs (Rachel voice), cut in FFmpeg with Ken Burns
-              motion + fade transitions.
+              narration recorded, cut in FFmpeg with Ken Burns motion + fade transitions.
             </p>
             <div style={{ height: 1, background: "var(--border)", marginBottom: 20 }} />
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "18px 24px", marginBottom: 24 }}>

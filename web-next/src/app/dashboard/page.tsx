@@ -1136,11 +1136,11 @@ export default function DashboardPage() {
             </div>
             <h2 style={{ fontFamily: "var(--serif)", fontSize: "clamp(2rem, 3vw, 3.2rem)", fontWeight: 500, marginBottom: 20 }}>
               Turn any listing into a{" "}
-              <em style={{ color: "var(--accent)", fontStyle: "italic" }}>cinematic video</em>
+              <em style={{ color: "var(--accent)", fontStyle: "italic" }}>listing video</em>
             </h2>
             <p style={{ fontFamily: "var(--sans)", fontSize: "0.9rem", color: "var(--text-mute)", lineHeight: 1.7, marginBottom: 40, maxWidth: "44ch", margin: "0 auto 40px" }}>
-              Paste a Realtor.ca or Zillow URL. We write the script, record the voiceover,
-              and add music — your polished 30-second video is ready in under 15 minutes.
+              Paste a Realtor.ca or Zillow URL. We write the script, record narration,
+              and deliver an MP4 — ready in under 15 minutes.
             </p>
             <Link href="/video" className="btn-primary" style={{ textDecoration: "none", display: "inline-block" }}>
               Order a Video — from $99

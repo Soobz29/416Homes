@@ -242,10 +242,10 @@ export default function ToursPage() {
               {/* Bottom bar */}
               <div style={{ position: "absolute", bottom: 16, left: 16, right: 16, display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 3, pointerEvents: "none" }}>
                 <div style={{ background: "rgba(5,6,10,0.88)", padding: "8px 14px", border: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.68rem", color: "#fff" }}>
-                  <span style={{ color: "var(--accent)" }}>◆</span> 88 Niagara St, Unit 412 — King West · 2BR 2BA
+                  <span style={{ color: "var(--accent)" }}>◆</span> Sample listing · King West · 2BR 2BA
                 </div>
                 <div style={{ background: "rgba(5,6,10,0.88)", padding: "8px 12px", border: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.64rem", color: "var(--accent)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
-                  ◉ 360° on delivery
+                  ◉ All rooms on delivery
                 </div>
               </div>
             </div>
@@ -256,7 +256,7 @@ export default function ToursPage() {
                 <Eyebrow>Interactive demo</Eyebrow>
                 <div style={{ fontFamily: "var(--mono)", fontSize: "1.05rem", fontWeight: 600, margin: "10px 0 12px" }}>Click any room</div>
                 <div style={{ fontFamily: "var(--mono)", fontSize: "0.7rem", lineHeight: 1.6, color: "var(--text-mute)", marginBottom: 16 }}>
-                  Matterport-style 3D dollhouse. Click rooms in the model to navigate through the property.
+                  Photo-based room navigator. Click a room to view its listing photos full-screen.
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {(Object.keys(ROOM_NAMES) as RoomKey[]).map(k => (
@@ -276,7 +276,7 @@ export default function ToursPage() {
                 </div>
               </div>
               <div style={{ paddingTop: 16, borderTop: "1px solid var(--border)", marginTop: 16, fontFamily: "var(--mono)", fontSize: "0.58rem", color: "var(--text-dim)", lineHeight: 1.6, letterSpacing: "0.06em" }}>
-                Gemini Vision classifies your listing photos into rooms. Each room gets a hosted 360° panorama — shareable link + embed code delivered in under 5 minutes.
+                Your listing photos, classified by room and published as a hosted tour. Shareable link + embed code delivered in under 5 minutes.
               </div>
             </div>
           </div>
