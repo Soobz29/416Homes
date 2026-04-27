@@ -72,18 +72,34 @@ export default function ToursPage() {
   const [uploading, setUploading] = useState(false);
   const [paid, setPaid] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [tourId] = useState(() => Math.floor(Math.random() * 9000 + 1000));
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [tourUrl, setTourUrl] = useState<string | null>(null);
+  const [tourError, setTourError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Poll real job status instead of a fake timer
   useEffect(() => {
-    if (!paid) return;
-    const t = setInterval(() => setProgress(p => {
-      if (p >= 100) { clearInterval(t); return 100; }
-      return p + 5;
-    }), 200);
-    return () => clearInterval(t);
-  }, [paid]);
+    if (!paid || !jobId) return;
+    const iv = setInterval(async () => {
+      try {
+        const r = await fetch(`${API_BASE}/api/tour-jobs/${jobId}`);
+        if (!r.ok) return;
+        const d = await r.json();
+        setProgress(d.progress ?? 0);
+        if (d.status === "completed" || d.status === "complete") {
+          setTourUrl(d.tour_url ?? null);
+          setProgress(100);
+          clearInterval(iv);
+        } else if (d.status === "failed") {
+          setTourError(d.error_message || "Tour generation failed.");
+          clearInterval(iv);
+        }
+      } catch { /* network blip, retry next tick */ }
+    }, 2500);
+    return () => clearInterval(iv);
+  }, [paid, jobId]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []).slice(0, 9);
@@ -93,34 +109,49 @@ export default function ToursPage() {
 
   const handlePay = async () => {
     if (!email.includes("@")) { alert("Valid email required"); return; }
-    if (inputMode === "upload") {
-      if (selectedFiles.length === 0) { alert("Please select at least one photo"); return; }
-      setUploading(true);
-      try {
-        const formData = new FormData();
-        selectedFiles.forEach(f => formData.append("files", f));
-        const res = await fetch(`${API_BASE}/api/upload-photos`, { method: "POST", body: formData });
-        if (res.ok) {
-          const data = await res.json();
-          // Create real tour job with uploaded photos
-          await fetch(`${API_BASE}/api/tour-jobs`, {
+    setSubmitting(true);
+    setTourError(null);
+    try {
+      if (inputMode === "upload") {
+        if (selectedFiles.length === 0) { alert("Please select at least one photo"); setSubmitting(false); return; }
+        setUploading(true);
+        try {
+          const formData = new FormData();
+          selectedFiles.forEach(f => formData.append("files", f));
+          const uploadRes = await fetch(`${API_BASE}/api/upload-photos`, { method: "POST", body: formData });
+          if (!uploadRes.ok) throw new Error("Photo upload failed");
+          const uploadData = await uploadRes.json();
+          const jobRes = await fetch(`${API_BASE}/api/tour-jobs`, {
             method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ customer_email: email, photo_urls: data.urls }),
+            body: JSON.stringify({ customer_email: email, photo_urls: uploadData.urls }),
           });
-        }
-      } catch { /* silently fall through to demo mode */ }
-      finally { setUploading(false); }
-    } else {
-      if (!url.trim()) { alert("Listing URL required"); return; }
+          if (!jobRes.ok) throw new Error("Could not start tour job");
+          const jobData = await jobRes.json();
+          setJobId(jobData.id);
+        } finally { setUploading(false); }
+      } else {
+        if (!url.trim()) { alert("Listing URL required"); setSubmitting(false); return; }
+        const jobRes = await fetch(`${API_BASE}/api/tour-jobs`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ listing_url: url.trim(), customer_email: email }),
+        });
+        if (!jobRes.ok) throw new Error("Could not start tour job. Try again.");
+        const jobData = await jobRes.json();
+        setJobId(jobData.id);
+      }
+      setPaid(true);
+    } catch (err) {
+      setTourError(err instanceof Error ? err.message : "Something went wrong. Try again.");
+    } finally {
+      setSubmitting(false);
     }
-    setPaid(true);
   };
 
   const progressLabel =
     progress < 30  ? "Fetching listing photos…" :
     progress < 60  ? "Classifying rooms with Gemini Vision…" :
     progress < 100 ? "Assembling hosted manifest…" :
-    `Tour live: 416homes.ca/tours/${tourId}`;
+    tourUrl ? "Tour ready — open link below" : "Finalising…";
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)" }}>
@@ -354,33 +385,55 @@ export default function ToursPage() {
                   </div>
                 </div>
 
-                <PrimaryBtn onClick={handlePay} disabled={uploading}>
-                  {uploading ? "Uploading…" : "Pay & generate →"}
+                <PrimaryBtn onClick={handlePay} disabled={uploading || submitting}>
+                  {uploading ? "Uploading…" : submitting ? "Starting…" : "Pay & generate →"}
                 </PrimaryBtn>
+                {tourError && !paid && (
+                  <div style={{ marginTop: 12, padding: "10px 12px", border: "1px solid #cf6357", background: "rgba(207,99,87,0.08)", color: "#ffb4a8", fontFamily: "var(--mono)", fontSize: "0.72rem", lineHeight: 1.5 }}>
+                    {tourError}
+                  </div>
+                )}
                 <div style={{ fontFamily: "var(--mono)", fontSize: "0.6rem", color: "var(--text-dim)", textAlign: "center", marginTop: 12 }}>
                   Secure checkout via Stripe
                 </div>
               </>
             ) : (
               <>
-                <Eyebrow>{progress < 100 ? "Generating" : "Ready"}</Eyebrow>
+                <Eyebrow>{tourError ? "Failed" : progress < 100 ? "Generating" : "Ready"}</Eyebrow>
                 <div style={{ fontFamily: "var(--mono)", fontSize: "1.4rem", fontWeight: 700, margin: "14px 0 20px" }}>
-                  {progress < 100 ? "Building your tour…" : "Your tour is live."}
+                  {tourError ? "Tour generation failed." : progress < 100 ? "Building your tour…" : "Your tour is ready."}
                 </div>
-                <div style={{ width: "100%", height: 6, background: "var(--bg)", overflow: "hidden", marginBottom: 16 }}>
-                  <div style={{ width: `${progress}%`, height: "100%", background: "var(--accent)", transition: "width 0.2s" }} />
-                </div>
-                <div style={{ fontFamily: "var(--mono)", fontSize: "0.72rem", color: "var(--text-mute)", lineHeight: 1.6 }}>
-                  {progressLabel}
-                </div>
-                {progress >= 100 && (
-                  <button
-                    onClick={() => { setPaid(false); setProgress(0); setUrl(""); setEmail(""); }}
-                    style={{ marginTop: 24, padding: "10px 20px", background: "transparent", border: "1px solid var(--border-strong)", color: "var(--accent)", fontFamily: "var(--mono)", fontSize: "0.68rem", letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer" }}
-                  >
-                    Order another →
-                  </button>
+                {!tourError && (
+                  <>
+                    <div style={{ width: "100%", height: 6, background: "var(--bg)", overflow: "hidden", marginBottom: 16 }}>
+                      <div style={{ width: `${progress}%`, height: "100%", background: "var(--accent)", transition: "width 0.4s" }} />
+                    </div>
+                    <div style={{ fontFamily: "var(--mono)", fontSize: "0.72rem", color: "var(--text-mute)", lineHeight: 1.6 }}>
+                      {progressLabel}
+                    </div>
+                  </>
                 )}
+                {tourError && (
+                  <div style={{ padding: "12px 14px", border: "1px solid #cf6357", background: "rgba(207,99,87,0.08)", color: "#ffb4a8", fontFamily: "var(--mono)", fontSize: "0.74rem", lineHeight: 1.5, marginBottom: 16 }}>
+                    {tourError}
+                  </div>
+                )}
+                {progress >= 100 && tourUrl && (
+                  <a
+                    href={tourUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ display: "block", marginTop: 20, padding: "14px 20px", background: "var(--accent)", color: "var(--bg)", fontFamily: "var(--mono)", fontSize: "0.82rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", textDecoration: "none", textAlign: "center" }}
+                  >
+                    Open tour →
+                  </a>
+                )}
+                <button
+                  onClick={() => { setPaid(false); setProgress(0); setUrl(""); setEmail(""); setJobId(null); setTourUrl(null); setTourError(null); }}
+                  style={{ marginTop: 14, padding: "10px 20px", background: "transparent", border: "1px solid var(--border-strong)", color: "var(--accent)", fontFamily: "var(--mono)", fontSize: "0.68rem", letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer", width: "100%" }}
+                >
+                  {tourError ? "Try again →" : "Order another →"}
+                </button>
               </>
             )}
           </div>

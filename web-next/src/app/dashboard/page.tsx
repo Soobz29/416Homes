@@ -283,14 +283,7 @@ export default function DashboardPage() {
     if (activeTab === "listings") void loadListings();
   }, [activeTab, filters, listingsPage]);
 
-  useEffect(() => {
-    if (!tourPaid) return;
-    const t = setInterval(() => setTourProgress(p => {
-      if (p >= 100) { clearInterval(t); return 100; }
-      return p + 5;
-    }), 200);
-    return () => clearInterval(t);
-  }, [tourPaid]);
+  // Tour product has its own dedicated page (/tours) — no in-dashboard fake progress.
 
   async function triggerScan() {
     setScanLoading(true);
@@ -1161,112 +1154,20 @@ export default function DashboardPage() {
 
         {/* ── VIRTUAL TOUR TAB ────────────────────────────────────── */}
         {activeTab === "tour" && (
-          <div style={{ maxWidth: 1000, margin: "0 auto", padding: "48px 40px" }}>
-            <div style={{ fontFamily: "var(--serif)", fontSize: "clamp(1.4rem,2vw,2.2rem)", fontWeight: 500, marginBottom: 8 }}>Virtual Tour</div>
-            <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", color: "var(--text-dim)", marginBottom: 32 }}>Gemini Vision · listing photos → hosted room-by-room tour in 5 minutes</div>
-
-            {/* 3D Dollhouse demo */}
-            <div style={{ marginBottom: 40, border: "1px solid var(--border-strong)", overflow: "hidden", background: "var(--bg-elev)" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 260px", gap: 0 }}>
-                <div style={{ position: "relative", aspectRatio: "16/10", background: "#060606", overflow: "hidden" }}>
-                  <style>{`
-                    @keyframes dashKB { 0%{transform:scale(1) translate(0,0)} 100%{transform:scale(1.07) translate(-1%,-0.5%)} }
-                    @keyframes dashFI { from{opacity:0} to{opacity:1} }
-                  `}</style>
-                  <img
-                    key={tourRoom}
-                    src={DASH_ROOM_MAP[tourRoom].photo}
-                    alt={DASH_ROOM_MAP[tourRoom].name}
-                    style={{
-                      position: "absolute", inset: 0, width: "100%", height: "100%",
-                      objectFit: "cover",
-                      animation: "dashKB 9s ease-out forwards, dashFI 0.35s ease",
-                      transformOrigin: "center center",
-                    }}
-                  />
-                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(5,6,10,0.18) 0%, rgba(5,6,10,0.62) 100%)", pointerEvents: "none" }} />
-                  <div style={{ position: "absolute", top: 16, left: 16, background: "rgba(5,6,10,0.88)", padding: "10px 14px", border: "1px solid var(--border)", zIndex: 3 }}>
-                    <div style={{ fontFamily: "var(--mono)", fontSize: "0.56rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)" }}>Live Demo</div>
-                    <div style={{ fontFamily: "var(--mono)", fontSize: "0.95rem", fontWeight: 600, color: "#fff", marginTop: 4 }}>{DASH_ROOM_MAP[tourRoom].name}</div>
-                  </div>
-                  <div style={{ position: "absolute", bottom: 12, left: 12, right: 12, display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 3 }}>
-                    <div style={{ background: "rgba(5,6,10,0.88)", padding: "7px 12px", border: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.64rem", color: "#fff" }}>
-                      <span style={{ color: "var(--accent)" }}>◆</span> 88 Niagara St, Unit 412 — King West
-                    </div>
-                    <div style={{ background: "rgba(5,6,10,0.88)", padding: "7px 10px", border: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.58rem", color: "var(--accent)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
-                      ◉ 360° on delivery
-                    </div>
-                  </div>
-                </div>
-                <div style={{ padding: 24, borderLeft: "1px solid var(--border)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                  <div>
-                    <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 12 }}>Interactive demo</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      {(Object.entries(DASH_ROOM_MAP) as [DashRoomKey, { name: string }][]).map(([k, v]) => (
-                        <button key={k} onClick={() => setTourRoom(k)} style={{
-                          padding: "9px 10px", textAlign: "left",
-                          background: tourRoom === k ? "var(--bg-panel)" : "transparent",
-                          border: `1px solid ${tourRoom === k ? "var(--accent)" : "var(--border)"}`,
-                          color: tourRoom === k ? "var(--accent)" : "var(--text)",
-                          fontFamily: "var(--mono)", fontSize: "0.66rem", cursor: "pointer",
-                          display: "flex", alignItems: "center", gap: 8,
-                        }}>
-                          <span style={{ opacity: tourRoom === k ? 1 : 0.4 }}>{tourRoom === k ? "●" : "○"}</span>
-                          {v.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div style={{ paddingTop: 14, borderTop: "1px solid var(--border)", marginTop: 12, fontFamily: "var(--mono)", fontSize: "0.56rem", color: "var(--text-dim)", lineHeight: 1.5 }}>
-                    Click any room in the dollhouse to navigate.
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Order form */}
-            <div style={{ maxWidth: 480, border: "1px solid var(--border-strong)", padding: 32, background: "var(--bg-elev)" }}>
-              {!tourPaid ? (
-                <>
-                  <div style={{ fontFamily: "var(--mono)", fontSize: "1.2rem", fontWeight: 700, marginBottom: 20 }}>Order a Virtual Tour — $49</div>
-                  {[
-                    { label: "Listing URL", val: tourUrl, set: setTourUrl, placeholder: "https://www.realtor.ca/..." },
-                    { label: "Delivery email", val: tourEmail, set: setTourEmail, placeholder: "you@example.com" },
-                  ].map(({ label, val, set, placeholder }) => (
-                    <div key={label} style={{ marginBottom: 16 }}>
-                      <label style={{ display: "block", fontFamily: "var(--mono)", fontSize: "0.56rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-mute)", marginBottom: 6 }}>{label}</label>
-                      <input value={val} onChange={e => set(e.target.value)} placeholder={placeholder}
-                        style={{ width: "100%", padding: "11px 13px", background: "transparent", border: "1px solid var(--border)", color: "var(--text)", fontFamily: "var(--mono)", fontSize: "0.82rem", outline: "none" }} />
-                    </div>
-                  ))}
-                  <button
-                    className="btn-primary"
-                    style={{ width: "100%", marginTop: 8 }}
-                    onClick={() => { if (tourUrl && tourEmail) { setTourPaid(true); setTourProgress(0); } }}
-                  >
-                    Pay &amp; Generate Tour →
-                  </button>
-                  <div style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", color: "var(--text-dim)", textAlign: "center", marginTop: 10 }}>Secure checkout via Stripe</div>
-                </>
-              ) : (
-                <>
-                  <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--accent)", marginBottom: 10 }}>{tourProgress < 100 ? "◈ Generating" : "◆ Ready"}</div>
-                  <div style={{ fontFamily: "var(--mono)", fontSize: "1.3rem", fontWeight: 700, marginBottom: 16 }}>{tourProgress < 100 ? "Building your tour…" : "Tour is live."}</div>
-                  <div style={{ width: "100%", height: 6, background: "var(--bg)", overflow: "hidden", marginBottom: 12 }}>
-                    <div style={{ width: `${tourProgress}%`, height: "100%", background: "var(--accent)", transition: "width 0.2s" }} />
-                  </div>
-                  <div style={{ fontFamily: "var(--mono)", fontSize: "0.7rem", color: "var(--text-mute)" }}>
-                    {tourProgress < 30 ? "Fetching listing photos…" : tourProgress < 60 ? "Classifying rooms with Gemini Vision…" : tourProgress < 100 ? "Assembling hosted manifest…" : "Tour live at 416homes.ca/tours/demo"}
-                  </div>
-                  {tourProgress >= 100 && (
-                    <button onClick={() => { setTourPaid(false); setTourProgress(0); setTourUrl(""); setTourEmail(""); }}
-                      style={{ marginTop: 20, padding: "9px 18px", background: "transparent", border: "1px solid var(--border-strong)", color: "var(--accent)", fontFamily: "var(--mono)", fontSize: "0.66rem", letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer" }}>
-                      Order another →
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
+          <div style={{ maxWidth: 600, margin: "0 auto", padding: "80px 40px", textAlign: "center" }}>
+            <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 16 }}>◆ Virtual Tours</div>
+            <div style={{ fontFamily: "var(--mono)", fontSize: "1.5rem", fontWeight: 700, marginBottom: 16 }}>Order on the dedicated tours page.</div>
+            <p style={{ fontFamily: "var(--mono)", fontSize: "0.78rem", lineHeight: 1.7, color: "var(--text-mute)", maxWidth: "42ch", margin: "0 auto 32px" }}>
+              Paste a listing URL or upload photos. Your tour is generated and hosted in under 5 minutes.
+            </p>
+            <Link href="/tours" style={{
+              display: "inline-block", padding: "14px 32px",
+              background: "var(--accent)", color: "var(--bg)",
+              fontFamily: "var(--mono)", fontSize: "0.82rem", fontWeight: 700,
+              letterSpacing: "0.08em", textTransform: "uppercase", textDecoration: "none",
+            }}>
+              Order a tour — $49 →
+            </Link>
           </div>
         )}
       </main>
