@@ -316,10 +316,18 @@ export default function HomePage() {
   const ticker = [...TICKER_ITEMS, ...TICKER_ITEMS];
   const router = useRouter();
   const [featured, setFeatured] = useState(FEATURED);
+  const [liveCount, setLiveCount] = useState<number | null>(null);
   const [searchCity, setSearchCity] = useState("");
   const [searchType, setSearchType] = useState("");
   const [searchPrice, setSearchPrice] = useState("");
   const [searchBeds, setSearchBeds] = useState("");
+
+  useEffect(() => {
+    // Fetch live listing count for the stats strip
+    fetchListings({ limit: 1 }).then(({ total }) => {
+      if (typeof total === "number" && total > 0) setLiveCount(total);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetchListings({ limit: 20 }).then(({ listings }) => {
@@ -404,12 +412,12 @@ export default function HomePage() {
           {/* Subtext */}
           <p style={{ fontFamily: "var(--mono)", fontSize: "0.88rem", lineHeight: 1.8, color: "rgba(255,255,255,0.65)", maxWidth: "50ch", margin: "0 0 28px" }}>
             Discover verified listings for sale and rent across Toronto, Mississauga,
-            Brampton and the entire Greater Toronto Area — with AI-powered valuations.
+            Brampton and the entire Greater Toronto Area — with price checks against real sold comps.
           </p>
 
           {/* Trust badges */}
           <div style={{ display: "flex", gap: 28, marginBottom: 32, flexWrap: "wrap" }}>
-            {([["✓", "Verified Listings"], ["↻", "Updated Daily"], ["◎", "Local GTA Experts"]] as [string, string][]).map(([icon, label]) => (
+            {([["✓", "Verified Listings"], ["↻", "Scanned every 30 min"], ["◎", "Free to start"]] as [string, string][]).map(([icon, label]) => (
               <div key={label} style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--mono)", fontSize: "0.68rem", letterSpacing: "0.08em", color: "rgba(255,255,255,0.60)" }}>
                 <span style={{ color: "var(--accent)", fontSize: "0.8rem" }}>{icon}</span> {label}
               </div>
@@ -506,7 +514,7 @@ export default function HomePage() {
       <div style={{ borderBottom: "1px solid var(--border)", background: "var(--bg-elev)" }}>
         <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 56px", display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }} className="stats-strip">
           {[
-            ["2,847+", "Active GTA Listings"],
+            [liveCount ? `${liveCount.toLocaleString()}` : "2,500+", liveCount ? "Active GTA listings" : "Est. active GTA listings"],
             ["50+", "Neighbourhoods Tracked"],
             ["Every 30 min", "Scan Cadence"],
             ["$0", "To Get Started"],
@@ -518,6 +526,40 @@ export default function HomePage() {
           ))}
         </div>
       </div>
+
+      {/* ── Alert CTA (primary action — above How It Works) ── */}
+      <section className="sec-wrap sec-pad-lg alert-cta" id="alert" style={{ maxWidth: 1320, margin: "0 auto", padding: "80px 56px", borderBottom: "1px solid var(--border)", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64 }}>
+        <div>
+          <Eyebrow line>Free · No credit card</Eyebrow>
+          <h2 style={{ fontFamily: "var(--mono)", fontSize: "clamp(2.2rem, 3.4vw, 3.6rem)", fontWeight: 700, lineHeight: 1, letterSpacing: "-0.015em", margin: "20px 0 20px" }}>
+            Tell us what you want.<br />
+            We watch the GTA <span className="accent-highlight">every 30 minutes.</span>
+          </h2>
+          <p style={{ fontFamily: "var(--mono)", fontSize: "0.85rem", lineHeight: 1.8, color: "var(--text-mute)", maxWidth: "44ch", marginBottom: 32 }}>
+            Set your cities, budget, and beds. We scan every listing source and send you only the properties worth a look — with the price check included.
+          </p>
+          <div style={{ borderTop: "1px solid var(--border)" }}>
+            {[
+              ["Listing search", "Realtor.ca · Zoocasa · Condos.ca · Kijiji"],
+              ["Price checks", "vs real sold comps from HouseSigma"],
+              ["Agent outreach", "Professional email sent on your behalf"],
+              ["Morning digest", "New matches in your inbox daily"],
+              ["Dashboard", "Listings, alerts, history"],
+            ].map(([n, r]) => (
+              <div key={n} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 0", borderBottom: "1px solid var(--border)" }}>
+                <div>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: "0.95rem", fontWeight: 600 }}>{n}</div>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: "0.68rem", color: "var(--text-mute)", marginTop: 3 }}>{r}</div>
+                </div>
+                <span style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)", border: "1px solid var(--border-strong)", padding: "3px 8px" }}>
+                  Free
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <AlertForm />
+      </section>
 
       {/* ── How It Works ── */}
       <section id="how-it-works" className="sec-wrap sec-pad-lg" style={{ maxWidth: 1320, margin: "0 auto", padding: "96px 56px", borderBottom: "1px solid var(--border)" }}>
@@ -538,7 +580,7 @@ export default function HomePage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 0, border: "1px solid var(--border)" }} className="how-grid">
           {[
             ["01", "Define", "Cities, budget, beds, neighbourhoods. Ninety seconds, tops.", "01/04"],
-            ["02", "Scan", "Realtor.ca · HouseSigma · Kijiji · Zoocasa, every 30 minutes.", "02/04"],
+            ["02", "Scan", "Realtor.ca · Zoocasa · Condos.ca · Kijiji, every 30 minutes.", "02/04"],
             ["03", "Value", "Every listing compared to real sold comps in that exact pocket.", "03/04"],
             ["04", "Reach", "When a match appears, a professional email is sent to the listing agent.", "04/04"],
           ].map(([n, t, d, f], i) => (
@@ -572,7 +614,7 @@ export default function HomePage() {
         <div className="why-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 0, border: "1px solid var(--border)" }}>
           {[
             ["Sold comps", "What homes actually sold for",
-              "We pull real transaction prices from HouseSigma across 50+ GTA neighbourhoods — not estimates, not Zestimates. Every listing is compared against actual closes in the exact same pocket."],
+              "We pull real sold-comp prices from HouseSigma across 50+ GTA neighbourhoods — not estimates, not Zestimates. Every listing is compared against actual closes in the exact same pocket."],
             ["Transit premium", "Ontario Line & Eglinton Crosstown",
               "The Crosstown opened late 2024 and premiums are forming along the corridor. Ontario Line lands ~2030. We score every listing's proximity to both — a forward signal most buyers aren't pricing in yet."],
             ["Assignment sales", "Pre-construction, tracked",
@@ -598,8 +640,8 @@ export default function HomePage() {
         <Eyebrow line>Optional add-ons</Eyebrow>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, marginTop: 32, border: "1px solid var(--border)" }} className="products-grid">
           {[
-            { tag: "Cinematic video", title: "Any listing URL → 30-second film", price: "from $99", desc: "Paste a Realtor.ca link. We write the script, record the voiceover, and cut the film — delivered in under 15 minutes.", cta: "See samples →", href: "/video", right: false },
-            { tag: "Virtual tour", title: "Photos → hosted room-by-room tour", price: "$49", desc: "Gemini classifies every listing photo by room, builds a shareable tour link and embed code. Delivered in 5 minutes.", cta: "Order a tour →", href: "/tours", right: true },
+            { tag: "Listing video", title: "Any listing URL → 30-second MP4", price: "from $99", desc: "Paste a Realtor.ca link. We write the script, record narration, and deliver an MP4 — in under 15 minutes.", cta: "See samples →", href: "/video", right: false },
+            { tag: "Virtual tour", title: "Photos → hosted room-by-room tour", price: "$49", desc: "Your listing photos, classified by room and published as a hosted tour. Shareable link and embed code. Delivered in 5 minutes.", cta: "Order a tour →", href: "/tours", right: true },
           ].map(p => (
             <div key={p.tag} style={{ padding: 48, borderRight: p.right ? "none" : "1px solid var(--border)" }}>
               <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--accent)" }}>{p.tag}</div>
@@ -617,41 +659,6 @@ export default function HomePage() {
             </div>
           ))}
         </div>
-      </section>
-
-      {/* ── Alert CTA ── */}
-      <section className="sec-wrap sec-pad-lg alert-cta" style={{ maxWidth: 1320, margin: "0 auto", padding: "96px 56px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64 }}>
-        <div>
-          <Eyebrow line>Free · No credit card</Eyebrow>
-          <h2 style={{ fontFamily: "var(--mono)", fontSize: "clamp(2.2rem, 3.4vw, 3.6rem)", fontWeight: 700, lineHeight: 1, letterSpacing: "-0.015em", margin: "20px 0 20px" }}>
-            Set it once.<br />
-            We handle <span className="accent-highlight">the rest.</span>
-          </h2>
-          <p style={{ fontFamily: "var(--mono)", fontSize: "0.85rem", lineHeight: 1.8, color: "var(--text-mute)", maxWidth: "44ch", marginBottom: 32 }}>
-            Tell us what you&apos;re looking for. We&apos;ll scan the GTA every thirty minutes
-            and send you only the listings worth a look — with the price check included.
-          </p>
-          <div style={{ borderTop: "1px solid var(--border)" }}>
-            {[
-              ["Listing search", "Realtor.ca · HouseSigma · Kijiji · Zoocasa"],
-              ["Price checks", "vs real sold comps from HouseSigma"],
-              ["Agent outreach", "Professional email sent on your behalf"],
-              ["Morning digest", "New matches in your inbox daily"],
-              ["Dashboard", "Listings, alerts, history"],
-            ].map(([n, r]) => (
-              <div key={n} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 0", borderBottom: "1px solid var(--border)" }}>
-                <div>
-                  <div style={{ fontFamily: "var(--mono)", fontSize: "0.95rem", fontWeight: 600 }}>{n}</div>
-                  <div style={{ fontFamily: "var(--mono)", fontSize: "0.68rem", color: "var(--text-mute)", marginTop: 3 }}>{r}</div>
-                </div>
-                <span style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)", border: "1px solid var(--border-strong)", padding: "3px 8px" }}>
-                  Free
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <AlertForm />
       </section>
 
       <FooterBar />
