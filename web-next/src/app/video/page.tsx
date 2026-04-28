@@ -27,7 +27,6 @@ const TIERS: { id: Tier; price: number; label: string; delivery: string; badge?:
 
 const DEMO_VIDEO_SRC = "https://upwkbeyzmdfdkwoaayub.supabase.co/storage/v1/object/sign/416homevideo/5314533739356475027.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8zYTEyZTQyMC1mMGZiLTQ4YzEtYTQ1OC00NjRkZTQ0MTdkMTciLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiI0MTZob21ldmlkZW8vNTMxNDUzMzczOTM1NjQ3NTAyNy5tcDQiLCJpYXQiOjE3NzY3MDA5NzgsImV4cCI6MTgwODIzNjk3OH0.GipcwNQCMjJkRZyFJlhlLbyiciHFW0-k47odpXpdBKg";
 const DEMO_POSTER = "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=1280&q=80";
-const DEMO_BG = "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=1920&q=80";
 
 /* ── Progress panel (Terminal Broker style) ────────────────────────── */
 function ProgressPanel({
@@ -331,7 +330,6 @@ export default function VideoPage() {
       <ScrollExpandHero
         mediaSrc={DEMO_VIDEO_SRC}
         posterSrc={DEMO_POSTER}
-        bgImageSrc={DEMO_BG}
         title="Any Listing URL"
         date="$99 – $299 CAD"
         scrollToExpand="Scroll to preview"

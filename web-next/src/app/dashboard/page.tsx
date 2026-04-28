@@ -12,7 +12,7 @@ import { Alert, fetchAlerts, createAlert, updateAlert, deleteAlert, generateLink
 import { DropdownSelect } from "@/components/DropdownSelect";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { ListingCard, ListingCardSkeleton, ListRow } from "@/components/listing-card";
-import { ListingDestinationCard } from "@/components/ui/listing-destination-card";
+import { ListingTiltCard } from "@/components/ui/card-7";
 
 /* ── Reno ROI data (dashboard tab) ─────────────────────────────────── */
 const DASH_RENO_TYPES = [
@@ -996,7 +996,7 @@ export default function DashboardPage() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 20, marginTop: 20 }}>
                   {listings.map(l => (
                     <div key={l.id} style={{ height: 340 }}>
-                      <ListingDestinationCard listing={l} />
+                      <ListingTiltCard listing={l} />
                     </div>
                   ))}
                 </div>
