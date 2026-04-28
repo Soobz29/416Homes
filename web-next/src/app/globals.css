@@ -39,10 +39,10 @@
   --color-foreground: var(--text);
 }
 
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; background: var(--bg); }
 
 body {
-  background: var(--bg);
+  background: transparent;
   color: var(--text);
   font-family: var(--mono);
   -webkit-font-smoothing: antialiased;

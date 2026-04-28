@@ -465,7 +465,7 @@ export default function DashboardPage() {
   const monoSm: React.CSSProperties = { fontFamily: "var(--mono)", fontSize: "0.68rem", textTransform: "uppercase" as const, letterSpacing: "0.1em" };
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)" }}>
+    <div style={{ minHeight: "100vh", background: "transparent", color: "var(--text)" }}>
 
       {/* ── Nav ──────────────────────────────────────────────────────── */}
       <nav className="dash-nav" style={{

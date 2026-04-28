@@ -5,7 +5,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { fetchListings } from "@/lib/api";
 import HouseLogo from "@/components/HouseLogo";
-import { MeshGradientBg } from "@/components/ui/mesh-gradient-bg";
 
 /* ─── Shared primitives ─────────────────────────────────────────────── */
 
@@ -363,7 +362,7 @@ export default function HomePage() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", color: "var(--text)", background: "var(--bg)" }}>
+    <div style={{ minHeight: "100vh", color: "var(--text)", background: "transparent" }}>
       <TopNav active="How It Works" />
 
       {/* ── Ticker ── */}
@@ -387,8 +386,6 @@ export default function HomePage() {
 
       {/* ── Hero ── */}
       <section style={{ position: "relative", width: "100%", minHeight: 580, overflow: "hidden", borderBottom: "1px solid var(--border)" }}>
-        {/* Animated mesh gradient background */}
-        <MeshGradientBg speed={0.3} />
         {/* Readability overlay: strong left → transparent right */}
         <div style={{ position: "absolute", inset: 0, zIndex: 1, background: "linear-gradient(to right, rgba(5,6,10,0.90) 0%, rgba(5,6,10,0.65) 55%, rgba(5,6,10,0.22) 100%)" }} />
 

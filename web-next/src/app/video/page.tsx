@@ -287,7 +287,7 @@ export default function VideoPage() {
   const mono: React.CSSProperties = { fontFamily: "var(--mono)" };
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)" }}>
+    <div style={{ minHeight: "100vh", background: "transparent", color: "var(--text)" }}>
 
       {/* ── Nav ─────────────────────────────────────────────────────── */}
       <nav className="nav-bar" style={{

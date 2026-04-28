@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Syne, Cormorant_Garamond, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { GlobalBackground } from "@/components/ui/global-background";
 
 const cormorant = Cormorant_Garamond({
   subsets: ["latin"],
@@ -40,6 +41,7 @@ export default function RootLayout({
       <body
         className={`${cormorant.variable} ${syne.variable} ${jetbrains.variable}`}
       >
+        <GlobalBackground />
         {children}
       </body>
     </html>

@@ -154,7 +154,7 @@ export default function ToursPage() {
     tourUrl ? "Tour ready — open link below" : "Finalising…";
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)" }}>
+    <div style={{ minHeight: "100vh", background: "transparent", color: "var(--text)" }}>
 
       {/* Nav */}
       <nav style={{

@@ -186,7 +186,7 @@ export default function TourViewerPage() {
   // ── Loading ──
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", background: BG, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1rem", color: TEXT, fontFamily: FONT_MONO }}>
+      <div style={{ minHeight: "100vh", background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1rem", color: TEXT, fontFamily: FONT_MONO }}>
         <div style={{ width: 40, height: 40, border: `2px solid ${GOLD_DIM}`, borderTopColor: GOLD, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         <span style={{ fontSize: "0.8rem", color: SUBTEXT, letterSpacing: "0.1em" }}>Loading your tour...</span>
@@ -197,7 +197,7 @@ export default function TourViewerPage() {
   // ── Error ──
   if (error || !manifest) {
     return (
-      <div style={{ minHeight: "100vh", background: BG, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1.5rem", color: TEXT, fontFamily: FONT_MONO, padding: "2rem", textAlign: "center" }}>
+      <div style={{ minHeight: "100vh", background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1.5rem", color: TEXT, fontFamily: FONT_MONO, padding: "2rem", textAlign: "center" }}>
         <div style={{ fontSize: "1.2rem", fontWeight: 700 }}>Tour not found</div>
         <p style={{ fontSize: "0.78rem", color: SUBTEXT, maxWidth: "36ch", lineHeight: 1.7 }}>{error ?? "This tour link may have expired or the tour is still being generated."}</p>
         <a href="/tours" style={{ display: "inline-block", background: GOLD, color: BG, fontFamily: FONT_DISPLAY, fontWeight: 800, fontSize: "0.85rem", padding: "0.75rem 2rem", textDecoration: "none", letterSpacing: "0.05em", textTransform: "uppercase" }}>← Back to Tour Builder</a>
@@ -212,7 +212,7 @@ export default function TourViewerPage() {
   // ── Matterport / real 3D embed ──
   if (manifest.embed_url) {
     return (
-      <div style={{ minHeight: "100vh", background: BG, color: TEXT, fontFamily: FONT_MONO }}>
+      <div style={{ minHeight: "100vh", background: "transparent", color: TEXT, fontFamily: FONT_MONO }}>
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1rem 2.5rem", borderBottom: `1px solid ${GOLD_DIM}`, background: "rgba(10,10,8,0.95)", position: "sticky", top: 0, zIndex: 40, height: HEADER_H, boxSizing: "border-box" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
             <span style={{ fontFamily: FONT_DISPLAY, fontWeight: 900, fontSize: "1rem" }}><span style={{ color: GOLD }}>416</span>Homes</span>
@@ -239,7 +239,7 @@ export default function TourViewerPage() {
   const hasNext = roomIdx < rooms.length - 1 || photoIdx < currentRoom.photos.length - 1;
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden", background: BG, color: TEXT, fontFamily: FONT_MONO }}>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden", background: "transparent", color: TEXT, fontFamily: FONT_MONO }}>
       <style>{`
         @keyframes kenBurns {
           0%   { transform: scale(1)    translate(0%,   0%); }

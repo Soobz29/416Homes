@@ -176,7 +176,7 @@ export default function RenoPage() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)" }}>
+    <div style={{ minHeight: "100vh", background: "transparent", color: "var(--text)" }}>
       <NavBar />
 
       {/* ── Hero ── */}
