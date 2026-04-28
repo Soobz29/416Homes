@@ -154,8 +154,10 @@ export default function VideoPage() {
   const [revisionMessage, setRevisionMessage] = useState<string | null>(null);
   const [revisionSuccess, setRevisionSuccess] = useState(false);
   const [revisionVisible, setRevisionVisible] = useState(false);
+  const [jobError, setJobError] = useState<string | null>(null);
   const [demoPlaying, setDemoPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const pollFailCount = useRef(0);
   const [videoInputMode, setVideoInputMode] = useState<"url" | "upload">("url");
   const [videoFiles, setVideoFiles] = useState<File[]>([]);
   const [videoFilePreviews, setVideoFilePreviews] = useState<string[]>([]);
@@ -174,6 +176,8 @@ export default function VideoPage() {
   const selectTier = useCallback((t: Tier) => setTier(t), []);
 
   const showProgress = useCallback((jobId: string, addr: string) => {
+    pollFailCount.current = 0;
+    setJobError(null);
     setCurrentJobId(jobId); setProgressAddr(addr);
     setOrderFormVisible(false); setProgressVisible(true);
     setStepMessages({});
@@ -224,8 +228,17 @@ export default function VideoPage() {
     const poll = async () => {
       try {
         const res = await fetch(`${API_BASE}/api/video-jobs/${currentJobId}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        pollFailCount.current = 0;
         updateProgressFromApi(await res.json(), currentJobId);
-      } catch (e) { console.error("Poll error:", e); }
+      } catch (e) {
+        console.error("Poll error:", e);
+        pollFailCount.current += 1;
+        if (pollFailCount.current >= 4) {
+          if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+          setJobError("Lost connection to the server. Refresh the page to check your job status.");
+        }
+      }
     };
     poll(); pollRef.current = setInterval(poll, 3000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
@@ -269,33 +282,10 @@ export default function VideoPage() {
       const jobId = data.job_id || data.id;
       if (jobId) showProgress(jobId, url.length > 60 ? url.slice(0, 60) + "…" : url);
       else throw new Error("No job ID returned");
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
-      // Demo fallback
-      const jobId = "demo-" + Math.random().toString(36).slice(2, 8);
-      showProgress(jobId, url.length > 60 ? url.slice(0, 60) + "…" : url);
-      const demoSteps = [
-        { step: "scrape", msg: "Found 6 photos · GTA listing", delay: 1500 },
-        { step: "script", msg: "Script complete · Narration ready", delay: 3500 },
-        { step: "audio",  msg: "Narration recorded · Music generated", delay: 6000 },
-        { step: "animate", msg: "All 6 clips animated with dolly shots", delay: 10000 },
-        { step: "assemble", msg: "Final video assembled · 4K MP4", delay: 13000 },
-      ];
-      demoSteps.forEach(({ step, msg, delay }) => {
-        setTimeout(() => {
-          setStepStates(prev => {
-            const next = { ...prev };
-            const idx = STEP_ORDER.indexOf(step as typeof STEP_ORDER[number]);
-            STEP_ORDER.forEach((s, i) => { next[s] = i < idx ? "done" : i === idx ? "active" : "pending"; });
-            return next;
-          });
-          setStepMessages(prev => ({ ...prev, [step]: msg }));
-        }, delay);
-      });
-      setTimeout(() => {
-        setStepStates({ scrape: "done", script: "done", audio: "done", animate: "done", assemble: "done" });
-        setDownloadVisible(true); setDownloadSubtitle("Demo mode — connect API for real video generation");
-      }, 15000);
+      const msg = err instanceof Error ? err.message : "Could not reach the server.";
+      setJobError(`Submission failed — ${msg}. Please try again.`);
     } finally { setSubmitLoading(false); }
   }, [formListingUrl, formEmail, tier, price, showProgress, videoInputMode, videoFiles]);
 
@@ -602,6 +592,11 @@ export default function VideoPage() {
             >
               {submitLoading ? "Processing…" : "Checkout with Stripe →"}
             </button>
+            {jobError && !progressVisible && (
+              <div style={{ marginTop: 16, padding: "14px 18px", border: "1px solid #8b3a3a", background: "rgba(139,58,58,0.08)", ...mono, fontSize: "0.74rem", color: "#cf6357", lineHeight: 1.6 }}>
+                ◆ {jobError}
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -609,16 +604,35 @@ export default function VideoPage() {
       {/* ── Progress panel ───────────────────────────────────────────── */}
       {progressVisible && (
         <section style={{ maxWidth: 1320, margin: "0 auto", padding: "72px 56px", borderBottom: "1px solid var(--border)" }}>
-          <ProgressPanel
-            progressAddr={progressAddr} stepMessages={stepMessages} stepStates={stepStates}
-            downloadVisible={downloadVisible} downloadSubtitle={downloadSubtitle}
-            jobId={currentJobId} videoUrl={videoUrl}
-            videoLoadError={videoLoadError} onVideoError={() => setVideoLoadError(true)}
-            revisionVisible={revisionVisible} revisionNotes={revisionNotes}
-            onRevisionNotesChange={setRevisionNotes} onSubmitRevision={submitRevision}
-            revisionSubmitting={revisionSubmitting} revisionMessage={revisionMessage}
-            revisionSuccess={revisionSuccess}
-          />
+          {jobError ? (
+            <div style={{ border: "1px solid #8b3a3a", background: "rgba(139,58,58,0.08)", padding: "28px 32px", maxWidth: 640 }}>
+              <div style={{ fontFamily: "var(--mono)", fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.15em", color: "#cf6357", marginBottom: 10 }}>
+                ◆ Job failed
+              </div>
+              <p style={{ fontFamily: "var(--mono)", fontSize: "0.82rem", color: "var(--text-mute)", lineHeight: 1.7, marginBottom: 20 }}>
+                {jobError}
+              </p>
+              <button
+                onClick={() => { setProgressVisible(false); setOrderFormVisible(true); setJobError(null); setCurrentJobId(null); }}
+                style={{ padding: "12px 24px", border: "1px solid var(--border-strong)", background: "transparent", fontFamily: "var(--mono)", fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--text)", cursor: "pointer" }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+              >
+                ← Try again
+              </button>
+            </div>
+          ) : (
+            <ProgressPanel
+              progressAddr={progressAddr} stepMessages={stepMessages} stepStates={stepStates}
+              downloadVisible={downloadVisible} downloadSubtitle={downloadSubtitle}
+              jobId={currentJobId} videoUrl={videoUrl}
+              videoLoadError={videoLoadError} onVideoError={() => setVideoLoadError(true)}
+              revisionVisible={revisionVisible} revisionNotes={revisionNotes}
+              onRevisionNotesChange={setRevisionNotes} onSubmitRevision={submitRevision}
+              revisionSubmitting={revisionSubmitting} revisionMessage={revisionMessage}
+              revisionSuccess={revisionSuccess}
+            />
+          )}
         </section>
       )}
 
