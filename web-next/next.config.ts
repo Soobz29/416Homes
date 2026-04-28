@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "images.expcloud.com" },
       { protocol: "https", hostname: "qbmxwkctscpkmxfbksmb.supabase.co" },
+      { protocol: "https", hostname: "upwkbeyzmdfdkwoaayub.supabase.co" },
+      { protocol: "https", hostname: "images.unsplash.com" },
     ],
     unoptimized: process.env.NODE_ENV === "development",
   },

@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
 import HouseLogo from "@/components/HouseLogo";
+import ScrollExpandHero from "@/components/ui/scroll-expand-hero";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || (typeof window !== "undefined" ? window.location.origin : "http://localhost:8000")).replace(/\/$/, "");
 const STEP_ORDER = ["scrape", "script", "audio", "animate", "assemble"] as const;
@@ -24,7 +25,9 @@ const TIERS: { id: Tier; price: number; label: string; delivery: string; badge?:
   },
 ];
 
-const DEMO_HOUSE = "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=900&q=80";
+const DEMO_VIDEO_SRC = "https://upwkbeyzmdfdkwoaayub.supabase.co/storage/v1/object/sign/416homevideo/5314533739356475027.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8zYTEyZTQyMC1mMGZiLTQ4YzEtYTQ1OC00NjRkZTQ0MTdkMTciLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiI0MTZob21ldmlkZW8vNTMxNDUzMzczOTM1NjQ3NTAyNy5tcDQiLCJpYXQiOjE3NzY3MDA5NzgsImV4cCI6MTgwODIzNjk3OH0.GipcwNQCMjJkRZyFJlhlLbyiciHFW0-k47odpXpdBKg";
+const DEMO_POSTER = "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=1280&q=80";
+const DEMO_BG = "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=1920&q=80";
 
 /* ── Progress panel (Terminal Broker style) ────────────────────────── */
 function ProgressPanel({
@@ -155,20 +158,12 @@ export default function VideoPage() {
   const [revisionSuccess, setRevisionSuccess] = useState(false);
   const [revisionVisible, setRevisionVisible] = useState(false);
   const [jobError, setJobError] = useState<string | null>(null);
-  const [demoPlaying, setDemoPlaying] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const pollFailCount = useRef(0);
   const [videoInputMode, setVideoInputMode] = useState<"url" | "upload">("url");
   const [videoFiles, setVideoFiles] = useState<File[]>([]);
   const [videoFilePreviews, setVideoFilePreviews] = useState<string[]>([]);
   const [videoUploading, setVideoUploading] = useState(false);
   const videoFileRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (demoPlaying && videoRef.current) {
-      videoRef.current.play().catch(() => {/* browser may still block, that's ok */});
-    }
-  }, [demoPlaying]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const price = TIERS.find(t => t.id === tier)?.price ?? 249;
@@ -332,104 +327,40 @@ export default function VideoPage() {
         )}
       </nav>
 
-      {/* ── Hero ─────────────────────────────────────────────────────── */}
-      <section className="sec-wrap sec-pad-lg" style={{ maxWidth: 1320, margin: "0 auto", padding: "72px 56px 64px", borderBottom: "1px solid var(--border)" }}>
-        {/* Eyebrow */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, ...mono, fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.18em", color: "var(--accent)", marginBottom: 24 }}>
-          <span style={{ height: 1, width: 28, background: "var(--accent)", flexShrink: 0 }} />
-          Listing Video
-        </div>
-
-        {/* Headline */}
-        <h1 style={{ ...mono, fontSize: "clamp(2.4rem, 4.5vw, 5rem)", fontWeight: 500, lineHeight: 1.05, letterSpacing: "-0.02em", marginBottom: 20 }}>
-          Any listing URL,{" "}
-          <span style={{ color: "var(--accent)" }}>ready in minutes.</span>
-        </h1>
-
-        {/* Description */}
-        <p style={{ ...mono, fontSize: "0.85rem", color: "var(--text-mute)", maxWidth: "56ch", lineHeight: 1.75, marginBottom: 56 }}>
-          Paste a Realtor.ca, Zillow, or HouseSigma URL. We pull the photos, write the script,
-          record narration, and deliver an MP4 to your inbox.
-        </p>
-
-        {/* Demo card — 2 col */}
-        <div className="demo-card" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", border: "1px solid var(--border-strong)", overflow: "hidden", minHeight: 400 }}>
-          {/* Left: video */}
-          <div className="demo-video-col" style={{ position: "relative", background: "#060606", overflow: "hidden", minHeight: 340 }}>
-            <video
-              ref={videoRef}
-              src="https://upwkbeyzmdfdkwoaayub.supabase.co/storage/v1/object/sign/416homevideo/5314533739356475027.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8zYTEyZTQyMC1mMGZiLTQ4YzEtYTQ1OC00NjRkZTQ0MTdkMTciLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiI0MTZob21ldmlkZW8vNTMxNDUzMzczOTM1NjQ3NTAyNy5tcDQiLCJpYXQiOjE3NzY3MDA5NzgsImV4cCI6MTgwODIzNjk3OH0.GipcwNQCMjJkRZyFJlhlLbyiciHFW0-k47odpXpdBKg"
-              loop
-              playsInline
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: demoPlaying ? "block" : "none" }}
-              onError={() => setDemoPlaying(false)}
-            />
-            {!demoPlaying && (
-              <>
-                <img src={DEMO_HOUSE} alt="Demo listing" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.65 }} />
-                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom right, rgba(11,11,11,0.4), rgba(11,11,11,0.1))" }} />
-                <button
-                  onClick={() => setDemoPlaying(true)}
-                  style={{
-                    position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
-                    width: 72, height: 72, borderRadius: "50%",
-                    background: "var(--accent)", border: "none", cursor: "pointer",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: "1.4rem", color: "#000",
-                    boxShadow: "0 0 40px rgba(212,175,55,0.5)",
-                    transition: "transform 0.2s, box-shadow 0.2s",
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = "translate(-50%,-50%) scale(1.1)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = "translate(-50%,-50%) scale(1)"; }}
-                >
-                  ▶
-                </button>
-              </>
-            )}
+      {/* ── Hero — scroll-expanding video preview ────────────────────── */}
+      <ScrollExpandHero
+        mediaSrc={DEMO_VIDEO_SRC}
+        posterSrc={DEMO_POSTER}
+        bgImageSrc={DEMO_BG}
+        title="Any Listing URL"
+        date="$99 – $299 CAD"
+        scrollToExpand="Scroll to preview"
+      >
+        {/* Revealed after full expansion — description + specs */}
+        <div style={{ maxWidth: 1320, margin: "0 auto", padding: "64px 56px", borderBottom: "1px solid var(--border)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, ...mono, fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.18em", color: "var(--accent)", marginBottom: 20 }}>
+            <span style={{ height: 1, width: 28, background: "var(--accent)", flexShrink: 0 }} />
+            Sample Output
           </div>
-
-          {/* Right: sample output */}
-          <div style={{ background: "var(--bg-elev)", borderLeft: "1px solid var(--border-strong)", padding: 32, display: "flex", flexDirection: "column", gap: 0 }}>
-            <div style={{ ...mono, fontSize: "0.52rem", textTransform: "uppercase", letterSpacing: "0.18em", color: "var(--accent)", marginBottom: 14 }}>
-              Sample Output
-            </div>
-            <h2 style={{ ...mono, fontSize: "1.35rem", fontWeight: 500, color: "var(--text)", lineHeight: 1.25, marginBottom: 16 }}>
-              Sample listing — Mississauga<br />Cinematic tier
-            </h2>
-            <p style={{ ...mono, fontSize: "0.72rem", color: "var(--text-mute)", lineHeight: 1.75, marginBottom: 20 }}>
-              Generated from 3 listing photos in 14 minutes. Script written by Gemini,
-              narration recorded, cut in FFmpeg with Ken Burns motion + fade transitions.
-            </p>
-            <div style={{ height: 1, background: "var(--border)", marginBottom: 20 }} />
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "18px 24px", marginBottom: 24 }}>
-              {[["Duration", "00:28"], ["Resolution", "3840×2160"], ["Voiceover", "Professional"], ["Delivery", "MP4 + vertical"]].map(([l, v]) => (
-                <div key={l}>
-                  <div style={{ ...mono, fontSize: "0.5rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--text-dim)", marginBottom: 5 }}>{l}</div>
-                  <div style={{ ...mono, fontSize: "0.95rem", fontWeight: 500, color: "var(--text)" }}>{v}</div>
-                </div>
-              ))}
-            </div>
-            <button
-              onClick={() => setDemoPlaying(true)}
-              style={{
-                marginTop: "auto", padding: "16px 20px",
-                border: "1px solid var(--border-strong)", background: "transparent",
-                ...mono, fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.14em",
-                color: "var(--accent)", cursor: "pointer", textAlign: "center",
-                transition: "background 0.2s",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = "rgba(212,175,55,0.07)"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
-            >
-              ▸ Play Preview
-            </button>
+          <p style={{ ...mono, fontSize: "0.88rem", color: "var(--text-mute)", maxWidth: "60ch", lineHeight: 1.8, marginBottom: 40 }}>
+            Paste a Realtor.ca, Zillow, or HouseSigma URL. We pull the photos,
+            write the script, record narration, and deliver an MP4 to your inbox.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "18px 32px", marginBottom: 40, borderTop: "1px solid var(--border)", paddingTop: 28 }}>
+            {[["Duration","00:28"],["Resolution","3840×2160"],["Narration","Professional"],["Delivery","MP4 + vertical"]].map(([l, v]) => (
+              <div key={l}>
+                <div style={{ ...mono, fontSize: "0.5rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--text-dim)", marginBottom: 6 }}>{l}</div>
+                <div style={{ ...mono, fontSize: "1rem", fontWeight: 600, color: "var(--text)" }}>{v}</div>
+              </div>
+            ))}
           </div>
+          <a href="#order" className="btn-primary" style={{ textDecoration: "none" }}>Order a Video →</a>
         </div>
-      </section>
+      </ScrollExpandHero>
 
       {/* ── Order section ────────────────────────────────────────────── */}
       {orderFormVisible && (
-        <section style={{ maxWidth: 1320, margin: "0 auto", padding: "72px 56px 64px", borderBottom: "1px solid var(--border)" }}>
+        <section id="order" style={{ maxWidth: 1320, margin: "0 auto", padding: "72px 56px 64px", borderBottom: "1px solid var(--border)" }}>
 
           {/* Input mode toggle */}
           <div style={{ display: "flex", marginBottom: 16, border: "1px solid var(--border)" }}>

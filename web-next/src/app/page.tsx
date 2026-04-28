@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { fetchListings } from "@/lib/api";
 import HouseLogo from "@/components/HouseLogo";
+import { MeshGradientBg } from "@/components/ui/mesh-gradient-bg";
 
 /* ─── Shared primitives ─────────────────────────────────────────────── */
 
@@ -386,15 +387,10 @@ export default function HomePage() {
 
       {/* ── Hero ── */}
       <section style={{ position: "relative", width: "100%", minHeight: 580, overflow: "hidden", borderBottom: "1px solid var(--border)" }}>
-        {/* Background photo */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="https://images.unsplash.com/photo-1517090186835-e348b621c820?w=1920&q=80"
-          alt=""
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 40%" }}
-        />
-        {/* Dark gradient overlay */}
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, rgba(5,6,10,0.93) 0%, rgba(5,6,10,0.72) 55%, rgba(5,6,10,0.38) 100%)" }} />
+        {/* Animated mesh gradient background */}
+        <MeshGradientBg speed={0.3} />
+        {/* Readability overlay: strong left → transparent right */}
+        <div style={{ position: "absolute", inset: 0, zIndex: 1, background: "linear-gradient(to right, rgba(5,6,10,0.90) 0%, rgba(5,6,10,0.65) 55%, rgba(5,6,10,0.22) 100%)" }} />
 
         {/* Hero content */}
         <div style={{ position: "relative", zIndex: 2, maxWidth: 1320, margin: "0 auto", padding: "80px 56px 72px" }}>

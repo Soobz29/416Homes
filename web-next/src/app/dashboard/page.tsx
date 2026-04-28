@@ -12,6 +12,7 @@ import { Alert, fetchAlerts, createAlert, updateAlert, deleteAlert, generateLink
 import { DropdownSelect } from "@/components/DropdownSelect";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { ListingCard, ListingCardSkeleton, ListRow } from "@/components/listing-card";
+import { ListingDestinationCard } from "@/components/ui/listing-destination-card";
 
 /* ── Reno ROI data (dashboard tab) ─────────────────────────────────── */
 const DASH_RENO_TYPES = [
@@ -218,6 +219,7 @@ export default function DashboardPage() {
   const [listingsPage, setListingsPage] = useState(0);
   const [totalListings, setTotalListings] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(false);
@@ -645,9 +647,29 @@ export default function DashboardPage() {
             {scanLoading ? "Scanning..." : "↻ Refresh"}
           </button>
           {scanMessage && <span style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", color: "var(--text-dim)" }}>{scanMessage}</span>}
-          <span style={{ marginLeft: "auto", fontFamily: "var(--mono)", fontSize: "0.62rem", color: "var(--text-dim)" }}>
-            {totalListings.toLocaleString()} listings
-          </span>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+            {/* View-mode toggle */}
+            {(["list", "grid"] as const).map(m => (
+              <button
+                key={m}
+                onClick={() => setViewMode(m)}
+                title={m === "list" ? "List + Map" : "Card grid"}
+                style={{
+                  padding: "5px 10px",
+                  background: viewMode === m ? "rgba(255,176,0,0.12)" : "transparent",
+                  border: `1px solid ${viewMode === m ? "var(--accent)" : "var(--border)"}`,
+                  color: viewMode === m ? "var(--accent)" : "var(--text-dim)",
+                  fontFamily: "var(--mono)", fontSize: "0.7rem", cursor: "pointer",
+                  lineHeight: 1,
+                }}
+              >
+                {m === "list" ? "☰" : "⊞"}
+              </button>
+            ))}
+            <span style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", color: "var(--text-dim)", marginLeft: 8 }}>
+              {totalListings.toLocaleString()} listings
+            </span>
+          </div>
         </div>
       )}
 
@@ -875,83 +897,111 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* ── Split view: List | Map ───────────────────────────── */}
-            <div
-              className="split-view"
-              style={{ display: "grid", gridTemplateColumns: "440px 1fr", minHeight: 640 }}
-            >
-              {/* List column */}
-              <div className="list-col" style={{ overflowY: "auto", borderRight: "1px solid var(--border)", maxHeight: "calc(100vh - 180px)", display: "flex", flexDirection: "column" }}>
-                {/* Market insights bar */}
-                {!loading && listings.length > 0 && (
+            {/* ── Shared empty / loading states ───────────────────────── */}
+            {loading && viewMode === "grid" && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 20, padding: "24px 24px" }}>
+                {Array.from({ length: 9 }).map((_, i) => (
+                  <div key={i} style={{ height: 340, background: "linear-gradient(90deg,#1a1a14 25%,#222218 50%,#1a1a14 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite" }} />
+                ))}
+              </div>
+            )}
+
+            {!loading && listings.length === 0 && (
+              <div style={{ padding: "60px 24px", textAlign: "center" }}>
+                <div style={{ fontSize: "2rem", color: "var(--border)", marginBottom: 12 }}>◎</div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "0.95rem", fontWeight: 600, color: "var(--text-mute)", marginBottom: 8 }}>No listings match your filters</div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "0.72rem", color: "var(--text-dim)", marginBottom: 20 }}>Try widening your city, price range, or property type.</div>
+                <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+                  <button
+                    onClick={() => setFilters({ city: "GTA", minPrice: "", maxPrice: "", bedrooms: "", bathrooms: "", propertyType: "" })}
+                    style={{ padding: "7px 14px", background: "transparent", border: "1px solid var(--border-strong)", color: "var(--accent)", fontFamily: "var(--mono)", fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.08em", cursor: "pointer" }}
+                  >
+                    Reset filters
+                  </button>
+                  <button
+                    onClick={() => void triggerScan()}
+                    disabled={scanLoading}
+                    style={{ padding: "7px 14px", background: "var(--accent)", color: "#000", border: "none", fontFamily: "var(--mono)", fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.08em", cursor: "pointer", fontWeight: 700 }}
+                  >
+                    Scan now
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ── List + Map view ──────────────────────────────────────── */}
+            {viewMode === "list" && (
+              <div
+                className="split-view"
+                style={{ display: "grid", gridTemplateColumns: "440px 1fr", minHeight: 640 }}
+              >
+                {/* List column */}
+                <div className="list-col" style={{ overflowY: "auto", borderRight: "1px solid var(--border)", maxHeight: "calc(100vh - 180px)", display: "flex", flexDirection: "column" }}>
+                  {!loading && listings.length > 0 && (
+                    <MarketInsightsBar listings={listings} total={totalListings} />
+                  )}
+                  {loading ? (
+                    Array.from({ length: 8 }).map((_, i) => (
+                      <div key={i} style={{ padding: "14px 16px", borderBottom: "1px solid var(--border)", display: "flex", gap: 12 }}>
+                        <div style={{ width: 56, height: 56, background: "linear-gradient(90deg,#1a1a14 25%,#222218 50%,#1a1a14 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite", flexShrink: 0 }} />
+                        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                          {[70, 50, 40].map(w => (
+                            <div key={w} style={{ height: 12, width: `${w}%`, background: "linear-gradient(90deg,#1a1a14 25%,#222218 50%,#1a1a14 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite" }} />
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    listings.map(l => (
+                      <ListRow
+                        key={l.id}
+                        listing={l}
+                        active={l.id === selectedId}
+                        onClick={() => setSelectedId(l.id === selectedId ? null : l.id)}
+                        onValuate={() => {
+                          setValuationForm({
+                            neighbourhood: "",
+                            city: l.city || "Toronto",
+                            bedrooms: l.beds > 0 ? String(l.beds) : "",
+                            bathrooms: l.baths > 0 ? String(l.baths) : "",
+                            sqft: l.sqft > 0 ? String(l.sqft) : "",
+                            list_price: l.price > 0 ? String(l.price) : "",
+                          });
+                          setValuationResult(null);
+                          setValuationError(null);
+                          setActiveTab("valuation");
+                        }}
+                      />
+                    ))
+                  )}
+                </div>
+
+                {/* Map column */}
+                <div className="map-col" style={{ position: "relative", height: "calc(100vh - 180px)" }}>
+                  <GTAMap
+                    listings={listings}
+                    selectedId={selectedId}
+                    onSelect={id => setSelectedId(id === selectedId ? null : id)}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* ── Card grid view ───────────────────────────────────────── */}
+            {viewMode === "grid" && !loading && listings.length > 0 && (
+              <div style={{ padding: "20px 24px" }}>
+                {listings.length > 0 && (
                   <MarketInsightsBar listings={listings} total={totalListings} />
                 )}
-                {loading ? (
-                  Array.from({ length: 8 }).map((_, i) => (
-                    <div key={i} style={{ padding: "14px 16px", borderBottom: "1px solid var(--border)", display: "flex", gap: 12 }}>
-                      <div style={{ width: 56, height: 56, background: "linear-gradient(90deg,#1a1a14 25%,#222218 50%,#1a1a14 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite", flexShrink: 0 }} />
-                      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
-                        {[70, 50, 40].map(w => (
-                          <div key={w} style={{ height: 12, width: `${w}%`, background: "linear-gradient(90deg,#1a1a14 25%,#222218 50%,#1a1a14 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite" }} />
-                        ))}
-                      </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 20, marginTop: 20 }}>
+                  {listings.map(l => (
+                    <div key={l.id} style={{ height: 340 }}>
+                      <ListingDestinationCard listing={l} />
                     </div>
-                  ))
-                ) : listings.length === 0 ? (
-                  <div style={{ padding: "60px 24px", textAlign: "center" }}>
-                    <div style={{ fontSize: "2rem", color: "var(--border)", marginBottom: 12 }}>◎</div>
-                    <div style={{ fontFamily: "var(--mono)", fontSize: "0.95rem", fontWeight: 600, color: "var(--text-mute)", marginBottom: 8 }}>No listings match your filters</div>
-                    <div style={{ fontFamily: "var(--mono)", fontSize: "0.72rem", color: "var(--text-dim)", marginBottom: 20 }}>Try widening your city, price range, or property type.</div>
-                    <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
-                      <button
-                        onClick={() => setFilters({ city: "GTA", minPrice: "", maxPrice: "", bedrooms: "", bathrooms: "", propertyType: "" })}
-                        style={{ padding: "7px 14px", background: "transparent", border: "1px solid var(--border-strong)", color: "var(--accent)", fontFamily: "var(--mono)", fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.08em", cursor: "pointer" }}
-                      >
-                        Reset filters
-                      </button>
-                      <button
-                        onClick={() => void triggerScan()}
-                        disabled={scanLoading}
-                        style={{ padding: "7px 14px", background: "var(--accent)", color: "#000", border: "none", fontFamily: "var(--mono)", fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.08em", cursor: "pointer", fontWeight: 700 }}
-                      >
-                        Scan now
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  listings.map(l => (
-                    <ListRow
-                      key={l.id}
-                      listing={l}
-                      active={l.id === selectedId}
-                      onClick={() => setSelectedId(l.id === selectedId ? null : l.id)}
-                      onValuate={() => {
-                        setValuationForm({
-                          neighbourhood: "",
-                          city: l.city || "Toronto",
-                          bedrooms: l.beds > 0 ? String(l.beds) : "",
-                          bathrooms: l.baths > 0 ? String(l.baths) : "",
-                          sqft: l.sqft > 0 ? String(l.sqft) : "",
-                          list_price: l.price > 0 ? String(l.price) : "",
-                        });
-                        setValuationResult(null);
-                        setValuationError(null);
-                        setActiveTab("valuation");
-                      }}
-                    />
-                  ))
-                )}
+                  ))}
+                </div>
               </div>
-
-              {/* Map column */}
-              <div className="map-col" style={{ position: "relative", height: "calc(100vh - 180px)" }}>
-                <GTAMap
-                  listings={listings}
-                  selectedId={selectedId}
-                  onSelect={id => setSelectedId(id === selectedId ? null : id)}
-                />
-              </div>
-            </div>
+            )}
 
             {/* Pagination */}
             {!loading && totalListings > LISTINGS_PAGE_SIZE && (
