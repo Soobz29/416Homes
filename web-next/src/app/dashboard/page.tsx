@@ -404,7 +404,7 @@ export default function DashboardPage() {
       const msg = e instanceof Error ? e.message : "Could not reach backend";
       setMeError(msg.includes("401") || msg.includes("Missing")
         ? "Sign in required."
-        : `${msg}. Set NEXT_PUBLIC_API_URL to your Railway API URL in Vercel.`);
+        : `${msg}. Ensure NEXT_PUBLIC_API_URL is set to your DigitalOcean backend URL in Vercel.`);
     }
   }
 
@@ -518,7 +518,7 @@ export default function DashboardPage() {
           {mounted && (
             sessionEmail ? (
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={{ ...monoSm, color: "var(--text-dim)" }}>
+                <span className="dash-email-label" style={{ ...monoSm, color: "var(--text-dim)" }}>
                   {sessionEmail.split("@")[0]}
                 </span>
                 <button onClick={handleSignOut} style={{ ...monoSm, background: "transparent", border: "none", color: "var(--accent)", cursor: "pointer" }}>
@@ -545,7 +545,7 @@ export default function DashboardPage() {
 
       {/* ── Action strip (logged-in only) ───────────────────────────────── */}
       {sessionEmail && (
-        <div style={{
+        <div className="dash-action-strip" style={{
           background: "var(--bg-panel)", borderBottom: "1px solid var(--border)",
           padding: "10px 40px", display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap",
         }}>
@@ -569,9 +569,9 @@ export default function DashboardPage() {
 
       {/* ── Telegram nudge (if logged in but not connected) ─────────────── */}
       {sessionEmail && !telegramLinked && (
-        <div style={{
+        <div className="dash-telegram-nudge" style={{
           background: "rgba(255,176,0,0.06)", borderBottom: "1px solid rgba(255,176,0,0.2)",
-          padding: "10px 40px", display: "flex", alignItems: "center", gap: 12,
+          padding: "10px 40px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
         }}>
           <span style={{ fontFamily: "var(--mono)", fontSize: "0.72rem", color: "var(--accent)" }}>
             ◆ Telegram not connected — you won&apos;t receive match alerts in real time.
@@ -606,6 +606,7 @@ export default function DashboardPage() {
             placeholder="Min Price"
             value={filters.minPrice}
             onChange={e => setFilters({ ...filters, minPrice: e.target.value })}
+            className="dash-price-input"
             style={{ border: "1px solid var(--border)", background: "transparent", padding: "6px 10px", fontFamily: "var(--mono)", fontSize: "0.78rem", color: "var(--text)", width: 120, outline: "none" }}
           />
           <input
@@ -613,6 +614,7 @@ export default function DashboardPage() {
             placeholder="Max Price"
             value={filters.maxPrice}
             onChange={e => setFilters({ ...filters, maxPrice: e.target.value })}
+            className="dash-price-input"
             style={{ border: "1px solid var(--border)", background: "transparent", padding: "6px 10px", fontFamily: "var(--mono)", fontSize: "0.78rem", color: "var(--text)", width: 120, outline: "none" }}
           />
           <DropdownSelect
@@ -684,7 +686,7 @@ export default function DashboardPage() {
         if (filters.propertyType) chips.push({ label: filters.propertyType, key: "propertyType", reset: "" });
         if (!chips.length) return null;
         return (
-          <div style={{ padding: "8px 24px", display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", borderBottom: "1px solid var(--border)", background: "rgba(255,176,0,0.03)" }}>
+          <div className="dash-filter-chips" style={{ padding: "8px 24px", display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", borderBottom: "1px solid var(--border)", background: "rgba(255,176,0,0.03)" }}>
             {chips.map(c => (
               <button
                 key={c.key}
@@ -711,7 +713,7 @@ export default function DashboardPage() {
         {activeTab === "listings" && (
 <>
             {/* My alerts + Telegram card */}
-            <div style={{ borderBottom: "1px solid var(--border)", padding: "20px 40px", background: "var(--bg-panel)" }}>
+            <div className="dash-alerts-card" style={{ borderBottom: "1px solid var(--border)", padding: "20px 40px", background: "var(--bg-panel)" }}>
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 24 }}>
 
                 {/* Alerts section */}
@@ -899,7 +901,7 @@ export default function DashboardPage() {
 
             {/* ── Shared empty / loading states ───────────────────────── */}
             {loading && viewMode === "grid" && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 20, padding: "24px 24px" }}>
+              <div className="dash-card-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 20, padding: "24px 24px" }}>
                 {Array.from({ length: 9 }).map((_, i) => (
                   <div key={i} style={{ height: 340, background: "linear-gradient(90deg,#1a1a14 25%,#222218 50%,#1a1a14 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite" }} />
                 ))}
@@ -993,7 +995,7 @@ export default function DashboardPage() {
                 {listings.length > 0 && (
                   <MarketInsightsBar listings={listings} total={totalListings} />
                 )}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 20, marginTop: 20 }}>
+                <div className="dash-card-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 20, marginTop: 20 }}>
                   {listings.map(l => (
                     <div key={l.id} style={{ height: 340 }}>
                       <ListingDestinationCard listing={l} style={{ height: 320 }} />

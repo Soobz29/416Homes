@@ -202,6 +202,27 @@ select option { background: #ffffff; color: #0a0a08; }
 
   /* Typography */
   .page-h1         { font-size: clamp(2.4rem, 9vw, 4rem) !important; }
+
+  /* ── Dashboard mobile ──────────────────────────────────────────── */
+
+  /* Action strip & nudge: tighten padding */
+  .dash-action-strip   { padding: 10px 16px !important; gap: 12px !important; }
+  .dash-telegram-nudge { padding: 10px 16px !important; }
+
+  /* My Alerts card */
+  .dash-alerts-card { padding: 16px 16px !important; }
+
+  /* Filter chips row */
+  .dash-filter-chips { padding: 8px 16px !important; }
+
+  /* Price inputs: shrink to fit */
+  .dash-price-input { width: 88px !important; }
+
+  /* Hide email label in nav to save space */
+  .dash-email-label { display: none !important; }
+
+  /* Card grid: 1 col on phones */
+  .dash-card-grid { grid-template-columns: 1fr !important; }
 }
 
 /* ── Reduced motion ──────────────────────────────────────────────────── */
