@@ -400,11 +400,10 @@ export default function DashboardPage() {
       const me = await fetchMe(email);
       setTelegramLinked(!!me?.telegram_chat_id);
     } catch (e: unknown) {
-      console.error("Failed to load /api/me", e);
-      const msg = e instanceof Error ? e.message : "Could not reach backend";
-      setMeError(msg.includes("401") || msg.includes("Missing")
-        ? "Sign in required."
-        : `${msg}. Ensure NEXT_PUBLIC_API_URL is set to your DigitalOcean backend URL in Vercel.`);
+      // Silently fail — Telegram just shows as "not connected"
+      console.warn("loadMe failed (non-critical):", e instanceof Error ? e.message : e);
+      setTelegramLinked(false);
+      setMeError(null);
     }
   }
 

@@ -107,7 +107,7 @@ const ListingDestinationCard = React.forwardRef<HTMLDivElement, ListingDestinati
           )}
 
           {/* Content */}
-          <div className="relative flex flex-col justify-end h-full p-5" style={{ color: "#E8E4D9" }}>
+          <div className="relative flex flex-col justify-end h-full p-5" style={{ color: "var(--accent)" }}>
             {/* Address + neighbourhood */}
             <p
               style={{
@@ -115,7 +115,7 @@ const ListingDestinationCard = React.forwardRef<HTMLDivElement, ListingDestinati
                 fontSize: "0.6rem",
                 letterSpacing: "0.12em",
                 textTransform: "uppercase",
-                color: "rgba(232,228,217,0.60)",
+                color: "rgba(255,176,0,0.70)",
                 marginBottom: 4,
                 display: "flex",
                 alignItems: "center",
@@ -134,7 +134,7 @@ const ListingDestinationCard = React.forwardRef<HTMLDivElement, ListingDestinati
                 fontWeight: 700,
                 letterSpacing: "-0.01em",
                 lineHeight: 1.1,
-                color: "#E8E4D9",
+                color: "var(--accent)",
                 marginBottom: 4,
               }}
             >
@@ -147,7 +147,7 @@ const ListingDestinationCard = React.forwardRef<HTMLDivElement, ListingDestinati
                 style={{
                   fontFamily: "var(--mono)",
                   fontSize: "0.68rem",
-                  color: "rgba(232,228,217,0.70)",
+                  color: "rgba(255,176,0,0.80)",
                   marginBottom: 16,
                   display: "flex",
                   alignItems: "center",

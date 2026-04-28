@@ -335,7 +335,7 @@ export default function VideoPage() {
         scrollToExpand="Scroll to preview"
       >
         {/* Revealed after full expansion — description + specs */}
-        <div style={{ maxWidth: 1320, margin: "0 auto", padding: "64px 56px", borderBottom: "1px solid var(--border)" }}>
+        <div className="sec-wrap sec-pad-lg" style={{ maxWidth: 1320, margin: "0 auto", padding: "64px 56px", borderBottom: "1px solid var(--border)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, ...mono, fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.18em", color: "var(--accent)", marginBottom: 20 }}>
             <span style={{ height: 1, width: 28, background: "var(--accent)", flexShrink: 0 }} />
             Sample Output
@@ -344,7 +344,7 @@ export default function VideoPage() {
             Paste a Realtor.ca, Zillow, or HouseSigma URL. We pull the photos,
             write the script, record narration, and deliver an MP4 to your inbox.
           </p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "18px 32px", marginBottom: 40, borderTop: "1px solid var(--border)", paddingTop: 28 }}>
+          <div className="stats-numbers-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "18px 32px", marginBottom: 40, borderTop: "1px solid var(--border)", paddingTop: 28 }}>
             {[["Duration","00:28"],["Resolution","3840×2160"],["Narration","Professional"],["Delivery","MP4 + vertical"]].map(([l, v]) => (
               <div key={l}>
                 <div style={{ ...mono, fontSize: "0.5rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--text-dim)", marginBottom: 6 }}>{l}</div>
@@ -358,7 +358,7 @@ export default function VideoPage() {
 
       {/* ── Order section ────────────────────────────────────────────── */}
       {orderFormVisible && (
-        <section id="order" style={{ maxWidth: 1320, margin: "0 auto", padding: "72px 56px 64px", borderBottom: "1px solid var(--border)" }}>
+        <section id="order" className="sec-wrap sec-pad-lg" style={{ maxWidth: 1320, margin: "0 auto", padding: "72px 56px 64px", borderBottom: "1px solid var(--border)" }}>
 
           {/* Input mode toggle */}
           <div style={{ display: "flex", marginBottom: 16, border: "1px solid var(--border)" }}>
@@ -449,7 +449,7 @@ export default function VideoPage() {
           </div>
 
           {/* Pricing grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", border: "1px solid var(--border)" }}>
+          <div className="tiers-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", border: "1px solid var(--border)" }}>
             {TIERS.map((t, i) => (
               <div
                 key={t.id}
@@ -532,7 +532,7 @@ export default function VideoPage() {
 
       {/* ── Progress panel ───────────────────────────────────────────── */}
       {progressVisible && (
-        <section style={{ maxWidth: 1320, margin: "0 auto", padding: "72px 56px", borderBottom: "1px solid var(--border)" }}>
+        <section className="sec-wrap sec-pad-lg" style={{ maxWidth: 1320, margin: "0 auto", padding: "72px 56px", borderBottom: "1px solid var(--border)" }}>
           {jobError ? (
             <div style={{ border: "1px solid #8b3a3a", background: "rgba(139,58,58,0.08)", padding: "28px 32px", maxWidth: 640 }}>
               <div style={{ fontFamily: "var(--mono)", fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.15em", color: "#cf6357", marginBottom: 10 }}>
@@ -566,7 +566,7 @@ export default function VideoPage() {
       )}
 
       {/* ── Footer ───────────────────────────────────────────────────── */}
-      <footer style={{
+      <footer className="sec-wrap footer-bar" style={{
         maxWidth: 1320, margin: "0 auto", padding: "32px 56px",
         borderTop: "1px solid var(--border)",
         display: "flex", alignItems: "center", justifyContent: "space-between",

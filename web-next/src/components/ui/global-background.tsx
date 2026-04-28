@@ -15,6 +15,9 @@ export function GlobalBackground() {
         inset: 0,
         zIndex: -1,
         pointerEvents: "none",
+        /* Force GPU layer so WebGL canvas never gets composited off-screen */
+        transform: "translateZ(0)",
+        willChange: "transform",
       }}
     >
       <MeshGradientBg speed={0.2} />

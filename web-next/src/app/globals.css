@@ -143,6 +143,10 @@ select option { background: #ffffff; color: #0a0a08; }
   .demo-card      { grid-template-columns: 1fr !important; min-height: unset !important; }
   .demo-video-col { min-height: 280px !important; }
   .tours-2col     { grid-template-columns: 1fr !important; }
+
+  /* Reduce large horizontal padding on tablet */
+  .sec-wrap { padding-left: 32px !important; padding-right: 32px !important; }
+  .page-hero-content { padding-left: 32px !important; padding-right: 32px !important; }
 }
 
 @media (max-width: 600px) {
@@ -203,6 +207,10 @@ select option { background: #ffffff; color: #0a0a08; }
   /* Typography */
   .page-h1         { font-size: clamp(2.4rem, 9vw, 4rem) !important; }
 
+  /* ── All pages: collapse 56px horizontal padding ───────────────── */
+  .sec-wrap          { padding-left: 20px !important; padding-right: 20px !important; }
+  .page-hero-content { padding: 48px 20px 40px !important; }
+
   /* ── Dashboard mobile ──────────────────────────────────────────── */
 
   /* Action strip & nudge: tighten padding */
@@ -223,6 +231,19 @@ select option { background: #ffffff; color: #0a0a08; }
 
   /* Card grid: 1 col on phones */
   .dash-card-grid { grid-template-columns: 1fr !important; }
+
+  /* ── Tiers grid on video page: stack on phones ────────────────── */
+  .tiers-grid { grid-template-columns: 1fr !important; }
+
+  /* ── Stats grid: 2 cols on phones ────────────────────────────── */
+  .stats-numbers-grid { grid-template-columns: 1fr 1fr !important; }
+
+  /* ── FAQ answer padding ───────────────────────────────────────── */
+  .faq-answer { padding: 20px 20px !important; }
+
+  /* ── Footer bar ───────────────────────────────────────────────── */
+  .footer-bar { flex-direction: column !important; gap: 10px !important;
+                text-align: center !important; padding: 28px 20px !important; }
 }
 
 /* ── Reduced motion ──────────────────────────────────────────────────── */

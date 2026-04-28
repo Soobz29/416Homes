@@ -390,7 +390,7 @@ export default function HomePage() {
         <div style={{ position: "absolute", inset: 0, zIndex: 1, background: "linear-gradient(to right, rgba(5,6,10,0.90) 0%, rgba(5,6,10,0.65) 55%, rgba(5,6,10,0.22) 100%)" }} />
 
         {/* Hero content */}
-        <div style={{ position: "relative", zIndex: 2, maxWidth: 1320, margin: "0 auto", padding: "80px 56px 72px" }}>
+        <div className="page-hero-content" style={{ position: "relative", zIndex: 2, maxWidth: 1320, margin: "0 auto", padding: "80px 56px 72px" }}>
           {/* Eyebrow */}
           <div style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.28em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 24 }}>
             Toronto · Mississauga · Brampton · Vaughan + More

@@ -196,7 +196,7 @@ export default function ToursPage() {
         )}
       </nav>
 
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 56px" }}>
+      <div className="sec-wrap sec-pad-lg" style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 56px" }}>
 
         {/* Header */}
         <Eyebrow line>Virtual tour · $49</Eyebrow>
