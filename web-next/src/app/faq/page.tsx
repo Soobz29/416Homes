@@ -153,6 +153,7 @@ export default function FAQPage() {
                 }}
               >
                 <button
+                  className="faq-btn"
                   onClick={() => setOpenIndex(isOpen ? null : i)}
                   style={{
                     width: "100%", padding: "24px 32px",
@@ -174,7 +175,7 @@ export default function FAQPage() {
                   </span>
                 </button>
                 {isOpen && (
-                  <div style={{
+                  <div className="faq-answer" style={{
                     padding: "0 32px 32px",
                     borderTop: "1px solid var(--border)",
                   }}>

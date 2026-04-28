@@ -577,7 +577,7 @@ export default function HomePage() {
             ["03", "Value", "Every listing compared to real sold comps in that exact pocket.", "03/04"],
             ["04", "Reach", "When a match appears, a professional email is sent to the listing agent.", "04/04"],
           ].map(([n, t, d, f], i) => (
-            <div key={n} style={{
+            <div key={n} className="how-step" style={{
               padding: 36,
               borderRight: i < 3 ? "1px solid var(--border)" : "none",
               minHeight: 260,
@@ -636,7 +636,7 @@ export default function HomePage() {
             { tag: "Listing video", title: "Any listing URL → 30-second MP4", price: "from $99", desc: "Paste a Realtor.ca link. We write the script, record narration, and deliver an MP4 — in under 15 minutes.", cta: "See samples →", href: "/video", right: false },
             { tag: "Virtual tour", title: "Photos → hosted room-by-room tour", price: "$49", desc: "Your listing photos, classified by room and published as a hosted tour. Shareable link and embed code. Delivered in 5 minutes.", cta: "Order a tour →", href: "/tours", right: true },
           ].map(p => (
-            <div key={p.tag} style={{ padding: 48, borderRight: p.right ? "none" : "1px solid var(--border)" }}>
+            <div key={p.tag} className="product-card" style={{ padding: 48, borderRight: p.right ? "none" : "1px solid var(--border)" }}>
               <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--accent)" }}>{p.tag}</div>
               <div style={{ fontFamily: "var(--mono)", fontSize: "1.7rem", fontWeight: 600, margin: "10px 0 12px", lineHeight: 1.15 }}>{p.title}</div>
               <div style={{ fontFamily: "var(--mono)", fontSize: "1rem", color: "var(--accent)", marginBottom: 12 }}>{p.price}</div>

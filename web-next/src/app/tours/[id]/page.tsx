@@ -239,7 +239,7 @@ export default function TourViewerPage() {
   const hasNext = roomIdx < rooms.length - 1 || photoIdx < currentRoom.photos.length - 1;
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden", background: "transparent", color: TEXT, fontFamily: FONT_MONO }}>
+    <div className="tour-layout" style={{ height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden", background: "transparent", color: TEXT, fontFamily: FONT_MONO }}>
       <style>{`
         @keyframes kenBurns {
           0%   { transform: scale(1)    translate(0%,   0%); }
@@ -253,17 +253,33 @@ export default function TourViewerPage() {
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: ${GOLD_DIM}; border-radius: 2px; }
+        @media (max-width: 600px) {
+          .tour-layout  { flex-direction: column !important; }
+          .tour-sidebar { width: 100% !important; height: 90px !important;
+                          flex-direction: row !important;
+                          overflow-x: auto !important; overflow-y: hidden !important;
+                          border-right: none !important;
+                          border-top: 1px solid rgba(200,169,110,0.2) !important;
+                          order: 2;
+                          -webkit-overflow-scrolling: touch; }
+          .tour-thumb   { flex-shrink: 0 !important; width: 80px !important;
+                          height: 72px !important; }
+          .tour-main    { flex: 1 !important; min-height: 0; order: 1; }
+          .tour-header  { padding: 0 1rem !important; }
+          .tour-title   { max-width: 140px !important; overflow: hidden !important;
+                          text-overflow: ellipsis !important; white-space: nowrap !important; }
+        }
       `}</style>
 
       {/* ── Header ── */}
-      <header style={{ height: HEADER_H, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 2rem", borderBottom: `1px solid ${GOLD_DIM}`, background: "rgba(10,10,8,0.92)", backdropFilter: "blur(12px)", zIndex: 40 }}>
+      <header className="tour-header" style={{ height: HEADER_H, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 2rem", borderBottom: `1px solid ${GOLD_DIM}`, background: "rgba(10,10,8,0.92)", backdropFilter: "blur(12px)", zIndex: 40 }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.9rem", minWidth: 0 }}>
           <span style={{ fontFamily: FONT_DISPLAY, fontWeight: 900, fontSize: "1rem", flexShrink: 0 }}>
             <span style={{ color: GOLD }}>416</span>Homes
           </span>
           <span style={{ fontFamily: FONT_MONO, fontSize: "0.55rem", textTransform: "uppercase", letterSpacing: "0.12em", color: SUBTEXT, flexShrink: 0 }}>Virtual Tour</span>
           {manifest.listing_url && (
-            <a href={manifest.listing_url} target="_blank" rel="noreferrer" style={{ fontFamily: FONT_MONO, fontSize: "0.65rem", color: GOLD, textDecoration: "none", borderBottom: `1px solid ${GOLD_DIM}`, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "28ch" }}>
+            <a className="tour-title" href={manifest.listing_url} target="_blank" rel="noreferrer" style={{ fontFamily: FONT_MONO, fontSize: "0.65rem", color: GOLD, textDecoration: "none", borderBottom: `1px solid ${GOLD_DIM}`, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "28ch" }}>
               {displayAddress} ↗
             </a>
           )}
@@ -292,7 +308,7 @@ export default function TourViewerPage() {
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
 
         {/* ── Sidebar: room list ── */}
-        <aside style={{ width: SIDEBAR_W, flexShrink: 0, background: "rgba(6,6,5,0.95)", borderRight: `1px solid ${GOLD_DIM}`, overflowY: "auto", display: "flex", flexDirection: "column" }}>
+        <aside className="tour-sidebar" style={{ width: SIDEBAR_W, flexShrink: 0, background: "rgba(6,6,5,0.95)", borderRight: `1px solid ${GOLD_DIM}`, overflowY: "auto", display: "flex", flexDirection: "column" }}>
           <div style={{ padding: "1rem 1.25rem 0.5rem", fontFamily: FONT_MONO, fontSize: "0.52rem", textTransform: "uppercase", letterSpacing: "0.18em", color: SUBTEXT }}>
             Rooms · {rooms.length}
           </div>
@@ -302,6 +318,7 @@ export default function TourViewerPage() {
               <button
                 key={room.slug}
                 type="button"
+                className="tour-thumb"
                 onClick={() => goToRoom(ri)}
                 style={{
                   display: "flex",
@@ -348,7 +365,7 @@ export default function TourViewerPage() {
         </aside>
 
         {/* ── Main photo viewport ── */}
-        <main style={{ flex: 1, position: "relative", overflow: "hidden", background: "#000" }}>
+        <main className="tour-main" style={{ flex: 1, position: "relative", overflow: "hidden", background: "#000" }}>
 
           {/* 360° panorama sphere — shown when panorama_url is available */}
           {currentRoom?.panorama_url ? (

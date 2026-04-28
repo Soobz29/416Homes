@@ -150,100 +150,120 @@ select option { background: #ffffff; color: #0a0a08; }
 }
 
 @media (max-width: 600px) {
-  .how-grid        { grid-template-columns: 1fr !important; }
-  .why-grid        { grid-template-columns: 1fr !important; }
-  .stats-strip     { grid-template-columns: 1fr 1fr !important; }
-  .hero-split      { padding: 36px 20px 32px !important; }
-  .hero-left       { padding-right: 0 !important; border-right: none !important; }
+  /* ── Universal ──────────────────────────────────────────────────────── */
+  .sec-wrap          { padding-left: 16px !important; padding-right: 16px !important; }
+  .sec-pad-lg        { padding-top: 40px !important; padding-bottom: 36px !important; }
+  .page-hero-content { padding: 40px 16px 36px !important; }
+  .page-h1           { font-size: clamp(2.2rem, 9vw, 3.6rem) !important; }
 
-  /* Nav */
+  /* ── Nav ── */
   .nav-bar         { padding: 0 16px !important; }
-  .nav-links       { display: none !important; }   /* hamburger overlay replaces on mobile */
+  .nav-links       { display: none !important; }
   .hamburger-btn   { display: block !important; }
   .nav-cta         { font-size: 0.65rem !important; padding: 8px 14px !important; }
 
-  /* Sections */
-  .sec-wrap        { padding-left: 20px !important; padding-right: 20px !important; }
-  .sec-pad-lg      { padding-top: 48px !important; padding-bottom: 40px !important; }
+  /* ── Hero ── */
+  .hero-split      { padding: 36px 16px 32px !important; }
+  .hero-left       { padding-right: 0 !important; border-right: none !important; }
+  .hero-right      { display: none !important; }
+  .hero-search-bar { grid-template-columns: 1fr !important; }
 
-  /* Filter bar horizontal scroll */
+  /* ── Stats strip (4 → 2 col) ── */
+  .stats-strip     { grid-template-columns: 1fr 1fr !important; }
+
+  /* ── Alert CTA ── */
+  .alert-cta       { grid-template-columns: 1fr !important; gap: 32px !important; }
+
+  /* ── How It Works ── */
+  .how-header      { grid-template-columns: 1fr !important; gap: 20px !important; }
+  .how-grid        { grid-template-columns: 1fr !important; }
+  .how-step        { border-right: none !important;
+                     border-bottom: 1px solid var(--border) !important;
+                     min-height: auto !important; padding: 24px 16px !important; }
+  .how-step:last-child { border-bottom: none !important; }
+
+  /* ── Why 416 ── */
+  .why-grid        { grid-template-columns: 1fr !important; }
+
+  /* ── Products ── */
+  .products-grid   { grid-template-columns: 1fr !important; }
+  .product-card    { border-right: none !important;
+                     border-bottom: 1px solid var(--border) !important;
+                     padding: 28px 16px !important; }
+  .product-card:last-child { border-bottom: none !important; }
+
+  /* ── Footer ── */
+  .footer-bar      { flex-direction: column !important; gap: 10px !important;
+                     text-align: center !important; padding: 24px 16px !important; }
+
+  /* ── Demo card (homepage) ── */
+  .demo-card       { grid-template-columns: 1fr !important; }
+  .demo-video-col  { min-height: 220px !important; }
+
+  /* ── Video: tier cards (3 → 1 col) ── */
+  .tiers-grid      { grid-template-columns: 1fr !important; }
+  .tier-card       { border-right: none !important;
+                     border-bottom: 1px solid var(--border) !important; }
+  .tier-card:last-child { border-bottom: none !important; }
+
+  /* ── Video: spec row (4 → 2 col) ── */
+  .stats-numbers-grid { grid-template-columns: 1fr 1fr !important; }
+
+  /* ── Tours page ── */
+  .tours-demo-grid    { grid-template-columns: 1fr !important; }
+  .tours-demo-sidebar { display: flex !important; flex-direction: row !important;
+                        overflow-x: auto !important; width: 100% !important;
+                        border-left: none !important;
+                        border-top: 1px solid var(--border-strong) !important;
+                        -webkit-overflow-scrolling: touch; }
+  .tours-2col         { grid-template-columns: 1fr !important; }
+  .tours-order        { position: static !important; }
+  .tours-footer       { flex-direction: column !important; gap: 10px !important;
+                        padding: 20px 16px !important; }
+
+  /* ── FAQ ── */
+  .faq-btn    { padding: 16px 20px !important; }
+  .faq-answer { padding: 14px 20px 20px !important; }
+
+  /* ── Reno ROI table — horizontal scroll ── */
+  .reno-table        { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+  .reno-table-inner  { min-width: 520px !important; }
+
+  /* ── Stats ── */
+  .stats-4col        { grid-template-columns: 1fr 1fr !important; }
+  .stats-3col        { grid-template-columns: 1fr !important; }
+  .stats-table       { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+  .stats-table-inner { min-width: 480px !important; }
+
+  /* ── Dashboard nav ── */
+  .dash-nav        { padding: 0 16px !important; }
+  .dash-nav-tabs   { overflow-x: auto !important; flex-shrink: 1 !important;
+                     max-width: calc(100vw - 120px) !important; }
+  .dash-nav-tabs button { padding: 0 10px !important; font-size: 0.58rem !important;
+                           white-space: nowrap !important; flex-shrink: 0 !important; }
+
+  /* ── Dashboard strips ── */
+  .dash-action-strip   { padding: 10px 16px !important; gap: 12px !important; }
+  .dash-telegram-nudge { padding: 10px 16px !important; }
+  .dash-alerts-card    { padding: 16px !important; }
+  .dash-filter-chips   { padding: 8px 16px !important; }
+  .dash-price-input    { width: 88px !important; }
+  .dash-email-label    { display: none !important; }
+  .dash-card-grid      { grid-template-columns: 1fr !important; }
+
+  /* ── Filter bar ── */
   .filter-bar      { overflow-x: auto !important; flex-wrap: nowrap !important;
                      padding: 8px 16px !important; -webkit-overflow-scrolling: touch; }
   .filter-bar > *  { flex-shrink: 0; }
 
-  /* Dashboard nav */
-  .dash-nav        { padding: 0 16px !important; }
-  .dash-nav-tabs   { gap: 0 !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch; flex-shrink: 1 !important; max-width: calc(100vw - 120px) !important; }
-  .dash-nav-tabs button { padding: 0 10px !important; font-size: 0.58rem !important; white-space: nowrap !important; flex-shrink: 0 !important; }
-
-  /* Dashboard: stacked list + map on phones */
-  .split-view      { grid-template-columns: 1fr !important; grid-template-rows: auto 260px !important; }
+  /* ── Dashboard split view ── */
+  .split-view      { grid-template-columns: 1fr !important;
+                     grid-template-rows: auto 260px !important; }
   .list-col        { max-height: 55vh !important; }
   .map-col         { height: 260px !important; }
-
-  /* Selected card: full width at map bottom on mobile */
-  .map-selected-card {
-    width: calc(100% - 24px) !important;
-    left: 12px !important;
-    right: 12px !important;
-    bottom: 12px !important;
-  }
-
-  /* Footer */
-  .footer-bar      { flex-direction: column !important; gap: 10px !important;
-                     text-align: center !important; padding: 28px 20px !important; }
-
-  /* Demo card video */
-  .demo-card       { grid-template-columns: 1fr !important; }
-  .demo-video-col  { min-height: 220px !important; }
-
-  /* Tours */
-  .tours-2col      { grid-template-columns: 1fr !important; }
-  .tours-order     { position: static !important; }
-
-  /* Alert form */
-  .alert-cta       { grid-template-columns: 1fr !important; }
-
-  /* Typography */
-  .page-h1         { font-size: clamp(2.4rem, 9vw, 4rem) !important; }
-
-  /* ── All pages: collapse 56px horizontal padding ───────────────── */
-  .sec-wrap          { padding-left: 20px !important; padding-right: 20px !important; }
-  .page-hero-content { padding: 48px 20px 40px !important; }
-
-  /* ── Dashboard mobile ──────────────────────────────────────────── */
-
-  /* Action strip & nudge: tighten padding */
-  .dash-action-strip   { padding: 10px 16px !important; gap: 12px !important; }
-  .dash-telegram-nudge { padding: 10px 16px !important; }
-
-  /* My Alerts card */
-  .dash-alerts-card { padding: 16px 16px !important; }
-
-  /* Filter chips row */
-  .dash-filter-chips { padding: 8px 16px !important; }
-
-  /* Price inputs: shrink to fit */
-  .dash-price-input { width: 88px !important; }
-
-  /* Hide email label in nav to save space */
-  .dash-email-label { display: none !important; }
-
-  /* Card grid: 1 col on phones */
-  .dash-card-grid { grid-template-columns: 1fr !important; }
-
-  /* ── Tiers grid on video page: stack on phones ────────────────── */
-  .tiers-grid { grid-template-columns: 1fr !important; }
-
-  /* ── Stats grid: 2 cols on phones ────────────────────────────── */
-  .stats-numbers-grid { grid-template-columns: 1fr 1fr !important; }
-
-  /* ── FAQ answer padding ───────────────────────────────────────── */
-  .faq-answer { padding: 20px 20px !important; }
-
-  /* ── Footer bar ───────────────────────────────────────────────── */
-  .footer-bar { flex-direction: column !important; gap: 10px !important;
-                text-align: center !important; padding: 28px 20px !important; }
+  .map-selected-card { width: calc(100% - 24px) !important;
+                       left: 12px !important; right: 12px !important;
+                       bottom: 12px !important; }
 }
 
 /* ── Reduced motion ──────────────────────────────────────────────────── */

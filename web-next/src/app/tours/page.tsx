@@ -213,7 +213,7 @@ export default function ToursPage() {
 
         {/* Demo — dollhouse + sidebar */}
         <div style={{ marginBottom: 48, border: "1px solid var(--border-strong)", overflow: "hidden", background: "var(--bg-elev)" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 0 }}>
+          <div className="tours-demo-grid" style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 0 }}>
             {/* Interactive room photo with Ken Burns animation */}
             <div style={{ position: "relative", aspectRatio: "16/10", background: "#060606", overflow: "hidden" }}>
               <style>{`
@@ -251,7 +251,7 @@ export default function ToursPage() {
             </div>
 
             {/* Sidebar */}
-            <div style={{ padding: 28, borderLeft: "1px solid var(--border)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+            <div className="tours-demo-sidebar" style={{ padding: 28, borderLeft: "1px solid var(--border)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
               <div>
                 <Eyebrow>Interactive demo</Eyebrow>
                 <div style={{ fontFamily: "var(--mono)", fontSize: "1.05rem", fontWeight: 600, margin: "10px 0 12px" }}>Click any room</div>
@@ -283,7 +283,7 @@ export default function ToursPage() {
         </div>
 
         {/* Order section */}
-        <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 64 }}>
+        <div className="tours-2col" style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 64 }}>
           {/* What's included */}
           <div>
             <div style={{ border: "1px solid var(--border)", padding: 28 }}>
@@ -441,7 +441,7 @@ export default function ToursPage() {
       </div>
 
       {/* Footer */}
-      <footer style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 56px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: "var(--mono)", fontSize: "0.62rem", color: "var(--text-mute)" }}>
+      <footer className="tours-footer sec-wrap" style={{ maxWidth: 1100, margin: "0 auto", padding: "40px 56px", borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: "var(--mono)", fontSize: "0.62rem", color: "var(--text-mute)" }}>
         <HouseLogo size={22} />
         <span>Covering the Greater Toronto Area · Built on real sold data</span>
         <span>© 2026 416Homes · Early Access</span>

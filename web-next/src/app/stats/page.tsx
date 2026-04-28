@@ -260,7 +260,7 @@ export default function StatsPage() {
         <div style={{ maxWidth: 1320, margin: "0 auto", padding: "0 80px 80px" }} className="sec-wrap">
 
           {/* ── Stat cards row ── */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 0, borderTop: "none", marginTop: 48, border: "1px solid var(--border)" }}>
+          <div className="stats-4col" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 0, borderTop: "none", marginTop: 48, border: "1px solid var(--border)" }}>
             <div style={{ borderRight: "1px solid var(--border)", padding: "24px 28px" }}>
               <div style={{ ...mono, fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--text-dim)", marginBottom: 10 }}>Total Active Listings</div>
               <div style={{ ...mono, fontSize: "2.2rem", fontWeight: 700, color: "var(--accent)" }}>{total.toLocaleString()}</div>
@@ -293,7 +293,7 @@ export default function StatsPage() {
               </div>
               <div style={{ border: "1px solid var(--border)", padding: "28px 32px", background: "var(--bg-elev)" }}>
                 <DistBar under={under} over={over} fair={fair} />
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 0, marginTop: 28, borderTop: "1px solid var(--border)", paddingTop: 24 }}>
+                <div className="stats-3col" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 0, marginTop: 28, borderTop: "1px solid var(--border)", paddingTop: 24 }}>
                   {[
                     { label: "Underpriced Listings", value: under, color: "#2ed573", desc: "fair_value ≥ 3% below estimate" },
                     { label: "At Market", value: fair, color: "var(--text-mute)", desc: "within 3% of fair value" },
@@ -319,7 +319,11 @@ export default function StatsPage() {
                 </div>
                 <div style={{ ...mono, fontSize: "0.58rem", color: "var(--text-dim)" }}>Sorted by listing volume</div>
               </div>
-              <NbhdTable rows={nbhdRows} />
+              <div className="stats-table">
+                <div className="stats-table-inner">
+                  <NbhdTable rows={nbhdRows} />
+                </div>
+              </div>
             </section>
           )}
 

@@ -303,22 +303,24 @@ export default function RenoPage() {
           <div style={{ ...mono, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--accent)", marginBottom: 20 }}>
             ◆ GTA Renovation ROI Reference · 2024–2026 Market Data
           </div>
-          <div style={{ border: "1px solid var(--border)", overflow: "hidden" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 100px 120px 100px", padding: "10px 20px", background: "var(--bg-elev)", borderBottom: "1px solid var(--border)" }}>
-              {["Renovation","ROI Range","Risk","Typical Cost","Break-even"].map(h => (
-                <div key={h} style={{ ...mono, fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)" }}>{h}</div>
+          <div className="reno-table">
+            <div className="reno-table-inner" style={{ border: "1px solid var(--border)", overflow: "hidden" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 100px 120px 100px", padding: "10px 20px", background: "var(--bg-elev)", borderBottom: "1px solid var(--border)" }}>
+                {["Renovation","ROI Range","Risk","Typical Cost","Break-even"].map(h => (
+                  <div key={h} style={{ ...mono, fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)" }}>{h}</div>
+                ))}
+              </div>
+              {RENO_TYPES.map((rt, i) => (
+                <div key={rt.id} style={{ display: "grid", gridTemplateColumns: "1fr 100px 100px 120px 100px", padding: "12px 20px", borderBottom: i < RENO_TYPES.length - 1 ? "1px solid var(--border)" : "none", background: i % 2 ? "rgba(255,191,0,0.01)" : "transparent", cursor: "pointer" }}
+                  onClick={() => setRenoType(rt.id)}>
+                  <span style={{ ...mono, fontSize: "0.72rem", color: rt.id === renoType ? "var(--accent)" : "var(--text)", fontWeight: rt.id === renoType ? 600 : 400 }}>{rt.label}</span>
+                  <span style={{ ...mono, fontSize: "0.68rem", color: "var(--text-mute)" }}>{rt.roiRange}</span>
+                  <span style={{ ...mono, fontSize: "0.68rem", color: RISK_COLORS[rt.risk] }}>{rt.risk}</span>
+                  <span style={{ ...mono, fontSize: "0.62rem", color: "var(--text-dim)" }}>{rt.typical}</span>
+                  <span style={{ ...mono, fontSize: "0.68rem", color: "var(--text-mute)" }}>~{rt.timeMonths}mo</span>
+                </div>
               ))}
             </div>
-            {RENO_TYPES.map((rt, i) => (
-              <div key={rt.id} style={{ display: "grid", gridTemplateColumns: "1fr 100px 100px 120px 100px", padding: "12px 20px", borderBottom: i < RENO_TYPES.length - 1 ? "1px solid var(--border)" : "none", background: i % 2 ? "rgba(255,191,0,0.01)" : "transparent", cursor: "pointer" }}
-                onClick={() => setRenoType(rt.id)}>
-                <span style={{ ...mono, fontSize: "0.72rem", color: rt.id === renoType ? "var(--accent)" : "var(--text)", fontWeight: rt.id === renoType ? 600 : 400 }}>{rt.label}</span>
-                <span style={{ ...mono, fontSize: "0.68rem", color: "var(--text-mute)" }}>{rt.roiRange}</span>
-                <span style={{ ...mono, fontSize: "0.68rem", color: RISK_COLORS[rt.risk] }}>{rt.risk}</span>
-                <span style={{ ...mono, fontSize: "0.62rem", color: "var(--text-dim)" }}>{rt.typical}</span>
-                <span style={{ ...mono, fontSize: "0.68rem", color: "var(--text-mute)" }}>~{rt.timeMonths}mo</span>
-              </div>
-            ))}
           </div>
         </section>
 

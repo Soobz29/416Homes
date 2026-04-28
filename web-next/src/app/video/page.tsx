@@ -453,6 +453,7 @@ export default function VideoPage() {
             {TIERS.map((t, i) => (
               <div
                 key={t.id}
+                className="tier-card"
                 onClick={() => selectTier(t.id)}
                 style={{
                   position: "relative", padding: 32, cursor: "pointer",
