@@ -275,7 +275,7 @@ function AlertForm() {
           ))}
         </div>
       </FormField>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div className="form-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <FormField label="Min price">
           <input value={minPrice} onChange={e => setMinPrice(e.target.value)} placeholder="$500,000" style={inputStyle} />
         </FormField>

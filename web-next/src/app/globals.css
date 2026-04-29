@@ -173,6 +173,7 @@ select option { background: #ffffff; color: #0a0a08; }
 
   /* ── Alert CTA ── */
   .alert-cta       { grid-template-columns: 1fr !important; gap: 32px !important; }
+  .form-2col       { grid-template-columns: 1fr !important; }
 
   /* ── How It Works ── */
   .how-header      { grid-template-columns: 1fr !important; gap: 20px !important; }
@@ -232,6 +233,19 @@ select option { background: #ffffff; color: #0a0a08; }
   /* ── Stats ── */
   .stats-4col        { grid-template-columns: 1fr 1fr !important; }
   .stats-3col        { grid-template-columns: 1fr !important; }
+  .stats-3col > div  { border-right: none !important;
+                       margin-right: 0 !important;
+                       padding-right: 0 !important;
+                       border-bottom: 1px solid var(--border) !important;
+                       padding-bottom: 20px !important;
+                       margin-bottom: 20px !important; }
+  .stats-3col > div:last-child { border-bottom: none !important;
+                                  padding-bottom: 0 !important;
+                                  margin-bottom: 0 !important; }
+  .stats-model-grid  { grid-template-columns: 1fr !important; }
+  .stats-model-grid > div { border-right: none !important;
+                            border-bottom: 1px solid var(--border) !important; }
+  .stats-model-grid > div:last-child { border-bottom: none !important; }
   .stats-table       { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
   .stats-table-inner { min-width: 480px !important; }
 

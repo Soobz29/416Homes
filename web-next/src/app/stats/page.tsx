@@ -332,7 +332,7 @@ export default function StatsPage() {
             <div style={{ ...mono, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--accent)", marginBottom: 20 }}>
               ◆ Valuation Engine Status
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, border: "1px solid var(--border)", background: "var(--bg-elev)" }} className="how-grid">
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, border: "1px solid var(--border)", background: "var(--bg-elev)" }} className="how-grid stats-model-grid">
               {[
                 { label: "Model", value: "LightGBM Regressor", sub: "Trained on GTA sold comps", ok: true },
                 { label: "Features", value: "6 inputs", sub: "Beds · Baths · sqft · Type · Neighbourhood · City", ok: true },
