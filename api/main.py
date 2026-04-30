@@ -384,9 +384,10 @@ async def root():
     return {"status": "ok", "service": "416Homes API"}
 
 
+@app.get("/health")
 @app.get("/api/health")
 async def health_check():
-    """Health check endpoint"""
+    """Health check endpoint — registered at both /health and /api/health."""
     return {
         "status": "healthy",
         "service": "416Homes API",
