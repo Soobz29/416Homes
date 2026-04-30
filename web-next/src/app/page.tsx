@@ -240,7 +240,7 @@ function AlertForm() {
 
   if (submitted) {
     return (
-      <div id="alert" style={{ border: "1px solid var(--border-strong)", padding: 40, background: "var(--bg-elev)", textAlign: "center" }}>
+      <div style={{ border: "1px solid var(--border-strong)", padding: 40, background: "var(--bg-elev)", textAlign: "center" }}>
         <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 16 }}>
           ◆ Alert activated
         </div>

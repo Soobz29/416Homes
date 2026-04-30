@@ -520,7 +520,7 @@ export default function VideoPage() {
               onMouseEnter={e => { if (!submitLoading) e.currentTarget.style.background = "var(--accent-hi)"; }}
               onMouseLeave={e => { if (!submitLoading) e.currentTarget.style.background = "var(--accent)"; }}
             >
-              {submitLoading ? "Processing…" : "Checkout with Stripe →"}
+              {submitLoading ? "Processing…" : "Order Video →"}
             </button>
             {jobError && !progressVisible && (
               <div style={{ marginTop: 16, padding: "14px 18px", border: "1px solid #8b3a3a", background: "rgba(139,58,58,0.08)", ...mono, fontSize: "0.74rem", color: "#cf6357", lineHeight: 1.6 }}>
