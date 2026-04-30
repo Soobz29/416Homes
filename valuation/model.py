@@ -70,10 +70,8 @@ class ValuationModel:
         if not _DS_ENABLED:
             raise RuntimeError("Valuation model disabled for minimal Railway deployment")
         try:
-            client = create_client(
-                os.getenv("SUPABASE_URL"),
-                os.getenv("SUPABASE_KEY")
-            )
+            _key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+            client = create_client(os.getenv("SUPABASE_URL"), _key)
             
             # Get sold comps for training
             result = client.table('sold_comps').select('*').execute()
@@ -95,7 +93,13 @@ class ValuationModel:
     
     def clean_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Clean and prepare training data"""
-        
+
+        # HouseSigma comps use sold_price / area; normalise column names
+        if 'price' not in df.columns and 'sold_price' in df.columns:
+            df = df.rename(columns={'sold_price': 'price'})
+        if 'sqft' not in df.columns and 'area' in df.columns:
+            df = df.rename(columns={'area': 'sqft'})
+
         # Remove rows with missing critical values
         df = df.dropna(subset=['price', 'bedrooms', 'bathrooms', 'sqft'])
         

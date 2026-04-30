@@ -6,6 +6,9 @@ on:
     - cron: '0 7 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   # ── Step 1: Scrape listings (independent) ─────────────────────────────────
   scrape:
@@ -52,12 +55,19 @@ jobs:
         echo "Training valuation model..."
         python valuation/model.py
         echo "Model training completed"
+    - name: Commit trained model
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add -f valuation_model.pkl valuation_model_encoders.pkl 2>/dev/null || true
+        git diff --cached --quiet || git commit -m "chore: update valuation model [skip ci]"
+        git push origin main 2>/dev/null || true
 
-  # ── Step 3: Agent loop (needs fresh listings from scrape) ─────────────────
+  # ── Step 3: Agent loop (needs fresh listings + trained model) ────────────
   agent:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [scrape]
+    needs: [scrape, train-model]
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v4
