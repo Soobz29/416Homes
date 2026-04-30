@@ -73,6 +73,7 @@ jobs:
         RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
         AGENT_EMAIL: ${{ secrets.AGENT_EMAIL }}
         LISTING_AGENT_EMAIL: ${{ secrets.LISTING_AGENT_EMAIL }}
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       run: |
         echo "Running agent matching loop..."
         python agent/main.py
