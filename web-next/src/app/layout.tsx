@@ -25,10 +25,28 @@ const jetbrains = JetBrains_Mono({
   display: "swap",
 });
 
+const SITE_URL = "https://416-homes.vercel.app";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "416Homes — Toronto Real Estate Intelligence",
   description:
-    "AI-powered listing aggregation for the Greater Toronto Area. Stop chasing listings — let them chase you.",
+    "GTA listing scanner that runs every 30 minutes. Real sold-comp valuations, Telegram alerts, and automated agent outreach. Free to start.",
+  openGraph: {
+    title: "416Homes — Toronto Real Estate Intelligence",
+    description:
+      "GTA listing scanner that runs every 30 minutes. Real sold-comp valuations, Telegram alerts, and automated agent outreach. Free to start.",
+    url: SITE_URL,
+    siteName: "416Homes",
+    type: "website",
+    locale: "en_CA",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "416Homes — Toronto Real Estate Intelligence",
+    description:
+      "GTA listing scanner that runs every 30 minutes. Real sold-comp valuations, Telegram alerts. Free to start.",
+  },
 };
 
 export default function RootLayout({
