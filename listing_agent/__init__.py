@@ -63,6 +63,7 @@ DEFAULT_CRITERIA = {
 # ── Alert storage ──────────────────────────────────────────────────────────
 MAX_ALERTS = 200
 SEEN_LISTINGS_FILE = Path("listing_agent/seen_listings.json")
+SEEN_HASHES_FILE   = Path("listing_agent/seen_hashes.json")
 LAST_SCAN_LISTINGS_FILE = Path("listing_agent/last_scan_listings.json")
 
 LISTINGS_PAGE_SIZE = 10
@@ -351,7 +352,8 @@ class ListingAgent:
         self.criteria: Dict[str, Any] = dict(DEFAULT_CRITERIA)
         self.running = False
         self.scan_interval_minutes = 30
-        self.seen_hashes: Set[str] = set()
+        # seen_hashes: hash → ISO timestamp (persisted so restarts don't reset it)
+        self.seen_hashes: Dict[str, str] = self._load_seen_hashes()
         self.alerts: List[ListingAlert] = []
         self.last_scan: Optional[str] = None
         self.scan_count = 0
@@ -410,7 +412,7 @@ class ListingAgent:
             "total_alerts": len(self.alerts),
             "auto_video": self.auto_video,
             "auto_video_min_price": self.auto_video_min_price,
-            "known_listings": len(self.seen_hashes),
+            "known_listings": len(self.seen_hashes),  # persisted hash count
         }
 
     def get_alerts(self, unseen_only: bool = False, limit: int = 50) -> List[Dict]:
@@ -507,6 +509,7 @@ class ListingAgent:
 
             # Create alerts for new listings
             self._purge_old_seen_listings()
+            self._purge_old_seen_hashes()
             
             for listing, source in new_listings:
                 listing_id = listing.get("id")
@@ -773,13 +776,54 @@ class ListingAgent:
             log_activity("ALERT", f"Telegram sent to chat_id for {alert.id} (HIGH)")
 
     def _is_new(self, listing: Dict[str, Any], source: str) -> bool:
-        """Check if listing has been seen before using content hash."""
+        """Check if listing has been seen before using a persisted content hash."""
         content = f"{listing.get('address','')}{listing.get('price','')}{source}"
         h = hashlib.md5(content.encode()).hexdigest()
         if h in self.seen_hashes:
             return False
-        self.seen_hashes.add(h)
+        self.seen_hashes[h] = datetime.utcnow().isoformat()
+        self._save_seen_hashes()
         return True
+
+    def _load_seen_hashes(self) -> Dict[str, str]:
+        """Load persisted seen-hashes dict (hash → ISO timestamp)."""
+        if SEEN_HASHES_FILE.exists():
+            try:
+                with open(SEEN_HASHES_FILE, "r") as f:
+                    data = json.load(f)
+                    # Legacy: if it was stored as a list of strings, migrate
+                    if isinstance(data, list):
+                        ts = datetime.utcnow().isoformat()
+                        return {h: ts for h in data}
+                    return data
+            except Exception as e:
+                logger.error(f"Error loading seen hashes: {e}")
+        return {}
+
+    def _save_seen_hashes(self) -> None:
+        """Persist seen-hashes dict to disk."""
+        try:
+            SEEN_HASHES_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with open(SEEN_HASHES_FILE, "w") as f:
+                json.dump(self.seen_hashes, f)
+        except Exception as e:
+            logger.error(f"Error saving seen hashes: {e}")
+
+    def _purge_old_seen_hashes(self) -> None:
+        """Remove hashes older than 48 hours so genuinely re-listed properties resurface."""
+        now = datetime.utcnow()
+        to_delete = []
+        for h, ts_str in self.seen_hashes.items():
+            try:
+                if now - datetime.fromisoformat(ts_str) > timedelta(hours=48):
+                    to_delete.append(h)
+            except Exception:
+                to_delete.append(h)
+        if to_delete:
+            for h in to_delete:
+                del self.seen_hashes[h]
+            self._save_seen_hashes()
+            logger.info(f"🧹 Purged {len(to_delete)} old hashes from seen_hashes.json")
 
     @staticmethod
     def _parse_price(price_str) -> int:
