@@ -324,6 +324,7 @@ export function ListRow({ listing, active = false, onClick, onOpen, onValuate }:
             )}
           </div>
         </div>
+        <InvestorPanel price={listing.price} beds={listing.beds} neighbourhood={listing.neighbourhood} />
       </div>
     </div>
   );
