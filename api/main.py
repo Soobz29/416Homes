@@ -1073,7 +1073,7 @@ async def valuate_property(data: dict):
             vm = ValuationModel()
             model_path = os.path.join(os.path.dirname(__file__), '..', 'valuation_model.pkl')
             if vm.load_model(model_path):
-                return vm.predict(data)
+                return vm.predict_with_contrib(data)
     except Exception as e:
         logger.warning(f"Valuation model unavailable, using fallback: {e}")
 

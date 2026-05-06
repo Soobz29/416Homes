@@ -318,6 +318,51 @@ class ValuationModel:
             logger.error(f"Prediction error: {e}")
             return {'error': f'Prediction failed: {str(e)}'}
     
+    def predict_with_contrib(self, property_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Like predict(), but also returns feature_deltas (SHAP-style per-feature dollar contributions)."""
+        result = self.predict(property_data)
+        if 'error' in result or not _DS_ENABLED or self.model is None:
+            return result
+        try:
+            input_df = pd.DataFrame([property_data])
+            for col, encoder in self.encoders.items():
+                if col in input_df.columns:
+                    value = input_df[col].iloc[0]
+                    if value not in encoder.classes_:
+                        value = encoder.classes_[0]
+                    input_df[f'{col}_encoded'] = encoder.transform([value])[0]
+            for col in ['bedrooms', 'bathrooms', 'sqft']:
+                fallback = self.numeric_medians.get(col, 0)
+                if col not in input_df.columns:
+                    input_df[col] = fallback
+                else:
+                    input_df[col] = pd.to_numeric(input_df[col], errors='coerce').fillna(fallback)
+            for col in ['property_type_encoded', 'neighbourhood_encoded', 'city_encoded']:
+                if col not in input_df.columns:
+                    input_df[col] = 0
+
+            X = input_df[self.feature_columns]
+            # pred_contrib returns shape (n_samples, n_features + 1) — last column is bias
+            contribs = self.model.predict(X, pred_contrib=True)[0]
+            sqft_val = float(input_df['sqft'].iloc[0]) or self.numeric_medians.get('sqft', 1000)
+
+            human_labels = {
+                'bedrooms': 'Bedrooms',
+                'bathrooms': 'Bathrooms',
+                'sqft': 'Sq. ft.',
+                'property_type_encoded': 'Property type',
+                'neighbourhood_encoded': 'Neighbourhood',
+                'city_encoded': 'City',
+            }
+            deltas: Dict[str, int] = {}
+            for i, feat in enumerate(self.feature_columns):
+                deltas[human_labels.get(feat, feat)] = int(contribs[i] * sqft_val)
+
+            result['feature_deltas'] = deltas
+        except Exception as e:
+            logger.warning(f"predict_with_contrib: contribution calc skipped — {e}")
+        return result
+
     def generate_market_analysis(self, estimated_price: int, property_data: Dict[str, Any]) -> str:
         """Generate market analysis text"""
 

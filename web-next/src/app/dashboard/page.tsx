@@ -246,7 +246,7 @@ export default function DashboardPage() {
     neighbourhood: "", city: "Toronto", bedrooms: "", bathrooms: "", sqft: "", list_price: "",
   });
   const [valuationCondition, setValuationCondition] = useState<"excellent"|"good"|"fair"|"poor">("good");
-  const [valuationResult, setValuationResult] = useState<null | { estimated_value: number; confidence: number; price_per_sqft?: number; market_analysis: string }>(null);
+  const [valuationResult, setValuationResult] = useState<null | { estimated_value: number; confidence: number; price_per_sqft?: number; market_analysis: string; feature_deltas?: Record<string, number> }>(null);
   const [valuationLoading, setValuationLoading] = useState(false);
   const [valuationError, setValuationError] = useState<string | null>(null);
 
@@ -1128,7 +1128,7 @@ export default function DashboardPage() {
               const confColor = conf >= 0.82 ? "#2ed573" : conf >= 0.72 ? "#ffa502" : "#cf6357";
               const listPrice = Number(valuationForm.list_price) || 0;
               const delta     = listPrice > 0 ? ((adjVal - listPrice) / listPrice) * 100 : null;
-              return (
+              return (<>
                 <div style={{ marginTop: 24, border: "1px solid var(--border)", overflow: "hidden" }}>
                   {/* Header */}
                   <div style={{ padding: "20px 24px", borderBottom: "1px solid var(--border)", background: "var(--bg-elev)" }}>
@@ -1176,7 +1176,86 @@ export default function DashboardPage() {
                     {valuationResult.market_analysis}
                   </div>
                 </div>
-              );
+
+                {/* ── Variance waterfall ── */}
+                {valuationResult.feature_deltas && (() => {
+                  const entries = Object.entries(valuationResult.feature_deltas as Record<string, number>)
+                    .filter(([, v]) => Math.abs(v) > 500)
+                    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+                  const maxAbs = Math.max(...entries.map(([, v]) => Math.abs(v)), 1);
+                  return entries.length > 0 ? (
+                    <div style={{ marginTop: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
+                      <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--border)", background: "var(--bg-elev)", fontFamily: "var(--mono)", fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--text-dim)" }}>
+                        ◆ Valuation Drivers — what moves the price
+                      </div>
+                      {entries.map(([feat, delta]) => {
+                        const isPos = delta >= 0;
+                        const barPct = Math.abs(delta) / maxAbs * 100;
+                        return (
+                          <div key={feat} style={{ display: "grid", gridTemplateColumns: "130px 1fr 90px", gap: 12, alignItems: "center", padding: "8px 20px", borderBottom: "1px solid var(--border)" }}>
+                            <div style={{ fontFamily: "var(--mono)", fontSize: "0.6rem", color: "var(--text-mute)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{feat}</div>
+                            <div style={{ position: "relative", height: 5, background: "var(--bg-elev)" }}>
+                              <div style={{ position: "absolute", [isPos ? "left" : "right"]: 0, width: `${barPct}%`, height: "100%", background: isPos ? "rgba(46,213,115,0.5)" : "rgba(207,99,87,0.5)" }} />
+                            </div>
+                            <div style={{ fontFamily: "var(--mono)", fontSize: "0.7rem", color: isPos ? "#2ed573" : "#cf6357", textAlign: "right" }}>
+                              {isPos ? "+" : "−"}${Math.abs(delta).toLocaleString("en-CA")}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null;
+                })()}
+
+                {/* ── Investor panel ── */}
+                {(() => {
+                  const price = Number(valuationForm.list_price) || 0;
+                  const beds  = Number(valuationForm.bedrooms)   || 1;
+                  const nbhd  = valuationForm.neighbourhood;
+                  if (!price) return null;
+                  const GTA_RENT: Record<number, number> = { 0:1900, 1:2200, 2:2800, 3:3500, 4:4200 };
+                  const NBHD_MULT: Record<string, number> = { "king west":1.15, "yorkville":1.25, "annex":1.10, "distillery":1.08, "liberty village":1.10, "leslieville":1.05, "roncesvalles":1.05, "beaches":1.08, "forest hill":1.20, "rosedale":1.25, "downtown":1.12, "north york":1.02 };
+                  const down = price * 0.20;
+                  const principal = price - down;
+                  const r = 0.065 / 12; const n = 300;
+                  const mortgage = Math.round(principal * r * Math.pow(1+r,n) / (Math.pow(1+r,n)-1));
+                  const nbhdKey = (nbhd||"").toLowerCase();
+                  const nbhdMult = Object.entries(NBHD_MULT).find(([k]) => nbhdKey.includes(k))?.[1] ?? 1.0;
+                  const bedCapped = Math.min(Math.max(Math.round(beds),0),4);
+                  const rent = Math.round((GTA_RENT[bedCapped]??2200) * nbhdMult);
+                  const noi  = rent - Math.round(rent*0.30);
+                  const grossYield   = (rent*12)/price*100;
+                  const capRate      = (noi*12)/price*100;
+                  const cashOnCash   = ((noi-mortgage)*12)/down*100;
+                  const isPositive   = cashOnCash > 0;
+                  const rows: [string,string,boolean?][] = [
+                    ["Down (20%)",       `$${down.toLocaleString("en-CA")}`],
+                    ["Monthly mortgage", `$${mortgage.toLocaleString("en-CA")}`],
+                    ["Est. rent / mo",   `$${rent.toLocaleString("en-CA")}`],
+                    ["Gross yield",      `${grossYield.toFixed(2)}%`],
+                    ["Cap rate",         `${capRate.toFixed(2)}%`],
+                    ["Cash-on-cash",     `${cashOnCash.toFixed(2)}%`, true],
+                  ];
+                  return (
+                    <div style={{ marginTop: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
+                      <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--border)", background: "var(--bg-elev)", fontFamily: "var(--mono)", fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--text-dim)" }}>
+                        ◈ Investor Analysis · 20% down · 25yr amort · 6.5% rate
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 0 }}>
+                        {rows.map(([label, value, highlight], i) => (
+                          <div key={label} style={{ padding: "14px 20px", borderRight: i%3 < 2 ? "1px solid var(--border)" : "none", borderBottom: i < 3 ? "1px solid var(--border)" : "none" }}>
+                            <div style={{ fontFamily: "var(--mono)", fontSize: "0.54rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)", marginBottom: 4 }}>{label}</div>
+                            <div style={{ fontFamily: "var(--mono)", fontSize: "0.9rem", color: highlight ? (isPositive ? "#2ed573" : "#cf6357") : "var(--text)" }}>{value}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ padding: "10px 20px", borderTop: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.56rem", color: "var(--text-dim)", lineHeight: 1.6 }}>
+                        Rent estimate based on GTA 2026 averages for {bedCapped}bd in {nbhd||"this area"}. Expenses assume 30% of rent (property tax, maintenance, insurance). Not financial advice.
+                      </div>
+                    </div>
+                  );
+                })()}
+              </>);
             })()}
           </div>
         )}
