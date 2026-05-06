@@ -379,14 +379,15 @@ export default function ToursPage() {
                 </FormField>
 
                 <div style={{ marginTop: 20, padding: "16px 0", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 20 }}>
-                  <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-mute)" }}>Total</div>
-                  <div style={{ fontFamily: "var(--mono)", fontSize: "2.4rem", fontWeight: 700 }}>
-                    $49 <span style={{ fontSize: "0.7rem", fontFamily: "var(--mono)", color: "var(--text-mute)", letterSpacing: "0.1em", textTransform: "uppercase" }}>CAD</span>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-mute)" }}>Beta price</div>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                    <div style={{ fontFamily: "var(--mono)", fontSize: "2.4rem", fontWeight: 700, color: "var(--accent)" }}>Free</div>
+                    <div style={{ fontFamily: "var(--mono)", fontSize: "0.6rem", color: "var(--text-dim)", letterSpacing: "0.1em", textTransform: "uppercase" }}>$49 CAD at launch</div>
                   </div>
                 </div>
 
                 <PrimaryBtn onClick={handlePay} disabled={uploading || submitting}>
-                  {uploading ? "Uploading…" : submitting ? "Starting…" : "Pay & generate →"}
+                  {uploading ? "Uploading…" : submitting ? "Starting…" : "Generate tour →"}
                 </PrimaryBtn>
                 {tourError && !paid && (
                   <div style={{ marginTop: 12, padding: "10px 12px", border: "1px solid #cf6357", background: "rgba(207,99,87,0.08)", color: "#ffb4a8", fontFamily: "var(--mono)", fontSize: "0.72rem", lineHeight: 1.5 }}>
@@ -394,7 +395,7 @@ export default function ToursPage() {
                   </div>
                 )}
                 <div style={{ fontFamily: "var(--mono)", fontSize: "0.6rem", color: "var(--text-dim)", textAlign: "center", marginTop: 12 }}>
-                  Secure checkout via Stripe
+                  Early access · Free during beta
                 </div>
               </>
             ) : (

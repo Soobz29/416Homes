@@ -106,6 +106,8 @@ export async function fetchListings(params?: {
   minPrice?: number;
   maxPrice?: number;
   propertyTypes?: string[];
+  bedrooms?: string;
+  bathrooms?: string;
   limit?: number;
   offset?: number;
 }) {
@@ -114,6 +116,8 @@ export async function fetchListings(params?: {
   if (params?.minPrice) queryParams.append("min_price", params.minPrice.toString());
   if (params?.maxPrice) queryParams.append("max_price", params.maxPrice.toString());
   if (params?.propertyTypes?.length) queryParams.append("property_types", params.propertyTypes.join(","));
+  if (params?.bedrooms) queryParams.append("bedrooms", params.bedrooms);
+  if (params?.bathrooms) queryParams.append("bathrooms", params.bathrooms);
   queryParams.append("limit", String(params?.limit ?? 20));
   queryParams.append("offset", String(params?.offset ?? 0));
 

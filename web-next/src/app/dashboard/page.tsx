@@ -332,6 +332,8 @@ export default function DashboardPage() {
         minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
         maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
         propertyTypes: filters.propertyType ? [filters.propertyType] : undefined,
+        bedrooms: filters.bedrooms || undefined,
+        bathrooms: filters.bathrooms || undefined,
         limit: LISTINGS_PAGE_SIZE,
         offset: listingsPage * LISTINGS_PAGE_SIZE,
       });

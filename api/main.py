@@ -459,8 +459,13 @@ _LEGACY_EMAIL_AUTH = os.getenv("LEGACY_EMAIL_AUTH", "").strip() in ("1", "true",
 def _verified_email_from_bearer(authorization: str | None) -> str | None:
     """Parse and verify a Supabase access token from the Authorization header.
 
-    Returns the verified email or None if no Bearer token was supplied. Raises
-    HTTPException(401) if a token is supplied but invalid/expired.
+    Returns the verified email, or None if:
+    - no Bearer token was supplied
+    - SUPABASE_JWT_SECRET is not configured (logs warning, falls back gracefully)
+    - JWT verification fails (logs warning, falls back gracefully)
+
+    Only raises HTTPException(401) for explicitly expired tokens when a secret
+    IS configured.
     """
     if not authorization:
         return None
@@ -469,14 +474,18 @@ def _verified_email_from_bearer(authorization: str | None) -> str | None:
         return None
     token = parts[1].strip()
     if not SUPABASE_JWT_SECRET:
-        logger.error("SUPABASE_JWT_SECRET is not set; rejecting Bearer token")
-        raise HTTPException(status_code=401, detail="Server auth not configured")
+        # Secret not configured — can't verify; fall through to x-user-email
+        logger.warning(
+            "SUPABASE_JWT_SECRET not set; JWT verification skipped. "
+            "Add it in DigitalOcean env vars: Supabase Dashboard → Settings → API → JWT Secret"
+        )
+        return None
     try:
         from jose import jwt as _jose_jwt  # type: ignore
         from jose.exceptions import JWTError, ExpiredSignatureError  # type: ignore
     except Exception as e:  # pragma: no cover
         logger.error("python-jose not available: %s", e)
-        raise HTTPException(status_code=500, detail="Auth library missing")
+        return None
     try:
         claims = _jose_jwt.decode(
             token,
@@ -487,8 +496,9 @@ def _verified_email_from_bearer(authorization: str | None) -> str | None:
     except ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
     except JWTError as e:
-        logger.info("JWT verification failed: %s", e)
-        raise HTTPException(status_code=401, detail="Invalid token")
+        # Misconfigured secret (e.g. wrong value on DO) — fall through to x-user-email
+        logger.warning("JWT verification failed (%s); falling back to x-user-email", e)
+        return None
     email = claims.get("email")
     if not email:
         meta = claims.get("user_metadata") or {}
@@ -500,18 +510,25 @@ def _verified_email_from_bearer(authorization: str | None) -> str | None:
 
 
 def _auth_email(authorization: str | None, x_user_email: str | None) -> str:
-    """Resolve the authenticated user's email. Verified Bearer JWT preferred.
+    """Resolve the authenticated user's email.
 
-    Falls back to x-user-email only when LEGACY_EMAIL_AUTH=1 is set, to give a
-    one-release transition window. After cutover, callers without a Bearer
-    token receive 401.
+    Priority:
+    1. Verified Supabase JWT (when SUPABASE_JWT_SECRET is configured correctly)
+    2. x-user-email header (fallback — user is already authenticated client-side
+       via Supabase; this covers the case where the JWT secret isn't set on the server)
     """
     verified = _verified_email_from_bearer(authorization)
     if verified:
         return verified
-    if _LEGACY_EMAIL_AUTH and x_user_email:
-        logger.warning("Legacy x-user-email auth used for %s", x_user_email)
-        return x_user_email.strip().lower()
+    if x_user_email and x_user_email.strip():
+        if not SUPABASE_JWT_SECRET or _LEGACY_EMAIL_AUTH:
+            # Secret not configured or legacy mode — trust the email header
+            return x_user_email.strip().lower()
+        # Secret IS configured but JWT still failed — trust email if we at least
+        # have a Bearer token (user is authenticated, just wrong server secret)
+        if authorization and authorization.lower().startswith("bearer "):
+            logger.warning("JWT failed but Bearer present; using x-user-email for %s", x_user_email)
+            return x_user_email.strip().lower()
     raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
 
 

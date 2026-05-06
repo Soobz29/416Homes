@@ -32,10 +32,8 @@ class PropertyAgent:
     """Autonomous property agent that matches listings to buyer alerts"""
     
     def __init__(self):
-        self.supabase = create_client(
-            os.getenv("SUPABASE_URL"),
-            os.getenv("SUPABASE_KEY")
-        )
+        _key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+        self.supabase = create_client(os.getenv("SUPABASE_URL"), _key)
         
         # Initialize Gemini
         api_key = os.getenv("GEMINI_API_KEY")
@@ -56,15 +54,21 @@ class PropertyAgent:
         self.agent_email = os.getenv("AGENT_EMAIL")
     
     async def get_active_alerts(self) -> List[Dict[str, Any]]:
-        """Get all active buyer alerts from the `alerts` table (written by the API)."""
+        """Get all active buyer alerts joined with user email."""
         try:
+            # Join users table so each alert row has the buyer's email
             result = self.supabase.table("alerts")\
-                .select("*")\
+                .select("*, users(email)")\
                 .eq("is_active", True)\
                 .execute()
-            
-            return result.data if result.data else []
-            
+
+            rows = result.data if result.data else []
+            # Flatten: pull email up from nested users object
+            for r in rows:
+                if not r.get("email") and isinstance(r.get("users"), dict):
+                    r["email"] = r["users"].get("email", "")
+            return rows
+
         except Exception as e:
             logger.error(f"Error fetching alerts: {e}")
             return []
