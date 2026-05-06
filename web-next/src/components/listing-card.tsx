@@ -4,6 +4,80 @@ import { useState, useEffect } from "react";
 import { Listing } from "@/types";
 import { formatPrice } from "@/lib/utils";
 
+/* ── Investor Panel helpers ──────────────────────────────────────────── */
+const GTA_RENT: Record<number, number> = {
+  0: 1900, 1: 2200, 2: 2800, 3: 3500, 4: 4200,
+};
+const NBHD_MULT: Record<string, number> = {
+  "king west": 1.15, "yorkville": 1.25, "annex": 1.10,
+  "distillery": 1.08, "liberty village": 1.10, "leslieville": 1.05,
+  "roncesvalles": 1.05, "beaches": 1.08, "forest hill": 1.20,
+  "rosedale": 1.25, "lawrence park": 1.15, "midtown": 1.08,
+  "downtown": 1.12, "east york": 0.98, "scarborough": 0.95,
+  "north york": 1.02, "etobicoke": 1.00,
+};
+
+function calcInvestor(price: number, beds: number, neighbourhood?: string) {
+  const down = price * 0.20;
+  const principal = price - down;
+  const r = 0.065 / 12;
+  const n = 300; // 25yr × 12
+  const mortgage = Math.round(principal * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1));
+  const nbhdKey = (neighbourhood || "").toLowerCase();
+  const nbhdMult = Object.entries(NBHD_MULT).find(([k]) => nbhdKey.includes(k))?.[1] ?? 1.0;
+  const bedCapped = Math.min(Math.max(Math.round(beds || 1), 0), 4);
+  const rent = Math.round((GTA_RENT[bedCapped] ?? 2200) * nbhdMult);
+  const expenses = Math.round(rent * 0.30);
+  const noi = rent - expenses;
+  const grossYield = (rent * 12) / price * 100;
+  const capRate = (noi * 12) / price * 100;
+  const cashflow = noi - mortgage;
+  const cashOnCash = (cashflow * 12) / down * 100;
+  return { down, mortgage, rent, grossYield, capRate, cashflow, cashOnCash };
+}
+
+export function InvestorPanel({
+  price, beds, neighbourhood,
+}: { price: number; beds: number; neighbourhood?: string }) {
+  const [open, setOpen] = useState(false);
+  if (!price || price < 10000) return null;
+  const m = calcInvestor(price, beds, neighbourhood);
+  const rows: [string, string, boolean?][] = [
+    ["Down (20%)",      `$${m.down.toLocaleString("en-CA")}`],
+    ["Monthly mortgage",`$${m.mortgage.toLocaleString("en-CA")}`],
+    ["Est. rent / mo",  `$${m.rent.toLocaleString("en-CA")}`],
+    ["Gross yield",     `${m.grossYield.toFixed(2)}%`],
+    ["Cap rate",        `${m.capRate.toFixed(2)}%`],
+    ["Cash-on-cash",    `${m.cashOnCash.toFixed(2)}%`, true],
+  ];
+  return (
+    <div style={{ borderTop: "1px solid var(--border)", marginTop: 10 }} onClick={e => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: "100%", padding: "7px 0", background: "transparent", border: "none",
+          fontFamily: "var(--mono)", fontSize: "0.56rem", letterSpacing: "0.1em",
+          textTransform: "uppercase" as const, color: "var(--text-dim)", cursor: "pointer",
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+        }}
+      >
+        <span>◈ Investor View</span>
+        <span style={{ fontSize: "0.5rem" }}>{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1, background: "var(--border)", marginBottom: 2 }}>
+          {rows.map(([label, value, highlight]) => (
+            <div key={label} style={{ background: "var(--bg)", padding: "8px 12px" }}>
+              <div style={{ fontFamily: "var(--mono)", fontSize: "0.52rem", color: "var(--text-dim)", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 2 }}>{label}</div>
+              <div style={{ fontFamily: "var(--mono)", fontSize: "0.78rem", color: highlight ? (m.cashOnCash > 0 ? "#2ed573" : "#cf6357") : "var(--text)" }}>{value}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface ListingCardProps {
   listing: Listing;
   index?: number;
@@ -347,6 +421,7 @@ export function ListingCard({ listing, index = 0, onValuate }: ListingCardProps)
             </button>
           )}
         </div>
+        <InvestorPanel price={listing.price} beds={listing.beds} neighbourhood={listing.neighbourhood} />
       </div>
     </div>
   );
