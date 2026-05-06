@@ -1,1 +1,6 @@
 -r requirements-railway.txt
+
+# Stealth scraping (HouseSigma / Zoocasa sold pages)
+undetected-chromedriver>=3.5.5
+fake-useragent>=1.5.1
+pdfplumber>=0.11.0
