@@ -3,17 +3,25 @@ Shared browser utility for all scrapers.
 
 On Windows: uses DrissionPage + Edge (stealth fingerprinting).
 On Linux/CI: uses Playwright Chromium (headless, stealth args).
+
+Also provides an `undetected-chromedriver` path for stubborn targets like
+HouseSigma where Cloudflare's bot-detection blocks the default browsers.
+Enable with: STEALTH_BROWSER=uc
 """
 
 import logging
+import os
 import platform
 import random
+import time
+from pathlib import Path
 from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 EDGE_PATH = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 _ON_LINUX = platform.system() != "Windows"
+_USE_UC = os.getenv("STEALTH_BROWSER", "").lower() in ("uc", "undetected", "1", "true")
 
 # ── Fingerprinting (shared) ────────────────────────────────────────────────────
 try:
@@ -183,12 +191,150 @@ def _create_drission_browser(headless: bool = False):
     return page
 
 
+# ── undetected-chromedriver wrapper (Cloudflare bypass path) ───────────────────
+
+class _UCElement:
+    """Thin wrapper making a Selenium WebElement look like a DrissionPage element."""
+
+    def __init__(self, el):
+        self._el = el
+
+    def attr(self, name: str) -> str:
+        if self._el is None:
+            return ""
+        try:
+            return self._el.get_attribute(name) or ""
+        except Exception:
+            return ""
+
+    @property
+    def text(self) -> str:
+        if self._el is None:
+            return ""
+        try:
+            return self._el.text or ""
+        except Exception:
+            return ""
+
+
+class _UCPage:
+    """Thin wrapper making an undetected-chromedriver driver look like DrissionPage."""
+
+    def __init__(self, driver):
+        self._driver = driver
+
+    # ── navigation ─────────────────────────────────────────────────────────────
+    def get(self, url: str, retry: int = 1, interval: int = 1, timeout: int = 30):
+        self._driver.set_page_load_timeout(timeout)
+        for attempt in range(max(retry, 1)):
+            try:
+                self._driver.get(url)
+                return
+            except Exception as e:
+                if attempt < retry - 1:
+                    time.sleep(interval)
+                else:
+                    raise
+
+    # ── element finders ────────────────────────────────────────────────────────
+    def eles(self, selector: str):
+        from selenium.webdriver.common.by import By
+        css = selector[4:] if selector.startswith("tag:") else selector
+        try:
+            els = self._driver.find_elements(By.CSS_SELECTOR, css)
+            return [_UCElement(e) for e in els]
+        except Exception:
+            return []
+
+    def ele(self, selector: str):
+        from selenium.webdriver.common.by import By
+        css = selector[4:] if selector.startswith("tag:") else selector
+        try:
+            e = self._driver.find_element(By.CSS_SELECTOR, css)
+            return _UCElement(e)
+        except Exception:
+            return None
+
+    # ── JS execution ───────────────────────────────────────────────────────────
+    def run_js(self, js: str):
+        try:
+            self._driver.execute_script(js)
+        except Exception:
+            pass
+
+    # ── cookies ────────────────────────────────────────────────────────────────
+    def get_cookies(self):
+        return self._driver.get_cookies()
+
+    def add_cookie(self, cookie: dict):
+        self._driver.add_cookie(cookie)
+
+    # ── scroll helper (DrissionPage-compatible interface) ──────────────────────
+    class _Scroll:
+        def __init__(self, driver):
+            self._driver = driver
+
+        def down(self, px: int = 500):
+            try:
+                self._driver.execute_script(f"window.scrollBy(0, {px});")
+            except Exception:
+                pass
+
+    @property
+    def scroll(self):
+        return self._Scroll(self._driver)
+
+    # ── cleanup ────────────────────────────────────────────────────────────────
+    def quit(self):
+        try:
+            self._driver.quit()
+        except Exception:
+            pass
+
+
+def _create_undetected_browser(headless: bool = False) -> _UCPage:
+    """Create an undetected-chromedriver browser (best Cloudflare evasion, $0)."""
+    import undetected_chromedriver as uc
+    try:
+        from fake_useragent import UserAgent
+        ua_str = UserAgent().chrome
+    except Exception:
+        ua_str = (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        )
+
+    options = uc.ChromeOptions()
+    options.add_argument(f"--user-agent={ua_str}")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--no-sandbox")
+    # Persistent profile preserves cf_clearance cookies between runs
+    profile_dir = Path.home() / ".uc_profile_416homes"
+    profile_dir.mkdir(exist_ok=True)
+    options.add_argument(f"--user-data-dir={profile_dir}")
+    if headless:
+        options.add_argument("--headless=new")
+
+    driver = uc.Chrome(options=options, version_main=None)
+    page = _UCPage(driver)
+    try:
+        page.run_js(CANVAS_NOISE_JS)
+    except Exception:
+        pass
+    return page
+
+
 def create_browser(headless: bool = True):
     """
     Return a browser page object.
+    - STEALTH_BROWSER=uc: undetected-chromedriver (best for Cloudflare targets).
     - Linux/CI: Playwright Chromium (headless).
-    - Windows: DrissionPage + Edge (stealth).
+    - Windows default: DrissionPage + Edge (stealth).
     """
+    if _USE_UC:
+        return _create_undetected_browser(headless=headless)
     if _ON_LINUX:
         return _create_playwright_browser(headless=True)
     return _create_drission_browser(headless=headless)

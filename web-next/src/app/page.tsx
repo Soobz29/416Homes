@@ -113,6 +113,8 @@ function fmtPriceFull(n: number) {
 
 const TOP_NAV_LINKS: [string, string][] = [
   ["/dashboard", "Listings"],
+  ["/deal", "Deal Analyzer"],
+  ["/strategy", "Find My Strategy"],
   ["/#how-it-works", "How It Works"],
   ["/video", "Videos"],
   ["/tours", "Virtual Tours"],

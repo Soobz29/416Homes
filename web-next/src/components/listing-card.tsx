@@ -3,62 +3,46 @@
 import { useState, useEffect } from "react";
 import { Listing } from "@/types";
 import { formatPrice } from "@/lib/utils";
-
-/* ── Investor Panel helpers ──────────────────────────────────────────── */
-const GTA_RENT: Record<number, number> = {
-  0: 1900, 1: 2200, 2: 2800, 3: 3500, 4: 4200,
-};
-const NBHD_MULT: Record<string, number> = {
-  "king west": 1.15, "yorkville": 1.25, "annex": 1.10,
-  "distillery": 1.08, "liberty village": 1.10, "leslieville": 1.05,
-  "roncesvalles": 1.05, "beaches": 1.08, "forest hill": 1.20,
-  "rosedale": 1.25, "lawrence park": 1.15, "midtown": 1.08,
-  "downtown": 1.12, "east york": 0.98, "scarborough": 0.95,
-  "north york": 1.02, "etobicoke": 1.00,
-};
-
-function calcInvestor(price: number, beds: number, neighbourhood?: string) {
-  const down = price * 0.20;
-  const principal = price - down;
-  const r = 0.065 / 12;
-  const n = 300; // 25yr × 12
-  const mortgage = Math.round(principal * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1));
-  const nbhdKey = (neighbourhood || "").toLowerCase();
-  const nbhdMult = Object.entries(NBHD_MULT).find(([k]) => nbhdKey.includes(k))?.[1] ?? 1.0;
-  const bedCapped = Math.min(Math.max(Math.round(beds || 1), 0), 4);
-  const rent = Math.round((GTA_RENT[bedCapped] ?? 2200) * nbhdMult);
-  const expenses = Math.round(rent * 0.30);
-  const noi = rent - expenses;
-  const grossYield = (rent * 12) / price * 100;
-  const capRate = (noi * 12) / price * 100;
-  const cashflow = noi - mortgage;
-  const cashOnCash = (cashflow * 12) / down * 100;
-  return { down, mortgage, rent, grossYield, capRate, cashflow, cashOnCash };
-}
+import { calcInvestor, getDealVerdict, fmtCashflow } from "@/lib/investor";
 
 export function InvestorPanel({
   price, beds, neighbourhood,
 }: { price: number; beds: number; neighbourhood?: string }) {
   if (!price || price < 10000) return null;
   const m = calcInvestor(price, beds, neighbourhood);
-  // Compact always-visible strip: mortgage | rent | yield | c-o-c
+  const v = getDealVerdict(m.cashOnCash, m.capRate, m.ptr);
+
+  const cfColor = m.cashflow >= 0 ? "#2ed573" : "#cf6357";
+
   return (
     <div style={{ borderTop: "1px solid var(--border)", marginTop: 10, paddingTop: 8 }} onClick={e => e.stopPropagation()}>
-      <div style={{ fontFamily: "var(--mono)", fontSize: "0.5rem", textTransform: "uppercase" as const, letterSpacing: "0.1em", color: "var(--text-dim)", marginBottom: 6 }}>
-        ◈ Investor · 20% dn · 25yr · 6.5%
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 1, background: "var(--border)" }}>
+      {/* Row 1 — 5 metrics */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 1, background: "var(--border)", marginBottom: 1 }}>
         {([
-          ["Mortgage/mo", `$${m.mortgage.toLocaleString("en-CA")}`, false],
-          ["Est. rent",   `$${m.rent.toLocaleString("en-CA")}`,     false],
-          ["Gross yld",   `${m.grossYield.toFixed(1)}%`,            false],
-          ["Cash-on-cash",`${m.cashOnCash.toFixed(1)}%`,            true],
-        ] as [string, string, boolean][]).map(([label, value, highlight]) => (
+          ["Mortgage/mo", `$${m.mortgage.toLocaleString("en-CA")}`, "var(--text)"],
+          ["Est. rent",   `$${m.rent.toLocaleString("en-CA")}`,     "var(--text)"],
+          ["Cash flow",   fmtCashflow(m.cashflow),                   cfColor],
+          ["Cap rate",    `${m.capRate.toFixed(1)}%`,                m.capRate >= 4 ? "#7bed9f" : "var(--text-mute)"],
+          ["Cash-on-cash",`${m.cashOnCash.toFixed(1)}%`,             m.cashOnCash > 0 ? "#7bed9f" : "#cf6357"],
+        ] as [string, string, string][]).map(([label, value, color]) => (
           <div key={label} style={{ background: "var(--bg-elev)", padding: "6px 8px" }}>
-            <div style={{ fontFamily: "var(--mono)", fontSize: "0.48rem", color: "var(--text-dim)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 2 }}>{label}</div>
-            <div style={{ fontFamily: "var(--mono)", fontSize: "0.72rem", color: highlight ? (m.cashOnCash > 0 ? "#2ed573" : "#cf6357") : "var(--text)", fontWeight: highlight ? 600 : 400 }}>{value}</div>
+            <div style={{ fontFamily: "var(--mono)", fontSize: "0.45rem", color: "var(--text-dim)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 2 }}>{label}</div>
+            <div style={{ fontFamily: "var(--mono)", fontSize: "0.68rem", color, fontWeight: 500 }}>{value}</div>
           </div>
         ))}
+      </div>
+      {/* Row 2 — Deal Verdict */}
+      <div style={{ background: "var(--bg-elev)", padding: "5px 8px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontFamily: "var(--mono)", fontSize: "0.45rem", color: "var(--text-dim)", textTransform: "uppercase" as const, letterSpacing: "0.1em" }}>◈ Deal verdict</span>
+          <span style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", color: v.color, fontWeight: 600 }}>{v.label}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontFamily: "var(--mono)", fontSize: "0.48rem", color: "var(--text-dim)" }}>PTR {m.ptr.toFixed(1)}×</span>
+          <span style={{ fontFamily: "var(--mono)", fontSize: "0.48rem", color: "var(--text-dim)" }}>
+            Score <span style={{ color: v.color }}>{v.score}</span>/100
+          </span>
+        </div>
       </div>
     </div>
   );

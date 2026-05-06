@@ -30,8 +30,10 @@ TORONTO_NEIGHBORHOODS = [
 ]
 
 def _scrape_housesigma_sync(area: str, days_back: int = 30) -> List[Dict[str, Any]]:
-    """Synchronous scraping using DrissionPage + Edge."""
+    """Synchronous scraping using DrissionPage + Edge (or undetected-chromedriver)."""
+    import random as _rand
     from .browser_util import create_browser
+    from .cookies import load_cookies, save_cookies
 
     url = AREA_URLS.get(area, AREA_URLS["gta"])
     listings = []
@@ -39,14 +41,35 @@ def _scrape_housesigma_sync(area: str, days_back: int = 30) -> List[Dict[str, An
 
     try:
         page = create_browser(headless=True)
-        logger.info(f"HouseSigma: navigating to {url}")
-        page.get(url, retry=1, interval=1, timeout=25)
-        time.sleep(12)  # HouseSigma has heavy JS + map loading
 
-        # Scroll to load sold cards
-        for _ in range(3):
-            page.scroll.down(500)
-            time.sleep(1)
+        # ── Warm-up: look like a real user visiting the site ────────────────────
+        logger.info("HouseSigma: warm-up — loading homepage")
+        try:
+            page.get("https://housesigma.com/", retry=1, interval=1, timeout=20)
+            time.sleep(_rand.uniform(3, 6))
+        except Exception:
+            pass
+
+        # Load any persisted cookies (cf_clearance etc.)
+        loaded = load_cookies(page, "housesigma.com")
+        if loaded:
+            logger.info(f"HouseSigma: loaded {loaded} cached cookies")
+
+        # Browse a city page before the sold-comp map
+        try:
+            page.get("https://housesigma.com/web/en/toronto", retry=1, interval=1, timeout=20)
+            time.sleep(_rand.uniform(4, 8))
+        except Exception:
+            pass
+
+        logger.info(f"HouseSigma: navigating to sold map — {url}")
+        page.get(url, retry=1, interval=1, timeout=25)
+        time.sleep(_rand.uniform(8, 16))  # was fixed 12s
+
+        # Human-like scrolling
+        for _ in range(_rand.randint(3, 7)):
+            page.scroll.down(_rand.randint(300, 700))
+            time.sleep(_rand.uniform(1.5, 4.0))
 
         # HouseSigma shows listing cards; grab all anchor tags
         all_links = page.eles('tag:a')
@@ -126,6 +149,13 @@ def _scrape_housesigma_sync(area: str, days_back: int = 30) -> List[Dict[str, An
                     })
             except Exception:
                 continue
+
+        # Persist cookies so cf_clearance survives next run
+        try:
+            save_cookies(page, "housesigma.com")
+            logger.info("HouseSigma: cookies saved")
+        except Exception:
+            pass
 
     except Exception as e:
         logger.error(f"HouseSigma scraping failed: {e}")
