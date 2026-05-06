@@ -9,6 +9,7 @@ import { fetchListings, fetchValuation } from "@/lib/api";
 
 import { getSession, signInWithEmail, signOut } from "@/lib/supabase";
 import { Alert, fetchAlerts, createAlert, updateAlert, deleteAlert, generateLinkCode, fetchMe } from "@/lib/alerts";
+import { calcInvestor, getDealVerdict, fmtCashflow } from "@/lib/investor";
 import { DropdownSelect } from "@/components/DropdownSelect";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { ListingCard, ListingCardSkeleton, ListRow } from "@/components/listing-card";
@@ -1229,53 +1230,68 @@ export default function DashboardPage() {
                   ) : null;
                 })()}
 
-                {/* ── Investor panel ── */}
+                {/* ── Investor panel + Deal Verdict ── */}
                 {(() => {
-                  const price = Number(valuationForm.list_price) || 0;
+                  const price = Number(valuationForm.list_price) || adjVal || 0;
                   const beds  = Number(valuationForm.bedrooms)   || 1;
                   const nbhd  = valuationForm.neighbourhood;
                   if (!price) return null;
-                  const GTA_RENT: Record<number, number> = { 0:1900, 1:2200, 2:2800, 3:3500, 4:4200 };
-                  const NBHD_MULT: Record<string, number> = { "king west":1.15, "yorkville":1.25, "annex":1.10, "distillery":1.08, "liberty village":1.10, "leslieville":1.05, "roncesvalles":1.05, "beaches":1.08, "forest hill":1.20, "rosedale":1.25, "downtown":1.12, "north york":1.02 };
-                  const down = price * 0.20;
-                  const principal = price - down;
-                  const r = 0.065 / 12; const n = 300;
-                  const mortgage = Math.round(principal * r * Math.pow(1+r,n) / (Math.pow(1+r,n)-1));
-                  const nbhdKey = (nbhd||"").toLowerCase();
-                  const nbhdMult = Object.entries(NBHD_MULT).find(([k]) => nbhdKey.includes(k))?.[1] ?? 1.0;
-                  const bedCapped = Math.min(Math.max(Math.round(beds),0),4);
-                  const rent = Math.round((GTA_RENT[bedCapped]??2200) * nbhdMult);
-                  const noi  = rent - Math.round(rent*0.30);
-                  const grossYield   = (rent*12)/price*100;
-                  const capRate      = (noi*12)/price*100;
-                  const cashOnCash   = ((noi-mortgage)*12)/down*100;
-                  const isPositive   = cashOnCash > 0;
-                  const rows: [string,string,boolean?][] = [
-                    ["Down (20%)",       `$${down.toLocaleString("en-CA")}`],
-                    ["Monthly mortgage", `$${mortgage.toLocaleString("en-CA")}`],
-                    ["Est. rent / mo",   `$${rent.toLocaleString("en-CA")}`],
-                    ["Gross yield",      `${grossYield.toFixed(2)}%`],
-                    ["Cap rate",         `${capRate.toFixed(2)}%`],
-                    ["Cash-on-cash",     `${cashOnCash.toFixed(2)}%`, true],
+                  const m = calcInvestor(price, beds, nbhd);
+                  const v = getDealVerdict(m.cashOnCash, m.capRate, m.ptr);
+                  const cfColor = m.cashflow >= 0 ? "#2ed573" : "#cf6357";
+                  const rows: [string,string,string][] = [
+                    ["Down (20%)",       `$${m.down.toLocaleString("en-CA")}`,      "var(--text)"],
+                    ["Monthly mortgage", `$${m.mortgage.toLocaleString("en-CA")}`,  "var(--text)"],
+                    ["Est. rent / mo",   `$${m.rent.toLocaleString("en-CA")}`,      "var(--text)"],
+                    ["Gross yield",      `${m.grossYield.toFixed(2)}%`,              "var(--text)"],
+                    ["Cap rate",         `${m.capRate.toFixed(2)}%`,                 m.capRate >= 4 ? "#7bed9f" : "var(--text-mute)"],
+                    ["Cash-on-cash",     `${m.cashOnCash.toFixed(2)}%`,              m.cashOnCash > 0 ? "#2ed573" : "#cf6357"],
                   ];
-                  return (
-                    <div style={{ marginTop: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
+                  return (<>
+                    {/* Deal Verdict */}
+                    <div style={{ marginTop: 12, border: `1px solid ${v.color}40`, background: `${v.color}06`, overflow: "hidden" }}>
+                      <div style={{ padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--border)" }}>
+                        <div>
+                          <div style={{ fontFamily: "var(--mono)", fontSize: "0.5rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--text-dim)", marginBottom: 4 }}>◈ Deal Verdict</div>
+                          <div style={{ fontFamily: "var(--mono)", fontSize: "1rem", color: v.color, fontWeight: 600 }}>{v.label}</div>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontFamily: "var(--mono)", fontSize: "0.5rem", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 2 }}>Confidence</div>
+                          <div style={{ fontFamily: "var(--mono)", fontSize: "1.4rem", color: v.color, fontWeight: 700, lineHeight: 1 }}>{v.score}<span style={{ fontSize: "0.6rem", color: "var(--text-dim)" }}>/100</span></div>
+                        </div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)" }}>
+                        {([
+                          ["Cash Flow/mo", fmtCashflow(m.cashflow), cfColor],
+                          ["Cap Rate",     `${m.capRate.toFixed(1)}%`, m.capRate >= 4 ? "#7bed9f" : "var(--text-mute)"],
+                          ["PTR",          `${m.ptr.toFixed(1)}×`,    m.ptr < 35 ? "#7bed9f" : "var(--text-mute)"],
+                        ] as [string,string,string][]).map(([l,val,col], i) => (
+                          <div key={l} style={{ padding: "12px 20px", borderRight: i < 2 ? "1px solid var(--border)" : "none" }}>
+                            <div style={{ fontFamily: "var(--mono)", fontSize: "0.5rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)", marginBottom: 4 }}>{l}</div>
+                            <div style={{ fontFamily: "var(--mono)", fontSize: "0.9rem", color: col, fontWeight: 500 }}>{val}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Full investor breakdown */}
+                    <div style={{ marginTop: 8, border: "1px solid var(--border)", overflow: "hidden" }}>
                       <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--border)", background: "var(--bg-elev)", fontFamily: "var(--mono)", fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--text-dim)" }}>
                         ◈ Investor Analysis · 20% down · 25yr amort · 6.5% rate
                       </div>
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 0 }}>
-                        {rows.map(([label, value, highlight], i) => (
+                        {rows.map(([label, value, color], i) => (
                           <div key={label} style={{ padding: "14px 20px", borderRight: i%3 < 2 ? "1px solid var(--border)" : "none", borderBottom: i < 3 ? "1px solid var(--border)" : "none" }}>
                             <div style={{ fontFamily: "var(--mono)", fontSize: "0.54rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)", marginBottom: 4 }}>{label}</div>
-                            <div style={{ fontFamily: "var(--mono)", fontSize: "0.9rem", color: highlight ? (isPositive ? "#2ed573" : "#cf6357") : "var(--text)" }}>{value}</div>
+                            <div style={{ fontFamily: "var(--mono)", fontSize: "0.9rem", color }}>{value}</div>
                           </div>
                         ))}
                       </div>
-                      <div style={{ padding: "10px 20px", borderTop: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.56rem", color: "var(--text-dim)", lineHeight: 1.6 }}>
-                        Rent estimate based on GTA 2026 averages for {bedCapped}bd in {nbhd||"this area"}. Expenses assume 30% of rent (property tax, maintenance, insurance). Not financial advice.
+                      <div style={{ padding: "10px 20px", borderTop: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.56rem", color: "var(--text-dim)", lineHeight: 1.6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span>Rent estimate for {Math.min(Math.max(beds,0),4)}bd in {nbhd||"this area"}. Expenses 30% of rent. Not financial advice.</span>
+                        <a href="/strategy" style={{ color: "var(--accent)", fontFamily: "var(--mono)", fontSize: "0.52rem", letterSpacing: "0.1em", textTransform: "uppercase" }}>Find My Strategy →</a>
                       </div>
                     </div>
-                  );
+                  </>);
                 })()}
               </>);
             })()}
