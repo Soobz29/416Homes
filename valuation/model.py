@@ -404,19 +404,19 @@ def main():
     if valuation_model.save_model():
         logger.info("Model training completed successfully")
         
-        # Print results
-        print(f"✅ Model Training Complete")
-        print(f"📊 Validation MAPE: {training_result['mape']:.2f}%")
-        print(f"🔢 Training samples: {training_result['training_samples']}")
-        print(f"✅ Validation samples: {training_result['validation_samples']}")
-        print(f"💾 Model saved to valuation_model.pkl")
-        
+        # Print results (ASCII-safe for Windows cp1252 console)
+        print("Model Training Complete")
+        print(f"Validation MAPE: {training_result['mape']:.2f}%")
+        print(f"Training samples: {training_result['training_samples']}")
+        print(f"Validation samples: {training_result['validation_samples']}")
+        print("Model saved to valuation_model.pkl")
+
         if training_result['mape'] < 10:
-            print("🎯 Model performance: EXCELLENT")
+            print("Model performance: EXCELLENT")
         elif training_result['mape'] < 15:
-            print("🎯 Model performance: GOOD")
+            print("Model performance: GOOD")
         else:
-            print("⚠️ Model performance: NEEDS IMPROVEMENT")
+            print("Model performance: NEEDS MORE DATA")
     else:
         logger.error("Failed to save model")
 
