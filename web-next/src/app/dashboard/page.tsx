@@ -249,6 +249,7 @@ export default function DashboardPage() {
   const [valuationResult, setValuationResult] = useState<null | { estimated_value: number; confidence: number; price_per_sqft?: number; market_analysis: string; feature_deltas?: Record<string, number> }>(null);
   const [valuationLoading, setValuationLoading] = useState(false);
   const [valuationError, setValuationError] = useState<string | null>(null);
+  const [autoRunValuation, setAutoRunValuation] = useState(false);
 
   /* Condition multipliers — applied to estimated_value on the frontend */
   const CONDITION_MULT: Record<string, number> = {
@@ -281,6 +282,28 @@ export default function DashboardPage() {
   useEffect(() => {
     if (activeTab === "listings") void loadListings();
   }, [activeTab, filters, listingsPage]);
+
+  // Auto-run valuation when switching to the tab via a listing's "Value" button
+  useEffect(() => {
+    if (!autoRunValuation || activeTab !== "valuation") return;
+    setAutoRunValuation(false);
+    setValuationLoading(true);
+    setValuationError(null);
+    setValuationResult(null);
+    fetchValuation({
+      neighbourhood: valuationForm.neighbourhood,
+      property_type: "",
+      city: valuationForm.city,
+      bedrooms: Number(valuationForm.bedrooms) || 0,
+      bathrooms: Number(valuationForm.bathrooms) || 0,
+      sqft: Number(valuationForm.sqft) || 0,
+      list_price: Number(valuationForm.list_price) || 0,
+    })
+      .then(r => setValuationResult(r))
+      .catch(() => setValuationError("Valuation failed — check API connection."))
+      .finally(() => setValuationLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRunValuation, activeTab]);
 
   // Tour product has its own dedicated page (/tours) — no in-dashboard fake progress.
 
@@ -961,7 +984,7 @@ export default function DashboardPage() {
                         onClick={() => setSelectedId(l.id === selectedId ? null : l.id)}
                         onValuate={() => {
                           setValuationForm({
-                            neighbourhood: "",
+                            neighbourhood: l.neighbourhood || "",
                             city: l.city || "Toronto",
                             bedrooms: l.beds > 0 ? String(l.beds) : "",
                             bathrooms: l.baths > 0 ? String(l.baths) : "",
@@ -970,6 +993,7 @@ export default function DashboardPage() {
                           });
                           setValuationResult(null);
                           setValuationError(null);
+                          setAutoRunValuation(true);
                           setActiveTab("valuation");
                         }}
                       />
