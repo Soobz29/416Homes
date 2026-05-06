@@ -39,41 +39,27 @@ function calcInvestor(price: number, beds: number, neighbourhood?: string) {
 export function InvestorPanel({
   price, beds, neighbourhood,
 }: { price: number; beds: number; neighbourhood?: string }) {
-  const [open, setOpen] = useState(false);
   if (!price || price < 10000) return null;
   const m = calcInvestor(price, beds, neighbourhood);
-  const rows: [string, string, boolean?][] = [
-    ["Down (20%)",      `$${m.down.toLocaleString("en-CA")}`],
-    ["Monthly mortgage",`$${m.mortgage.toLocaleString("en-CA")}`],
-    ["Est. rent / mo",  `$${m.rent.toLocaleString("en-CA")}`],
-    ["Gross yield",     `${m.grossYield.toFixed(2)}%`],
-    ["Cap rate",        `${m.capRate.toFixed(2)}%`],
-    ["Cash-on-cash",    `${m.cashOnCash.toFixed(2)}%`, true],
-  ];
+  // Compact always-visible strip: mortgage | rent | yield | c-o-c
   return (
-    <div style={{ borderTop: "1px solid var(--border)", marginTop: 10 }} onClick={e => e.stopPropagation()}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{
-          width: "100%", padding: "7px 0", background: "transparent", border: "none",
-          fontFamily: "var(--mono)", fontSize: "0.56rem", letterSpacing: "0.1em",
-          textTransform: "uppercase" as const, color: "var(--text-dim)", cursor: "pointer",
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-        }}
-      >
-        <span>◈ Investor View</span>
-        <span style={{ fontSize: "0.5rem" }}>{open ? "▲" : "▼"}</span>
-      </button>
-      {open && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1, background: "var(--border)", marginBottom: 2 }}>
-          {rows.map(([label, value, highlight]) => (
-            <div key={label} style={{ background: "var(--bg)", padding: "8px 12px" }}>
-              <div style={{ fontFamily: "var(--mono)", fontSize: "0.52rem", color: "var(--text-dim)", textTransform: "uppercase" as const, letterSpacing: "0.08em", marginBottom: 2 }}>{label}</div>
-              <div style={{ fontFamily: "var(--mono)", fontSize: "0.78rem", color: highlight ? (m.cashOnCash > 0 ? "#2ed573" : "#cf6357") : "var(--text)" }}>{value}</div>
-            </div>
-          ))}
-        </div>
-      )}
+    <div style={{ borderTop: "1px solid var(--border)", marginTop: 10, paddingTop: 8 }} onClick={e => e.stopPropagation()}>
+      <div style={{ fontFamily: "var(--mono)", fontSize: "0.5rem", textTransform: "uppercase" as const, letterSpacing: "0.1em", color: "var(--text-dim)", marginBottom: 6 }}>
+        ◈ Investor · 20% dn · 25yr · 6.5%
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 1, background: "var(--border)" }}>
+        {([
+          ["Mortgage/mo", `$${m.mortgage.toLocaleString("en-CA")}`, false],
+          ["Est. rent",   `$${m.rent.toLocaleString("en-CA")}`,     false],
+          ["Gross yld",   `${m.grossYield.toFixed(1)}%`,            false],
+          ["Cash-on-cash",`${m.cashOnCash.toFixed(1)}%`,            true],
+        ] as [string, string, boolean][]).map(([label, value, highlight]) => (
+          <div key={label} style={{ background: "var(--bg-elev)", padding: "6px 8px" }}>
+            <div style={{ fontFamily: "var(--mono)", fontSize: "0.48rem", color: "var(--text-dim)", textTransform: "uppercase" as const, letterSpacing: "0.06em", marginBottom: 2 }}>{label}</div>
+            <div style={{ fontFamily: "var(--mono)", fontSize: "0.72rem", color: highlight ? (m.cashOnCash > 0 ? "#2ed573" : "#cf6357") : "var(--text)", fontWeight: highlight ? 600 : 400 }}>{value}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

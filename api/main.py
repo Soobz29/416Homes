@@ -1795,6 +1795,32 @@ def _normalise_listing(row: dict) -> dict:
         or ""
     )
 
+    # fair_value: % delta between estimated value and list price.
+    # Positive = underpriced (good deal), negative = overpriced.
+    # Prefer the pre-computed DB column; fall back to a $/sqft estimate
+    # against the GTA 2026 median of $900/sqft when the column is absent.
+    _db_fair_value = row.get("fair_value")
+    if _db_fair_value is not None:
+        try:
+            fair_value_out: Optional[float] = float(_db_fair_value)
+        except (TypeError, ValueError):
+            fair_value_out = None
+    elif raw_area and row.get("price"):
+        try:
+            _price = float(row["price"])
+            _sqft  = float(raw_area)
+            _ppsf  = _price / _sqft if _sqft > 0 else None
+            if _ppsf and _price > 0:
+                _gta_median   = 900.0  # GTA 2026 median $/sqft
+                _est_value    = _gta_median * _sqft
+                fair_value_out = round((_est_value - _price) / _price * 100, 1)
+            else:
+                fair_value_out = None
+        except (TypeError, ValueError, ZeroDivisionError):
+            fair_value_out = None
+    else:
+        fair_value_out = None
+
     return {
         "id":             row.get("id", ""),
         "address":        addr,
@@ -1804,6 +1830,7 @@ def _normalise_listing(row: dict) -> dict:
         # Dashboard expects 'area'; source data may use 'sqft' (Supabase) or 'area' (last_scan JSON).
         "area":           ("" if raw_area is None else str(raw_area)),
         "city":           str(row.get("city") or ""),
+        "neighbourhood":  str(row.get("neighbourhood") or row.get("area_name") or ""),
         "lat":            row.get("lat"),
         "lng":            row.get("lng"),
         "source":         row.get("source", "unknown"),
@@ -1816,6 +1843,8 @@ def _normalise_listing(row: dict) -> dict:
                               row.get("city"),
                               addr,
                           ),
+        "fair_value":     fair_value_out,
+        "dom":            row.get("dom"),
         "is_assignment":  _detect_is_assignment(row),
         "floor_plan_url": floor_plan_url or None,
     }
