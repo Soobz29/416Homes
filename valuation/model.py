@@ -70,14 +70,24 @@ class ValuationModel:
         if not _DS_ENABLED:
             raise RuntimeError("Valuation model disabled for minimal Railway deployment")
         try:
-            _key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
-            client = create_client(os.getenv("SUPABASE_URL"), _key)
-            
+            # Use service role key to bypass RLS for training data access
+            supabase_key = (
+                os.getenv("SUPABASE_SERVICE_ROLE_KEY") or
+                os.getenv("SUPABASE_KEY")
+            )
+            client = create_client(os.getenv("SUPABASE_URL"), supabase_key)
+
             # Get sold comps for training
             result = client.table('sold_comps').select('*').execute()
-            
+
             if result.data:
                 df = pd.DataFrame(result.data)
+                # DB stores sqft as 'area' column — normalise to 'sqft' for the model
+                # Normalise column names to what the model expects
+                if 'sold_price' in df.columns and 'price' not in df.columns:
+                    df = df.rename(columns={'sold_price': 'price'})
+                if 'area' in df.columns and 'sqft' not in df.columns:
+                    df = df.rename(columns={'area': 'sqft'})
                 logger.info(f"Loaded {len(df)} sold comps for training")
                 
                 # Data cleaning
@@ -93,13 +103,7 @@ class ValuationModel:
     
     def clean_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Clean and prepare training data"""
-
-        # HouseSigma comps use sold_price / area; normalise column names
-        if 'price' not in df.columns and 'sold_price' in df.columns:
-            df = df.rename(columns={'sold_price': 'price'})
-        if 'sqft' not in df.columns and 'area' in df.columns:
-            df = df.rename(columns={'area': 'sqft'})
-
+        
         # Remove rows with missing critical values
         df = df.dropna(subset=['price', 'bedrooms', 'bathrooms', 'sqft'])
         
@@ -162,8 +166,8 @@ class ValuationModel:
         
         # Split features and target
         X = df[self.feature_columns]
-        y = df[self.target_column]
-        
+        y = np.asarray(df[self.target_column], dtype=np.float32)
+
         # Split data
         X_train, X_val, y_train, y_val = train_test_split(
             X, y, test_size=0.2, random_state=42
