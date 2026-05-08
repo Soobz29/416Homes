@@ -228,7 +228,7 @@ export default function ScrollExpandHero({
                       padding: "5px 12px", fontFamily: "var(--mono)", fontSize: "0.52rem",
                       letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)",
                     }}>
-                      3D GAUSSIAN SPLAT · DRAG TO EXPLORE
+                      3D IMMERSIVE TOUR · DRAG TO EXPLORE
                     </div>
                   )}
 

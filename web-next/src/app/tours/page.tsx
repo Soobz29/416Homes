@@ -5,8 +5,9 @@ import { useState, useEffect, useRef } from "react";
 import HouseLogo from "@/components/HouseLogo";
 import ScrollExpandHero from "@/components/ui/scroll-expand-hero";
 
-// Public Luma AI 3D Gaussian Splat capture — used for the demo hero
-const DEMO_SPLAT_EMBED = "https://lumalabs.ai/embed/31d69d18-0b00-4c65-add2-dc67f1bb5f4b?mode=sparkles&background=%230a0a08&color=%23c8a96e&showTitle=false&loadBg=true&logoPosition=bottom-left&boundingBox=false&boundingBoxScaled=true&hasTransparency=false";
+// Matterport 3D walkthrough demo — confirmed working model (see CLAUDE.md)
+// When users submit their own Luma AI / Polycam embed URL, that replaces this in /tours/{id}
+const DEMO_SPLAT_EMBED = "https://my.matterport.com/show/?m=jm5WwEA3HUN&play=1&qs=1&lang=en&title=0&tourcta=0&help=0";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://fouronesixhomes-mcr6b.ondigitalocean.app").replace(/\/$/, "");
 
