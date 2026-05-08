@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import dynamic from "next/dynamic";
 
 const PanoramaViewer = dynamic(() => import("@/components/PanoramaViewer"), { ssr: false });
+const SplatViewer = dynamic(() => import("@/components/SplatViewer"), { ssr: false });
 
 const API_BASE = (
   process.env.NEXT_PUBLIC_API_URL ||
@@ -24,6 +25,7 @@ interface Manifest {
   address?: string;
   stock_photos?: boolean;
   embed_url?: string;
+  splat_url?: string;
 }
 
 // ---- Demo manifest ----
@@ -224,6 +226,40 @@ export default function TourViewerPage() {
           <a href="/tours" style={{ fontFamily: FONT_MONO, fontSize: "0.7rem", color: SUBTEXT, textDecoration: "none" }}>← Back</a>
         </header>
         <iframe src={manifest.embed_url} style={{ width: "100%", height: `calc(100dvh - ${HEADER_H}px)`, border: "none", display: "block" }} allow="fullscreen; vr; xr-spatial-tracking" title="3D Virtual Tour" />
+      </div>
+    );
+  }
+
+  // ── 3D Gaussian Splat viewer ──
+  if (manifest.splat_url) {
+    return (
+      <div style={{ minHeight: "100dvh", background: "transparent", color: TEXT, fontFamily: FONT_MONO }}>
+        <header className="tour-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1rem 2.5rem", borderBottom: `1px solid ${GOLD_DIM}`, background: "rgba(10,10,8,0.95)", position: "sticky", top: 0, zIndex: 40, height: HEADER_H, boxSizing: "border-box" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem", minWidth: 0 }}>
+            <span style={{ fontFamily: FONT_DISPLAY, fontWeight: 900, fontSize: "1rem" }}><span style={{ color: GOLD }}>416</span>Homes</span>
+            <span style={{ fontFamily: FONT_MONO, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.1em", color: SUBTEXT }}>3D Gaussian Splat</span>
+            {manifest.listing_url && !manifest.listing_url.startsWith("splat://") && (
+              <a className="tour-title" href={manifest.listing_url} target="_blank" rel="noreferrer" style={{ fontFamily: FONT_MONO, fontSize: "0.68rem", color: GOLD, textDecoration: "none", borderBottom: `1px solid ${GOLD_DIM}`, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "28ch" }}>View Listing ↗</a>
+            )}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexShrink: 0 }}>
+            <span style={{ fontFamily: FONT_MONO, fontSize: "0.58rem", color: SUBTEXT, letterSpacing: "0.06em" }}>DRAG · SCROLL · WASD</span>
+            <a href="/tours" style={{ fontFamily: FONT_MONO, fontSize: "0.7rem", color: SUBTEXT, textDecoration: "none" }}>← Back</a>
+          </div>
+        </header>
+        <div style={{ position: "relative", height: `calc(100dvh - ${HEADER_H}px)` }}>
+          <SplatViewer splatUrl={manifest.splat_url} />
+          <div style={{
+            position: "absolute", top: 14, left: 14,
+            fontFamily: FONT_MONO, fontSize: "0.5rem",
+            letterSpacing: "0.14em", textTransform: "uppercase",
+            color: SUBTEXT,
+            background: "rgba(10,10,8,0.72)", padding: "5px 12px",
+            border: `1px solid ${GOLD_DIM}`, pointerEvents: "none",
+          }}>
+            3D GAUSSIAN SPLAT · DRAG TO NAVIGATE
+          </div>
+        </div>
       </div>
     );
   }
