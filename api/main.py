@@ -1245,6 +1245,7 @@ class TourJobRequest(BaseModel):
     customer_email: str
     customer_name: Optional[str] = ""
     photo_urls: Optional[List[str]] = None   # pre-uploaded photos (skips scraping)
+    embed_url: Optional[str] = None          # Luma AI / Polycam embed URL (3D scan path)
 
 class TourCheckoutRequest(BaseModel):
     listing_url: str
@@ -1267,6 +1268,31 @@ async def create_tour_job(request: TourJobRequest, background_tasks: BackgroundT
     if not supabase_client:
         raise HTTPException(status_code=503, detail="Database unavailable")
     import json as _json
+
+    # Fast-path: embed URL (Luma AI / Polycam 3D scan) — no pipeline needed
+    if request.embed_url:
+        jid = str(uuid.uuid4())
+        now = datetime.now(timezone.utc).isoformat()
+        app_url = os.getenv("APP_URL", "").split(",")[0].strip()
+        tour_url = f"{app_url}/tours/{jid}"
+        try:
+            supabase_client.table("tour_jobs").insert({
+                "id": jid,
+                "listing_url": request.embed_url,
+                "customer_email": request.customer_email,
+                "customer_name": request.customer_name or request.customer_email.split("@")[0],
+                "status": "completed",
+                "progress": 100,
+                "photo_manifest": {"embed_url": request.embed_url, "rooms": []},
+                "tour_url": tour_url,
+                "created_at": now,
+                "updated_at": now,
+            }).execute()
+        except Exception as e:
+            logger.error("Failed to create embed tour job: %s", e)
+            raise HTTPException(status_code=500, detail="Failed to create tour job")
+        return TourJobResponse(id=jid, status="completed", progress=100, tour_url=tour_url)
+
     # Encode pre-uploaded photos into listing_url so no schema change needed
     if request.photo_urls:
         listing_url = "upload://" + _json.dumps(request.photo_urls)
@@ -1292,6 +1318,65 @@ async def create_tour_job(request: TourJobRequest, background_tasks: BackgroundT
         raise HTTPException(status_code=500, detail="Failed to create tour job")
     background_tasks.add_task(_run_tour_job, jid)
     return {"id": jid, "status": "pending"}
+
+@app.post("/api/splat-upload")
+async def splat_upload(
+    file: UploadFile = File(...),
+    customer_email: str = Form(...),
+):
+    """Upload a .splat / .ply / .ksplat file for a 3D Gaussian Splat tour.
+    Stores the file in Supabase Storage bucket 'splat-tours' and creates a
+    completed tour_jobs record immediately (no pipeline run needed)."""
+    if not supabase_client:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in {".splat", ".ply", ".ksplat"}:
+        raise HTTPException(status_code=400, detail="Unsupported file type. Use .splat, .ply, or .ksplat")
+
+    contents = await file.read()
+    max_bytes = 200 * 1024 * 1024  # 200 MB
+    if len(contents) > max_bytes:
+        raise HTTPException(status_code=413, detail="File too large (max 200 MB)")
+
+    file_id = str(uuid.uuid4())
+    storage_path = f"splats/{file_id}{ext}"
+
+    try:
+        supabase_client.storage.from_("splat-tours").upload(
+            path=storage_path,
+            file=contents,
+            file_options={"content-type": "application/octet-stream"},
+        )
+        public_url = supabase_client.storage.from_("splat-tours").get_public_url(storage_path)
+    except Exception as e:
+        logger.error("Splat file upload to Supabase Storage failed: %s", e)
+        raise HTTPException(status_code=500, detail="File storage failed")
+
+    jid = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    app_url = os.getenv("APP_URL", "").split(",")[0].strip()
+    tour_url = f"{app_url}/tours/{jid}"
+
+    try:
+        supabase_client.table("tour_jobs").insert({
+            "id": jid,
+            "listing_url": f"splat://{file_id}",
+            "customer_email": customer_email,
+            "customer_name": customer_email.split("@")[0],
+            "status": "completed",
+            "progress": 100,
+            "photo_manifest": {"splat_url": public_url, "rooms": []},
+            "tour_url": tour_url,
+            "created_at": now,
+            "updated_at": now,
+        }).execute()
+    except Exception as e:
+        logger.error("Failed to create splat tour job record: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to create tour record")
+
+    return {"job_id": jid, "splat_url": public_url, "tour_url": f"/tours/{jid}"}
+
 
 @app.get("/api/tour-jobs/{job_id}", response_model=TourJobResponse)
 async def get_tour_job(job_id: str):

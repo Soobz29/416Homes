@@ -66,10 +66,13 @@ export default function ToursPage() {
   const [selectedRoom, setSelectedRoom] = useState<RoomKey>("living");
   const [url, setUrl] = useState("");
   const [email, setEmail] = useState("");
-  const [inputMode, setInputMode] = useState<"url" | "upload">("url");
+  const [inputMode, setInputMode] = useState<"url" | "upload" | "splat">("url");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [filePreviewUrls, setFilePreviewUrls] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [splatEmbedUrl, setSplatEmbedUrl] = useState("");
+  const [splatFile, setSplatFile] = useState<File | null>(null);
+  const splatFileInputRef = useRef<HTMLInputElement>(null);
   const [paid, setPaid] = useState(false);
   const [progress, setProgress] = useState(0);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -112,7 +115,38 @@ export default function ToursPage() {
     setSubmitting(true);
     setTourError(null);
     try {
-      if (inputMode === "upload") {
+      if (inputMode === "splat") {
+        if (!splatEmbedUrl.trim() && !splatFile) {
+          alert("Paste an embed URL or upload a .splat file");
+          setSubmitting(false);
+          return;
+        }
+        if (splatEmbedUrl.trim()) {
+          // Path A — embed URL (Luma AI, Polycam, etc.)
+          const jobRes = await fetch(`${API_BASE}/api/tour-jobs`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ embed_url: splatEmbedUrl.trim(), customer_email: email }),
+          });
+          if (!jobRes.ok) throw new Error("Could not create tour job. Try again.");
+          const jobData = await jobRes.json();
+          setJobId(jobData.id);
+        } else if (splatFile) {
+          // Path B — file upload
+          setUploading(true);
+          try {
+            const formData = new FormData();
+            formData.append("file", splatFile);
+            formData.append("customer_email", email);
+            const uploadRes = await fetch(`${API_BASE}/api/splat-upload`, { method: "POST", body: formData });
+            if (!uploadRes.ok) throw new Error("Splat upload failed");
+            const uploadData = await uploadRes.json();
+            setJobId(uploadData.job_id);
+            // job is already completed — set tour URL directly and skip polling
+            setTourUrl(uploadData.tour_url);
+            setProgress(100);
+          } finally { setUploading(false); }
+        }
+      } else if (inputMode === "upload") {
         if (selectedFiles.length === 0) { alert("Please select at least one photo"); setSubmitting(false); return; }
         setUploading(true);
         try {
@@ -328,24 +362,26 @@ export default function ToursPage() {
 
                 {/* Input mode toggle */}
                 <div style={{ display: "flex", marginBottom: 16, border: "1px solid var(--border)" }}>
-                  {(["url", "upload"] as const).map(mode => (
+                  {(["url", "upload", "splat"] as const).map(mode => (
                     <button key={mode} onClick={() => setInputMode(mode)} style={{
-                      flex: 1, padding: "9px 6px", border: "none",
+                      flex: 1, padding: "9px 4px", border: "none",
                       background: inputMode === mode ? "var(--accent)" : "transparent",
                       color: inputMode === mode ? "var(--bg)" : "var(--text-mute)",
-                      fontFamily: "var(--mono)", fontSize: "0.6rem", fontWeight: 700,
-                      letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer",
+                      fontFamily: "var(--mono)", fontSize: "0.55rem", fontWeight: 700,
+                      letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer",
                     }}>
-                      {mode === "url" ? "Listing URL" : "Upload Photos"}
+                      {mode === "url" ? "Listing URL" : mode === "upload" ? "Upload Photos" : "3D Scan ★"}
                     </button>
                   ))}
                 </div>
 
-                {inputMode === "url" ? (
+                {inputMode === "url" && (
                   <FormField label="Listing URL">
                     <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://www.realtor.ca/..." style={inputStyle} />
                   </FormField>
-                ) : (
+                )}
+
+                {inputMode === "upload" && (
                   <FormField label={`Upload listing photos (up to 9)`}>
                     <div>
                       <label style={{
@@ -374,6 +410,64 @@ export default function ToursPage() {
                   </FormField>
                 )}
 
+                {inputMode === "splat" && (
+                  <div style={{ marginBottom: 16 }}>
+                    {/* 3D Scan explainer */}
+                    <div style={{ padding: "12px 14px", background: "rgba(200,169,110,0.06)", border: "1px solid rgba(200,169,110,0.2)", marginBottom: 16 }}>
+                      <div style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 8 }}>How it works</div>
+                      <div style={{ fontFamily: "var(--mono)", fontSize: "0.66rem", color: "var(--text-mute)", lineHeight: 1.7 }}>
+                        1. Scan with <strong style={{ color: "var(--text)" }}>Luma AI</strong> or <strong style={{ color: "var(--text)" }}>Polycam</strong> (free iOS/Android apps)<br />
+                        2. Export as Gaussian Splat or copy the share link<br />
+                        3. Paste the link below — your tour is ready instantly
+                      </div>
+                    </div>
+
+                    {/* Sub-option: embed URL */}
+                    <FormField label="Paste embed URL (Luma AI · Polycam · KIRI Engine)">
+                      <input
+                        value={splatEmbedUrl}
+                        onChange={e => { setSplatEmbedUrl(e.target.value); if (e.target.value) setSplatFile(null); }}
+                        placeholder="https://lumalabs.ai/embed/... or https://poly.cam/capture/..."
+                        style={inputStyle}
+                      />
+                    </FormField>
+
+                    {/* Divider */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "12px 0", fontFamily: "var(--mono)", fontSize: "0.58rem", color: "var(--text-dim)" }}>
+                      <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+                      or upload a file
+                      <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+                    </div>
+
+                    {/* Sub-option: file upload */}
+                    <label style={{
+                      display: "block", border: `2px dashed ${splatFile ? "var(--accent)" : "var(--border)"}`,
+                      padding: "16px 12px", textAlign: "center", cursor: "pointer",
+                      fontFamily: "var(--mono)", fontSize: "0.68rem",
+                      color: splatFile ? "var(--accent)" : "var(--text-mute)",
+                      transition: "border-color 0.2s, color 0.2s", lineHeight: 1.7,
+                    }}
+                      onMouseEnter={e => (e.currentTarget.style.borderColor = "var(--accent)")}
+                      onMouseLeave={e => (e.currentTarget.style.borderColor = splatFile ? "var(--accent)" : "var(--border)")}
+                    >
+                      <input
+                        ref={splatFileInputRef}
+                        type="file"
+                        accept=".splat,.ply,.ksplat"
+                        onChange={e => {
+                          const f = e.target.files?.[0] ?? null;
+                          setSplatFile(f);
+                          if (f) setSplatEmbedUrl("");
+                        }}
+                        style={{ display: "none" }}
+                      />
+                      {splatFile
+                        ? `${splatFile.name} (${(splatFile.size / 1024 / 1024).toFixed(1)} MB) ✓`
+                        : <>Drop .splat · .ply · .ksplat here<br /><span style={{ fontSize: "0.56rem" }}>max 200 MB</span></>}
+                    </label>
+                  </div>
+                )}
+
                 <FormField label="Delivery email">
                   <input value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" style={inputStyle} />
                 </FormField>
@@ -382,12 +476,14 @@ export default function ToursPage() {
                   <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-mute)" }}>Beta price</div>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
                     <div style={{ fontFamily: "var(--mono)", fontSize: "2.4rem", fontWeight: 700, color: "var(--accent)" }}>Free</div>
-                    <div style={{ fontFamily: "var(--mono)", fontSize: "0.6rem", color: "var(--text-dim)", letterSpacing: "0.1em", textTransform: "uppercase" }}>$49 CAD at launch</div>
+                    <div style={{ fontFamily: "var(--mono)", fontSize: "0.6rem", color: "var(--text-dim)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                      {inputMode === "splat" ? "$149 CAD at launch" : "$49 CAD at launch"}
+                    </div>
                   </div>
                 </div>
 
                 <PrimaryBtn onClick={handlePay} disabled={uploading || submitting}>
-                  {uploading ? "Uploading…" : submitting ? "Starting…" : "Generate tour →"}
+                  {uploading ? "Uploading…" : submitting ? "Starting…" : inputMode === "splat" ? "Create 3D Tour →" : "Generate tour →"}
                 </PrimaryBtn>
                 {tourError && !paid && (
                   <div style={{ marginTop: 12, padding: "10px 12px", border: "1px solid #cf6357", background: "rgba(207,99,87,0.08)", color: "#ffb4a8", fontFamily: "var(--mono)", fontSize: "0.72rem", lineHeight: 1.5 }}>
@@ -430,7 +526,7 @@ export default function ToursPage() {
                   </a>
                 )}
                 <button
-                  onClick={() => { setPaid(false); setProgress(0); setUrl(""); setEmail(""); setJobId(null); setTourUrl(null); setTourError(null); }}
+                  onClick={() => { setPaid(false); setProgress(0); setUrl(""); setEmail(""); setJobId(null); setTourUrl(null); setTourError(null); setSplatEmbedUrl(""); setSplatFile(null); }}
                   style={{ marginTop: 14, padding: "10px 20px", background: "transparent", border: "1px solid var(--border-strong)", color: "var(--accent)", fontFamily: "var(--mono)", fontSize: "0.68rem", letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer", width: "100%" }}
                 >
                   {tourError ? "Try again →" : "Order another →"}
