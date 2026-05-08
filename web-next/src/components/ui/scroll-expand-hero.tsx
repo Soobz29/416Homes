@@ -12,8 +12,10 @@ import { motion } from "framer-motion"
 import { MeshGradientBg } from "@/components/ui/mesh-gradient-bg"
 
 export interface ScrollExpandHeroProps {
-  mediaSrc: string
+  mediaSrc?: string
   posterSrc?: string
+  /** When set, renders an <iframe> instead of <video> (e.g. for Luma AI / 3D splat embeds) */
+  iframeSrc?: string
   /** Title split into two words at first space — left word moves left, rest moves right */
   title?: string
   /** Smaller label shown below the expanding frame */
@@ -31,6 +33,7 @@ export interface ScrollExpandHeroProps {
 export default function ScrollExpandHero({
   mediaSrc,
   posterSrc,
+  iframeSrc,
   title,
   date,
   scrollToExpand = "Scroll to expand preview",
@@ -175,26 +178,37 @@ export default function ScrollExpandHero({
                 }}
               >
                 <div className="relative w-full h-full">
-                  <video
-                    ref={videoRef}
-                    src={mediaSrc}
-                    poster={posterSrc}
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                    preload="auto"
-                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                  />
+                  {iframeSrc ? (
+                    <iframe
+                      src={iframeSrc}
+                      style={{ width: "100%", height: "100%", border: "none", display: "block" }}
+                      allow="fullscreen; vr; xr-spatial-tracking"
+                      title="3D Gaussian Splat Demo"
+                    />
+                  ) : (
+                    <video
+                      ref={videoRef}
+                      src={mediaSrc}
+                      poster={posterSrc}
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      preload="auto"
+                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                    />
+                  )}
 
-                  {/* Veil that lifts as you scroll */}
-                  <motion.div
-                    className="absolute inset-0"
-                    initial={{ opacity: 0.65 }}
-                    animate={{ opacity: 0.45 - scrollProgress * 0.35 }}
-                    transition={{ duration: 0.2 }}
-                    style={{ background: "rgba(5,6,10,0.4)", pointerEvents: "none" }}
-                  />
+                  {/* Veil that lifts as you scroll — skip for iframe (needs pointer events) */}
+                  {!iframeSrc && (
+                    <motion.div
+                      className="absolute inset-0"
+                      initial={{ opacity: 0.65 }}
+                      animate={{ opacity: 0.45 - scrollProgress * 0.35 }}
+                      transition={{ duration: 0.2 }}
+                      style={{ background: "rgba(5,6,10,0.4)", pointerEvents: "none" }}
+                    />
+                  )}
 
                   {/* Amber border that brightens while expanding */}
                   <div
@@ -206,40 +220,54 @@ export default function ScrollExpandHero({
                     }}
                   />
 
-                  {/* ── Mute / unmute toggle — bottom-right corner ── */}
-                  <button
-                    onClick={toggleMute}
-                    title={isMuted ? "Unmute" : "Mute"}
-                    style={{
-                      position: "absolute",
-                      bottom: 12,
-                      right: 12,
-                      zIndex: 20,
-                      width: 36,
-                      height: 36,
-                      background: "rgba(5,6,10,0.75)",
-                      border: "1px solid rgba(255,176,0,0.40)",
-                      color: "var(--accent)",
-                      fontFamily: "var(--mono)",
-                      fontSize: "0.85rem",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      backdropFilter: "blur(6px)",
-                      transition: "border-color 0.2s, background 0.2s",
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = "rgba(255,176,0,0.15)"
-                      e.currentTarget.style.borderColor = "rgba(255,176,0,0.70)"
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = "rgba(5,6,10,0.75)"
-                      e.currentTarget.style.borderColor = "rgba(255,176,0,0.40)"
-                    }}
-                  >
-                    {isMuted ? "🔇" : "🔊"}
-                  </button>
+                  {/* 3D label overlay for iframe mode */}
+                  {iframeSrc && (
+                    <div style={{
+                      position: "absolute", top: 12, left: 12, zIndex: 20, pointerEvents: "none",
+                      background: "rgba(5,6,10,0.82)", border: "1px solid rgba(255,176,0,0.35)",
+                      padding: "5px 12px", fontFamily: "var(--mono)", fontSize: "0.52rem",
+                      letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)",
+                    }}>
+                      3D GAUSSIAN SPLAT · DRAG TO EXPLORE
+                    </div>
+                  )}
+
+                  {/* ── Mute / unmute toggle — video mode only ── */}
+                  {!iframeSrc && (
+                    <button
+                      onClick={toggleMute}
+                      title={isMuted ? "Unmute" : "Mute"}
+                      style={{
+                        position: "absolute",
+                        bottom: 12,
+                        right: 12,
+                        zIndex: 20,
+                        width: 36,
+                        height: 36,
+                        background: "rgba(5,6,10,0.75)",
+                        border: "1px solid rgba(255,176,0,0.40)",
+                        color: "var(--accent)",
+                        fontFamily: "var(--mono)",
+                        fontSize: "0.85rem",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        backdropFilter: "blur(6px)",
+                        transition: "border-color 0.2s, background 0.2s",
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = "rgba(255,176,0,0.15)"
+                        e.currentTarget.style.borderColor = "rgba(255,176,0,0.70)"
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = "rgba(5,6,10,0.75)"
+                        e.currentTarget.style.borderColor = "rgba(255,176,0,0.40)"
+                      }}
+                    >
+                      {isMuted ? "🔇" : "🔊"}
+                    </button>
+                  )}
                 </div>
 
                 {/* Date / price label + scroll hint — below the frame */}

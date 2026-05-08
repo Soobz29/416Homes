@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import HouseLogo from "@/components/HouseLogo";
+import ScrollExpandHero from "@/components/ui/scroll-expand-hero";
+
+// Public Luma AI 3D Gaussian Splat capture — used for the demo hero
+const DEMO_SPLAT_EMBED = "https://lumalabs.ai/embed/31d69d18-0b00-4c65-add2-dc67f1bb5f4b?mode=sparkles&background=%230a0a08&color=%23c8a96e&showTitle=false&loadBg=true&logoPosition=bottom-left&boundingBox=false&boundingBoxScaled=true&hasTransparency=false";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://fouronesixhomes-mcr6b.ondigitalocean.app").replace(/\/$/, "");
 
@@ -230,10 +234,42 @@ export default function ToursPage() {
         )}
       </nav>
 
-      <div className="sec-wrap sec-pad-lg" style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 56px" }}>
+      {/* ── Hero — scroll-expanding 3D Gaussian Splat demo ─────────────── */}
+      <ScrollExpandHero
+        iframeSrc={DEMO_SPLAT_EMBED}
+        title="Scan it. Share it."
+        date="$49 – $149 CAD"
+        scrollToExpand="Scroll to explore the 3D scan"
+      >
+        {/* Revealed after full expansion */}
+        <div className="sec-wrap" style={{ maxWidth: 1100, margin: "0 auto", padding: "56px 56px 40px", borderBottom: "1px solid var(--border)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, fontFamily: "var(--mono)", fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.18em", color: "var(--accent)", marginBottom: 20 }}>
+            <span style={{ height: 1, width: 28, background: "var(--accent)", flexShrink: 0 }} />
+            Live 3D Demo — drag to explore
+          </div>
+          <p style={{ fontFamily: "var(--mono)", fontSize: "0.88rem", color: "var(--text-mute)", maxWidth: "60ch", lineHeight: 1.8, marginBottom: 32 }}>
+            Scan your listing with a free app. We host the 3D scene and give you a
+            shareable link. Or paste your listing URL — we&apos;ll classify every room
+            photo and build a hosted tour in under 5 minutes.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "18px 32px", borderTop: "1px solid var(--border)", paddingTop: 28, marginBottom: 36 }}>
+            {[["3D Gaussian Splat", "$149 CAD"], ["Photo Room Tour", "$49 CAD"], ["Delivery", "< 5 min"]].map(([l, v]) => (
+              <div key={l}>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "0.5rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--text-dim)", marginBottom: 6 }}>{l}</div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "1rem", fontWeight: 600, color: "var(--text)" }}>{v}</div>
+              </div>
+            ))}
+          </div>
+          <a href="#order" style={{ display: "inline-block", padding: "13px 28px", background: "var(--accent)", color: "var(--bg)", fontFamily: "var(--mono)", fontSize: "0.78rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", textDecoration: "none" }}>
+            Order a Tour →
+          </a>
+        </div>
+      </ScrollExpandHero>
+
+      <div id="order" className="sec-wrap sec-pad-lg" style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 56px" }}>
 
         {/* Header */}
-        <Eyebrow line>Virtual tour · $49</Eyebrow>
+        <Eyebrow line>Virtual tour · from $49</Eyebrow>
         <h1 style={{ fontFamily: "var(--mono)", fontSize: "clamp(2rem, 3.2vw, 3.2rem)", fontWeight: 700, lineHeight: 1.02, letterSpacing: "-0.015em", margin: "16px 0 12px" }}>
           Listing photos →{" "}
           <span style={{ color: "var(--accent)", background: "linear-gradient(180deg,transparent 60%,rgba(255,176,0,0.18) 60%)", padding: "0 4px" }}>
@@ -243,6 +279,7 @@ export default function ToursPage() {
         <p style={{ fontFamily: "var(--mono)", fontSize: "0.85rem", lineHeight: 1.7, color: "var(--text-mute)", maxWidth: "54ch", marginBottom: 40 }}>
           Gemini Vision classifies every photo by room, assembles a shareable tour,
           and gives you a public link and embed code. Delivered in under five minutes.
+          Or upload a 3D scan for a full Gaussian Splat experience.
         </p>
 
         {/* Demo — dollhouse + sidebar */}
