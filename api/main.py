@@ -763,11 +763,28 @@ async def get_listings(
         # Apply filters in-memory
         filtered = []
         for r in rows:
-            # Drop non-GTA listings unless a specific city is requested
+            # Drop non-GTA listings unless a specific city is requested.
+            # Two-stage check:
+            #  1. If city column is set and not in the GTA whitelist → drop
+            #  2. If city is empty, fall back to checking the address for known
+            #     non-GTA city names (Ottawa, London, Kingston, etc.) → drop
             if not city_filter:
                 _row_city = (r.get("city") or "").strip().lower()
-                if _row_city and _row_city not in _GTA_CITIES:
-                    continue
+                if _row_city:
+                    if _row_city not in _GTA_CITIES:
+                        continue
+                else:
+                    # city column empty — check address for non-GTA indicators
+                    _addr_low = (r.get("address") or "").lower()
+                    _NON_GTA = {
+                        "ottawa", "london", "kingston", "guelph", "kitchener",
+                        "waterloo", "windsor", "sudbury", "thunder bay",
+                        "barrie", "orillia", "collingwood", "peterborough",
+                        "cobourg", "belleville", "niagara", "st. catharines",
+                        "brantford", "cambridge", "stratford", "sarnia",
+                    }
+                    if any(f", {c}," in _addr_low or f", {c} " in _addr_low for c in _NON_GTA):
+                        continue
 
             p = _num(r.get("price"))
             if min_price is not None and (p is None or p < min_price):
@@ -792,11 +809,19 @@ async def get_listings(
                 if types_set:
                     # Infer canonical type using the same logic as _normalise_listing
                     inferred = _infer_property_type(r).lower()
-                    # Alias mapping: detached / semi-detached / semi / freehold → "house"
+                    # Alias mapping:
+                    #   detached / semi-detached / semi / freehold → "house"
+                    #   apartment / apt → "condo"  (same bucket — can't reliably distinguish)
                     _HOUSE_ALIASES = {"detached", "semi detached", "semi", "house", "freehold"}
+                    _CONDO_ALIASES = {"condo", "apartment", "apt", "stacked"}
                     normalised_types_set = set()
                     for t in types_set:
-                        normalised_types_set.add("house" if t in _HOUSE_ALIASES else t)
+                        if t in _HOUSE_ALIASES:
+                            normalised_types_set.add("house")
+                        elif t in _CONDO_ALIASES:
+                            normalised_types_set.add("condo")
+                        else:
+                            normalised_types_set.add(t)
                     normalised_row = "house" if inferred in _HOUSE_ALIASES else inferred
                     # Exact match — prevents "house" matching "townhouse" via substring
                     if normalised_row not in normalised_types_set:
@@ -1899,10 +1924,21 @@ def _infer_property_type(row: dict) -> str:
             return str(_raw).strip()
 
     _addr = (row.get("address") or "").lower()
+
+    # Townhouse indicators — must be checked BEFORE the condo unit-number pattern
+    # because addresses like "th-23-100 Arbors Lane" match both.
+    if (
+        "townhouse" in _addr or "town house" in _addr
+        or re.match(r"^th[-\s]", _addr)          # "th-23-100 Arbors Ln"
+        or re.search(r"\bth\s*#?\s*\d", _addr)   # "TH 4 - 123 Main St"
+        or re.search(r"\btownhome\b", _addr)
+    ):
+        return "Townhouse"
+
+    # Apartment / condo indicators: unit-number before street number, or explicit keywords
     if re.search(r"\b\d{1,4}[-–]\d{1,5}\b|^\d{1,4}-|#\s*\d|\bunit\b|\bapt\b|\bph\b|\bsuite\b|\bpenth", _addr):
         return "Condo"
-    if "townhouse" in _addr or "town house" in _addr:
-        return "Townhouse"
+
     return "House"
 
 

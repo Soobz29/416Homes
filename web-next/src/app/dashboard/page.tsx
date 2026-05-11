@@ -101,9 +101,7 @@ const PROPERTY_TYPES = [
   { value: "Condo", label: "Condo" },
   { value: "Apartment", label: "Apartment" },
   { value: "Townhouse", label: "Townhouse" },
-  { value: "Detached", label: "Detached" },
-  { value: "Semi-Detached", label: "Semi-Detached" },
-  { value: "House", label: "House" },
+  { value: "House", label: "House / Detached" },
 ];
 
 const BED_OPTIONS = [
