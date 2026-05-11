@@ -764,27 +764,26 @@ async def get_listings(
         filtered = []
         for r in rows:
             # Drop non-GTA listings unless a specific city is requested.
-            # Two-stage check:
-            #  1. If city column is set and not in the GTA whitelist → drop
-            #  2. If city is empty, fall back to checking the address for known
-            #     non-GTA city names (Ottawa, London, Kingston, etc.) → drop
+            # Old scrapers stored city='Toronto' even for Ottawa/Guelph listings,
+            # so we ALWAYS check the address regardless of what city says.
             if not city_filter:
                 _row_city = (r.get("city") or "").strip().lower()
-                if _row_city:
-                    if _row_city not in _GTA_CITIES:
-                        continue
-                else:
-                    # city column empty — check address for non-GTA indicators
-                    _addr_low = (r.get("address") or "").lower()
-                    _NON_GTA = {
-                        "ottawa", "london", "kingston", "guelph", "kitchener",
-                        "waterloo", "windsor", "sudbury", "thunder bay",
-                        "barrie", "orillia", "collingwood", "peterborough",
-                        "cobourg", "belleville", "niagara", "st. catharines",
-                        "brantford", "cambridge", "stratford", "sarnia",
-                    }
-                    if any(f", {c}," in _addr_low or f", {c} " in _addr_low for c in _NON_GTA):
-                        continue
+                # Stage 1: city column is set and not in GTA whitelist → drop
+                if _row_city and _row_city not in _GTA_CITIES:
+                    continue
+                # Stage 2: always scan the address for explicit non-GTA city names
+                # (catches old rows that have city='Toronto' but address says 'Ottawa')
+                _addr_low = (r.get("address") or "").lower()
+                _NON_GTA_ADDR = {
+                    "ottawa", "london", "kingston", "guelph", "kitchener",
+                    "waterloo", "windsor", "sudbury", "thunder bay",
+                    "barrie", "orillia", "collingwood", "peterborough",
+                    "cobourg", "belleville", "niagara falls", "st. catharines",
+                    "brantford", "cambridge", "stratford", "sarnia",
+                    "stittsville", "kanata", "nepean", "gloucester",
+                }
+                if any(f", {c}," in _addr_low or _addr_low.endswith(f", {c}") for c in _NON_GTA_ADDR):
+                    continue
 
             p = _num(r.get("price"))
             if min_price is not None and (p is None or p < min_price):
