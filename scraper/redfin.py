@@ -10,6 +10,21 @@ from scrapling.fetchers import StealthyFetcher
 
 logger = logging.getLogger(__name__)
 
+_GTA_CITY_KEYWORDS = [
+    "toronto", "north york", "scarborough", "etobicoke", "downtown",
+    "mississauga", "brampton", "vaughan", "markham", "richmond hill",
+    "oakville", "burlington", "ajax", "pickering", "whitby", "oshawa",
+    "milton", "hamilton", "newmarket", "aurora", "caledon", "halton hills",
+]
+
+def _city_from_text(text: str, fallback: str = "Toronto") -> str:
+    """Infer GTA city from an address or card text string."""
+    lower = text.lower()
+    for city in _GTA_CITY_KEYWORDS:
+        if city in lower:
+            return city.title()
+    return fallback
+
 REDFIN_URLS = {
     "toronto": "https://www.redfin.ca/city/14075/ON/Toronto",
     "mississauga": "https://www.redfin.ca/city/16964/ON/Mississauga",
@@ -101,7 +116,7 @@ async def scrape_with_scrapling(area: str) -> List[Dict[str, Any]]:
                     "bedrooms": "",
                     "bathrooms": "",
                     "area": sqft,
-                    "city": "Toronto" if area.lower() in ("gta", "toronto") else area.title(),
+                    "city": _city_from_text(address or "", fallback="Toronto" if area.lower() in ("gta", "toronto") else area.title()),
                     "lat": None,
                     "lng": None,
                     "source": "redfin",

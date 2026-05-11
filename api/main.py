@@ -749,9 +749,26 @@ async def get_listings(
             except Exception:
                 return None
 
+        # GTA-only city whitelist — drop listings whose stored city is outside the GTA.
+        # (Scrapers like Kijiji/Redfin occasionally capture non-GTA listings.)
+        _GTA_CITIES = {
+            "toronto", "north york", "scarborough", "etobicoke", "downtown",
+            "mississauga", "brampton", "vaughan", "markham", "richmond hill",
+            "oakville", "burlington", "ajax", "ajax & pickering", "pickering",
+            "whitby", "oshawa", "milton", "hamilton", "richmond",
+            "newmarket", "aurora", "georgina", "king", "caledon",
+            "halton hills", "grimsby",
+        }
+
         # Apply filters in-memory
         filtered = []
         for r in rows:
+            # Drop non-GTA listings unless a specific city is requested
+            if not city_filter:
+                _row_city = (r.get("city") or "").strip().lower()
+                if _row_city and _row_city not in _GTA_CITIES:
+                    continue
+
             p = _num(r.get("price"))
             if min_price is not None and (p is None or p < min_price):
                 continue
@@ -759,20 +776,23 @@ async def get_listings(
                 continue
 
             b = _num(r.get("bedrooms"))
-            if bedrooms is not None and bedrooms != "" and b is not None and b < float(bedrooms):
-                continue
+            if bedrooms is not None and bedrooms != "":
+                # Skip listings with unknown bedroom count OR fewer than requested
+                if b is None or b < float(bedrooms):
+                    continue
 
             ba = _num(r.get("bathrooms"))
-            if bathrooms is not None and bathrooms != "" and ba is not None and ba < float(bathrooms):
-                continue
+            if bathrooms is not None and bathrooms != "":
+                # Skip listings with unknown bathroom count OR fewer than requested
+                if ba is None or ba < float(bathrooms):
+                    continue
 
             if property_types:
                 types_set = {t.strip().lower() for t in property_types.split(",") if t.strip()}
                 if types_set:
                     row_type = (r.get("property_type") or r.get("strategy") or "").lower()
                     row_type = row_type.replace("-", " ").replace("_", " ")
-                    # Alias mapping: detached / semi-detached / semi → "house"
-                    # so that selecting "Detached" or "Semi-Detached" matches inferred "House"
+                    # Alias mapping: detached / semi-detached / semi / freehold → "house"
                     _HOUSE_ALIASES = {"detached", "semi detached", "semi", "house", "freehold"}
                     normalised_types_set = set()
                     for t in types_set:
@@ -788,7 +808,8 @@ async def get_listings(
                             normalised_row = "condo"
                         else:
                             normalised_row = "house"
-                    if not any(t in normalised_row or normalised_row in t for t in normalised_types_set):
+                    # Use exact match to avoid "house" matching "townhouse" via substring
+                    if normalised_row not in normalised_types_set:
                         continue
 
             if is_assignment is not None:

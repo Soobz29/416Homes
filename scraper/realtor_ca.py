@@ -335,6 +335,8 @@ async def _scrape_region(client, headers: dict, name: str, coords: dict, min_pri
         "PropertyTypeGroupID": "1",
         "Version": "7.0",
         "CurrentPage": "1",
+        "SortBy": "6",      # 6 = Date Listed (newest first) — ensures we pick up new listings each scan
+        "SortOrder": "D",   # D = Descending
     }
 
     # ── Primary: curl_cffi Chrome impersonation (bypasses Cloudflare) ──────────

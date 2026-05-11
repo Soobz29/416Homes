@@ -10,6 +10,23 @@ from scrapling.fetchers import StealthyFetcher
 
 logger = logging.getLogger(__name__)
 
+# GTA city names (lowercase) — used to infer city from listing title/address
+_GTA_CITY_KEYWORDS = [
+    "toronto", "north york", "scarborough", "etobicoke", "downtown",
+    "mississauga", "brampton", "vaughan", "markham", "richmond hill",
+    "oakville", "burlington", "ajax", "pickering", "whitby", "oshawa",
+    "milton", "hamilton", "newmarket", "aurora", "caledon", "halton hills",
+    "king city", "stouffville", "aurora", "bolton",
+]
+
+def _city_from_text(text: str, fallback: str = "Toronto") -> str:
+    """Infer GTA city from a listing title or address string."""
+    lower = text.lower()
+    for city in _GTA_CITY_KEYWORDS:
+        if city in lower:
+            return city.title()
+    return fallback
+
 KIJIJI_URLS = {
     "toronto": "https://www.kijiji.ca/b-real-estate/gta-greater-toronto-area/c34l1700272",
     "mississauga": "https://www.kijiji.ca/b-real-estate/mississauga-peel-region/c34l1700276",
@@ -101,7 +118,7 @@ async def scrape_with_scrapling(area: str) -> List[Dict[str, Any]]:
                     "bedrooms": "",
                     "bathrooms": "",
                     "area": sqft,
-                    "city": "Toronto" if area.lower() in ("gta", "toronto") else area.title(),
+                    "city": _city_from_text(title or "", fallback="Toronto" if area.lower() in ("gta", "toronto") else area.title()),
                     "lat": None,
                     "lng": None,
                     "source": "kijiji",
