@@ -790,25 +790,15 @@ async def get_listings(
             if property_types:
                 types_set = {t.strip().lower() for t in property_types.split(",") if t.strip()}
                 if types_set:
-                    row_type = (r.get("property_type") or r.get("strategy") or "").lower()
-                    row_type = row_type.replace("-", " ").replace("_", " ")
+                    # Infer canonical type using the same logic as _normalise_listing
+                    inferred = _infer_property_type(r).lower()
                     # Alias mapping: detached / semi-detached / semi / freehold → "house"
                     _HOUSE_ALIASES = {"detached", "semi detached", "semi", "house", "freehold"}
                     normalised_types_set = set()
                     for t in types_set:
-                        if t in _HOUSE_ALIASES:
-                            normalised_types_set.add("house")
-                        else:
-                            normalised_types_set.add(t)
-                    normalised_row = "house" if row_type in _HOUSE_ALIASES else row_type
-                    # Also infer from address when row_type is still unknown
-                    if normalised_row in ("unknown", ""):
-                        _addr_check = (r.get("address") or "").lower()
-                        if re.search(r"\b\d{1,4}[-–]\d{1,5}\b|^\d{1,4}-|#\s*\d|\bunit\b|\bapt\b|\bph\b|\bsuite\b", _addr_check):
-                            normalised_row = "condo"
-                        else:
-                            normalised_row = "house"
-                    # Use exact match to avoid "house" matching "townhouse" via substring
+                        normalised_types_set.add("house" if t in _HOUSE_ALIASES else t)
+                    normalised_row = "house" if inferred in _HOUSE_ALIASES else inferred
+                    # Exact match — prevents "house" matching "townhouse" via substring
                     if normalised_row not in normalised_types_set:
                         continue
 
@@ -1887,6 +1877,35 @@ async def initiate_scan(background_tasks: BackgroundTasks):
 async def api_root():
     return JSONResponse(content={"message": "416Homes API is running", "dashboard": "/dashboard"})
 
+def _infer_property_type(row: dict) -> str:
+    """Infer property type from stored value, raw_data, or address pattern.
+
+    Priority:
+    1. Explicit non-unknown stored value
+    2. raw_data.property_type / PropertyType / type
+    3. Address contains unit/apt/# pattern → "Condo"
+    4. Address contains "townhouse" → "Townhouse"
+    5. Default → "House"
+    """
+    _stored = (row.get("property_type") or "").strip()
+    if _stored and _stored.lower() not in ("unknown", ""):
+        return _stored
+
+    _rd = row.get("raw_data") or {}
+    if isinstance(_rd, dict):
+        _raw = (_rd.get("property_type") or _rd.get("PropertyType") or
+                _rd.get("type") or _rd.get("propertyType") or "")
+        if _raw and str(_raw).lower() not in ("unknown", ""):
+            return str(_raw).strip()
+
+    _addr = (row.get("address") or "").lower()
+    if re.search(r"\b\d{1,4}[-–]\d{1,5}\b|^\d{1,4}-|#\s*\d|\bunit\b|\bapt\b|\bph\b|\bsuite\b|\bpenth", _addr):
+        return "Condo"
+    if "townhouse" in _addr or "town house" in _addr:
+        return "Townhouse"
+    return "House"
+
+
 def _normalise_listing(row: dict) -> dict:
     def _coerce_photo_urls(value: Any) -> List[str]:
         urls: List[str] = []
@@ -2017,28 +2036,7 @@ def _normalise_listing(row: dict) -> dict:
     else:
         fair_value_out = None
 
-    # Infer property_type from stored value or address pattern when not set.
-    # Scrapers don't currently populate property_type, so we derive it:
-    #   - explicit stored value → use it
-    #   - address contains unit/apt/# pattern → "Condo"
-    #   - address contains "Townhouse" hint → "Townhouse"
-    #   - otherwise → "House" (covers Detached & Semi-Detached)
-    _stored_type = (row.get("property_type") or "").strip()
-    if _stored_type and _stored_type.lower() not in ("unknown", ""):
-        inferred_type = _stored_type
-    else:
-        _addr_lower = addr.lower()
-        _rd2 = row.get("raw_data") or {}
-        _raw_type = (_rd2.get("property_type") or _rd2.get("PropertyType") or
-                     _rd2.get("type") or _rd2.get("propertyType") or "")
-        if _raw_type and str(_raw_type).lower() not in ("unknown", ""):
-            inferred_type = str(_raw_type).strip()
-        elif re.search(r"\b\d{1,4}[-–]\d{1,5}\b|^\d{1,4}-|#\s*\d|\bunit\b|\bapt\b|\bph\b|\bsuite\b|\bpenth", _addr_lower):
-            inferred_type = "Condo"
-        elif "townhouse" in _addr_lower or "town house" in _addr_lower:
-            inferred_type = "Townhouse"
-        else:
-            inferred_type = "House"
+    inferred_type = _infer_property_type(row)
 
     return {
         "id":             row.get("id", ""),
