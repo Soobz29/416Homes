@@ -1,5 +1,6 @@
 import uuid
 import asyncio
+import time
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Header, Request, UploadFile, File, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,9 +13,11 @@ from dotenv import load_dotenv
 import logging
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
+from collections import defaultdict
 import random
 import secrets
 import string
+from urllib.parse import urlparse
 
 from memory.store import memory_store, search_listings, replace_listings, embed_and_store_listings
 from valuation.model import market_analysis_from_ppsf
@@ -52,6 +55,69 @@ app = FastAPI(
     description="Toronto Real Estate Intelligence Platform",
     version="1.0.0"
 )
+
+_PUBLIC_TOUR_RATE_WINDOW_SECONDS = 60 * 60
+_PUBLIC_TOUR_RATE_LIMITS = {
+    "tour_jobs": 8,
+    "splat_upload": 3,
+}
+_PUBLIC_TOUR_RATE_STATE: dict[str, list[float]] = defaultdict(list)
+_ALLOWED_TOUR_EMBED_HOSTS = {
+    "my.matterport.com",
+    "matterport.com",
+    "lumalabs.ai",
+    "poly.cam",
+}
+
+
+def _normalize_public_email(raw_email: str) -> str:
+    email = (raw_email or "").strip().lower()
+    if "@" not in email or "." not in email.rsplit("@", 1)[-1]:
+        raise HTTPException(status_code=422, detail="A valid email address is required")
+    return email
+
+
+def _client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
+def _enforce_public_tour_rate_limit(request: Request, scope: str, email: str) -> None:
+    now = time.time()
+    limit = _PUBLIC_TOUR_RATE_LIMITS[scope]
+    ip = _client_ip(request)
+    keys = [f"{scope}:ip:{ip}", f"{scope}:email:{email}"]
+    cutoff = now - _PUBLIC_TOUR_RATE_WINDOW_SECONDS
+
+    for key in keys:
+        active = [ts for ts in _PUBLIC_TOUR_RATE_STATE[key] if ts > cutoff]
+        if len(active) >= limit:
+            raise HTTPException(
+                status_code=429,
+                detail="Too many tour requests from this email or network. Please try again later.",
+            )
+        active.append(now)
+        _PUBLIC_TOUR_RATE_STATE[key] = active
+
+
+def _validate_tour_embed_url(raw_url: str) -> str:
+    candidate = (raw_url or "").strip()
+    parsed = urlparse(candidate)
+    host = (parsed.netloc or "").lower()
+    if parsed.scheme not in {"http", "https"} or not host:
+        raise HTTPException(status_code=422, detail="Enter a valid 3D tour URL")
+    if host.startswith("www."):
+        host = host[4:]
+    if host not in _ALLOWED_TOUR_EMBED_HOSTS:
+        raise HTTPException(
+            status_code=422,
+            detail="Only Matterport, Luma AI, and Polycam share links are supported right now.",
+        )
+    return candidate
 
 # CORS middleware – restrict to APP_URL in production, localhost as fallback
 _allowed_origins = [o.strip() for o in os.getenv("APP_URL", "http://localhost:3000").split(",") if o.strip()]
@@ -1261,16 +1327,19 @@ class TourJobResponse(BaseModel):
     error_message: Optional[str] = None
 
 @app.post("/api/tour-jobs")
-async def create_tour_job(request: TourJobRequest, background_tasks: BackgroundTasks):
+async def create_tour_job(request: TourJobRequest, background_tasks: BackgroundTasks, http_request: Request):
     """Create a tour job directly (dev/internal use — bypasses Stripe).
     If photo_urls is provided, encodes them in listing_url as upload://[json] so
     the pipeline skips scraping and uses them directly."""
     if not supabase_client:
         raise HTTPException(status_code=503, detail="Database unavailable")
     import json as _json
+    customer_email = _normalize_public_email(request.customer_email)
+    _enforce_public_tour_rate_limit(http_request, "tour_jobs", customer_email)
 
     # Fast-path: embed URL (Luma AI / Polycam 3D scan) — no pipeline needed
     if request.embed_url:
+        embed_url = _validate_tour_embed_url(request.embed_url)
         jid = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
         app_url = os.getenv("APP_URL", "").split(",")[0].strip()
@@ -1278,12 +1347,12 @@ async def create_tour_job(request: TourJobRequest, background_tasks: BackgroundT
         try:
             supabase_client.table("tour_jobs").insert({
                 "id": jid,
-                "listing_url": request.embed_url,
-                "customer_email": request.customer_email,
-                "customer_name": request.customer_name or request.customer_email.split("@")[0],
+                "listing_url": embed_url,
+                "customer_email": customer_email,
+                "customer_name": request.customer_name or customer_email.split("@")[0],
                 "status": "completed",
                 "progress": 100,
-                "photo_manifest": {"embed_url": request.embed_url, "rooms": []},
+                "photo_manifest": {"embed_url": embed_url, "tour_type": "embed_3d_tour", "rooms": []},
                 "tour_url": tour_url,
                 "created_at": now,
                 "updated_at": now,
@@ -1306,8 +1375,8 @@ async def create_tour_job(request: TourJobRequest, background_tasks: BackgroundT
         supabase_client.table("tour_jobs").insert({
             "id": jid,
             "listing_url": listing_url,
-            "customer_email": request.customer_email,
-            "customer_name": request.customer_name or request.customer_email.split("@")[0],
+            "customer_email": customer_email,
+            "customer_name": request.customer_name or customer_email.split("@")[0],
             "status": "pending",
             "progress": 0,
             "created_at": now,
@@ -1321,6 +1390,7 @@ async def create_tour_job(request: TourJobRequest, background_tasks: BackgroundT
 
 @app.post("/api/splat-upload")
 async def splat_upload(
+    request: Request,
     file: UploadFile = File(...),
     customer_email: str = Form(...),
 ):
@@ -1329,6 +1399,8 @@ async def splat_upload(
     completed tour_jobs record immediately (no pipeline run needed)."""
     if not supabase_client:
         raise HTTPException(status_code=503, detail="Database unavailable")
+    email = _normalize_public_email(customer_email)
+    _enforce_public_tour_rate_limit(request, "splat_upload", email)
 
     ext = Path(file.filename or "").suffix.lower()
     if ext not in {".splat", ".ply", ".ksplat"}:
@@ -1362,11 +1434,11 @@ async def splat_upload(
         supabase_client.table("tour_jobs").insert({
             "id": jid,
             "listing_url": f"splat://{file_id}",
-            "customer_email": customer_email,
-            "customer_name": customer_email.split("@")[0],
+            "customer_email": email,
+            "customer_name": email.split("@")[0],
             "status": "completed",
             "progress": 100,
-            "photo_manifest": {"splat_url": public_url, "rooms": []},
+            "photo_manifest": {"splat_url": public_url, "tour_type": "splat_3d_tour", "rooms": []},
             "tour_url": tour_url,
             "created_at": now,
             "updated_at": now,

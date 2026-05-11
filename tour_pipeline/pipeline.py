@@ -392,6 +392,7 @@ async def process_tour_job(job_id: str) -> None:
         # Step 3: Build manifest
         manifest = _build_manifest(classified)
         manifest["listing_url"] = listing_url
+        manifest["tour_type"] = "photo_tour"
         if embed_url:
             manifest["embed_url"] = embed_url
         if used_stock:

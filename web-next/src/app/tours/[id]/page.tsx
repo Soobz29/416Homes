@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -26,12 +27,16 @@ interface Manifest {
   stock_photos?: boolean;
   embed_url?: string;
   splat_url?: string;
+  tour_type?: "photo_tour" | "embed_3d_tour" | "splat_3d_tour";
 }
 
-// ---- Demo manifest ----
-const DEMO_MANIFEST: Manifest = {
+const DEMO_3D_EMBED = "https://my.matterport.com/show/?m=jm5WwEA3HUN&play=1&qs=1&lang=en&title=0&tourcta=0&help=0";
+
+// ---- Demo manifests ----
+const DEMO_PHOTO_MANIFEST: Manifest = {
   listing_url: "https://416-homes.vercel.app/tours",
-  address: "Sample GTA Listing",
+  address: "King West Sample Listing",
+  tour_type: "photo_tour",
   rooms: [
     {
       slug: "exterior",
@@ -90,6 +95,20 @@ const DEMO_MANIFEST: Manifest = {
   ],
 };
 
+const DEMO_3D_MANIFEST: Manifest = {
+  listing_url: "https://416-homes.vercel.app/showcase",
+  address: "Hosted 3D Walkthrough Demo",
+  embed_url: DEMO_3D_EMBED,
+  tour_type: "embed_3d_tour",
+  rooms: [],
+};
+
+const DEMO_MANIFESTS: Record<string, Manifest> = {
+  "demo-photo-tour": DEMO_PHOTO_MANIFEST,
+  "demo-3d-tour": DEMO_3D_MANIFEST,
+  "demo-tour": DEMO_PHOTO_MANIFEST,
+};
+
 // ---- Style constants ----
 const BG = "#0a0a08";
 const GOLD = "#c8a96e";
@@ -117,7 +136,7 @@ export default function TourViewerPage() {
   useEffect(() => {
     if (!id) return;
     if (id.startsWith("demo-")) {
-      setManifest(DEMO_MANIFEST);
+      setManifest(DEMO_MANIFESTS[id] ?? DEMO_PHOTO_MANIFEST);
       setLoading(false);
       return;
     }
@@ -188,7 +207,7 @@ export default function TourViewerPage() {
   // ── Loading ──
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1rem", color: TEXT, fontFamily: FONT_MONO }}>
+      <div style={{ minHeight: "100dvh", background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1rem", color: TEXT, fontFamily: FONT_MONO }}>
         <div style={{ width: 40, height: 40, border: `2px solid ${GOLD_DIM}`, borderTopColor: GOLD, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         <span style={{ fontSize: "0.8rem", color: SUBTEXT, letterSpacing: "0.1em" }}>Loading your tour...</span>
@@ -202,7 +221,7 @@ export default function TourViewerPage() {
       <div style={{ minHeight: "100dvh", background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1.5rem", color: TEXT, fontFamily: FONT_MONO, padding: "2rem", textAlign: "center" }}>
         <div style={{ fontSize: "1.2rem", fontWeight: 700 }}>Tour not found</div>
         <p style={{ fontSize: "0.78rem", color: SUBTEXT, maxWidth: "36ch", lineHeight: 1.7 }}>{error ?? "This tour link may have expired or the tour is still being generated."}</p>
-        <a href="/tours" style={{ display: "inline-block", background: GOLD, color: BG, fontFamily: FONT_DISPLAY, fontWeight: 800, fontSize: "0.85rem", padding: "0.75rem 2rem", textDecoration: "none", letterSpacing: "0.05em", textTransform: "uppercase" }}>← Back to Tour Builder</a>
+        <Link href="/tours" style={{ display: "inline-block", background: GOLD, color: BG, fontFamily: FONT_DISPLAY, fontWeight: 800, fontSize: "0.85rem", padding: "0.75rem 2rem", textDecoration: "none", letterSpacing: "0.05em", textTransform: "uppercase" }}>← Back to Tour Builder</Link>
       </div>
     );
   }
@@ -218,12 +237,12 @@ export default function TourViewerPage() {
         <header className="tour-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1rem 2.5rem", borderBottom: `1px solid ${GOLD_DIM}`, background: "rgba(10,10,8,0.95)", position: "sticky", top: 0, zIndex: 40, height: HEADER_H, boxSizing: "border-box" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "1rem", minWidth: 0 }}>
             <span style={{ fontFamily: FONT_DISPLAY, fontWeight: 900, fontSize: "1rem" }}><span style={{ color: GOLD }}>416</span>Homes</span>
-            <span style={{ fontFamily: FONT_MONO, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.1em", color: SUBTEXT }}>3D Tour</span>
+            <span style={{ fontFamily: FONT_MONO, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.1em", color: SUBTEXT }}>{isDemo ? "3D Walkthrough Demo" : "3D Tour"}</span>
             {manifest.listing_url && (
               <a className="tour-title" href={manifest.listing_url} target="_blank" rel="noreferrer" style={{ fontFamily: FONT_MONO, fontSize: "0.68rem", color: GOLD, textDecoration: "none", borderBottom: `1px solid ${GOLD_DIM}`, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "28ch" }}>View Listing ↗</a>
             )}
           </div>
-          <a href="/tours" style={{ fontFamily: FONT_MONO, fontSize: "0.7rem", color: SUBTEXT, textDecoration: "none" }}>← Back</a>
+          <Link href="/tours" style={{ fontFamily: FONT_MONO, fontSize: "0.7rem", color: SUBTEXT, textDecoration: "none" }}>← Back</Link>
         </header>
         <iframe src={manifest.embed_url} style={{ width: "100%", height: `calc(100dvh - ${HEADER_H}px)`, border: "none", display: "block" }} allow="fullscreen; vr; xr-spatial-tracking" title="3D Virtual Tour" />
       </div>
@@ -237,14 +256,14 @@ export default function TourViewerPage() {
         <header className="tour-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1rem 2.5rem", borderBottom: `1px solid ${GOLD_DIM}`, background: "rgba(10,10,8,0.95)", position: "sticky", top: 0, zIndex: 40, height: HEADER_H, boxSizing: "border-box" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "1rem", minWidth: 0 }}>
             <span style={{ fontFamily: FONT_DISPLAY, fontWeight: 900, fontSize: "1rem" }}><span style={{ color: GOLD }}>416</span>Homes</span>
-            <span style={{ fontFamily: FONT_MONO, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.1em", color: SUBTEXT }}>3D Gaussian Splat</span>
+            <span style={{ fontFamily: FONT_MONO, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.1em", color: SUBTEXT }}>Native 3D Splat Tour</span>
             {manifest.listing_url && !manifest.listing_url.startsWith("splat://") && (
               <a className="tour-title" href={manifest.listing_url} target="_blank" rel="noreferrer" style={{ fontFamily: FONT_MONO, fontSize: "0.68rem", color: GOLD, textDecoration: "none", borderBottom: `1px solid ${GOLD_DIM}`, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "28ch" }}>View Listing ↗</a>
             )}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexShrink: 0 }}>
             <span style={{ fontFamily: FONT_MONO, fontSize: "0.58rem", color: SUBTEXT, letterSpacing: "0.06em" }}>DRAG · SCROLL · WASD</span>
-            <a href="/tours" style={{ fontFamily: FONT_MONO, fontSize: "0.7rem", color: SUBTEXT, textDecoration: "none" }}>← Back</a>
+            <Link href="/tours" style={{ fontFamily: FONT_MONO, fontSize: "0.7rem", color: SUBTEXT, textDecoration: "none" }}>← Back</Link>
           </div>
         </header>
         <div style={{ position: "relative", height: `calc(100dvh - ${HEADER_H}px)` }}>
@@ -324,7 +343,7 @@ export default function TourViewerPage() {
           <span style={{ fontFamily: FONT_MONO, fontSize: "0.6rem", color: SUBTEXT }}>
             {globalPhotoIdx + 1} / {totalPhotos}
           </span>
-          <a href="/tours" style={{ fontFamily: FONT_MONO, fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.1em", color: SUBTEXT, textDecoration: "none", border: `1px solid ${GOLD_DIM}`, padding: "0.35rem 0.8rem" }}>← Back</a>
+          <Link href="/tours" style={{ fontFamily: FONT_MONO, fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.1em", color: SUBTEXT, textDecoration: "none", border: `1px solid ${GOLD_DIM}`, padding: "0.35rem 0.8rem" }}>← Back</Link>
         </div>
       </header>
 
@@ -336,7 +355,7 @@ export default function TourViewerPage() {
       )}
       {isDemo && (
         <div style={{ flexShrink: 0, background: "rgba(200,169,110,0.08)", borderBottom: `1px solid rgba(200,169,110,0.2)`, padding: "0.45rem 2rem", fontFamily: FONT_MONO, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.12em", color: GOLD, textAlign: "center" }}>
-          ⬡ Demo Tour · <a href="/tours" style={{ color: GOLD, textDecoration: "underline" }}>Order a real tour →</a>
+          ⬡ Demo Tour · <Link href="/tours" style={{ color: GOLD, textDecoration: "underline" }}>Order a real tour →</Link>
         </div>
       )}
 

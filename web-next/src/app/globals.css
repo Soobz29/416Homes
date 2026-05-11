@@ -135,6 +135,7 @@ select option { background: #ffffff; color: #0a0a08; }
   .hero-right     { display: none !important; }
   .how-grid       { grid-template-columns: 1fr 1fr !important; }
   .products-grid  { grid-template-columns: 1fr !important; }
+  .showcase-grid  { grid-template-columns: 1fr !important; }
   .split-view     { grid-template-columns: 1fr !important; grid-template-rows: 1fr 340px !important; }
   .map-col        { display: block !important; height: 340px !important; }
   .alert-cta      { grid-template-columns: 1fr !important; }
@@ -192,6 +193,8 @@ select option { background: #ffffff; color: #0a0a08; }
                      border-bottom: 1px solid var(--border) !important;
                      padding: 28px 16px !important; }
   .product-card:last-child { border-bottom: none !important; }
+  .showcase-grid   { grid-template-columns: 1fr !important; }
+  .showcase-card   { padding: 0 !important; }
 
   /* ── Footer ── */
   .footer-bar      { flex-direction: column !important; gap: 10px !important;

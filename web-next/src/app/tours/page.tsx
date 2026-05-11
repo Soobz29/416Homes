@@ -5,9 +5,9 @@ import { useState, useEffect, useRef } from "react";
 import HouseLogo from "@/components/HouseLogo";
 import ScrollExpandHero from "@/components/ui/scroll-expand-hero";
 
-// Matterport 3D walkthrough demo — confirmed working model (see CLAUDE.md)
-// When users submit their own Luma AI / Polycam embed URL, that replaces this in /tours/{id}
-const DEMO_SPLAT_EMBED = "https://my.matterport.com/show/?m=jm5WwEA3HUN&play=1&qs=1&lang=en&title=0&tourcta=0&help=0";
+// Public 3D walkthrough demo used in the showcase shell.
+// Native splat uploads are supported separately and rendered by SplatViewer in /tours/[id].
+const DEMO_3D_EMBED = "https://my.matterport.com/show/?m=jm5WwEA3HUN&play=1&qs=1&lang=en&title=0&tourcta=0&help=0";
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://fouronesixhomes-mcr6b.ondigitalocean.app").replace(/\/$/, "");
 
@@ -86,6 +86,15 @@ export default function ToursPage() {
   const [submitting, setSubmitting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const focusOrderMode = (mode: "url" | "upload" | "splat") => {
+    setInputMode(mode);
+    if (typeof window !== "undefined") {
+      window.requestAnimationFrame(() => {
+        document.getElementById("order")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+  };
 
   // Poll real job status instead of a fake timer
   useEffect(() => {
@@ -188,7 +197,7 @@ export default function ToursPage() {
 
   const progressLabel =
     progress < 30  ? "Fetching listing photos…" :
-    progress < 60  ? "Classifying rooms with Gemini Vision…" :
+    progress < 60  ? "Grouping rooms and preparing the tour…" :
     progress < 100 ? "Assembling hosted manifest…" :
     tourUrl ? "Tour ready — open link below" : "Finalising…";
 
@@ -206,7 +215,7 @@ export default function ToursPage() {
       }}>
         <Link href="/" style={{ textDecoration: "none" }}><HouseLogo size={28} /></Link>
         <ul className="nav-links" style={{ display: "flex", listStyle: "none", gap: 36, margin: 0, padding: 0, fontFamily: "var(--mono)", fontSize: "0.68rem", letterSpacing: "0.14em", textTransform: "uppercase" }}>
-          {[["/dashboard", "Listings"], ["/video", "Videos"], ["/tours", "Virtual Tours"], ["/faq", "FAQ"]].map(([href, label]) => (
+          {[["/dashboard", "Listings"], ["/video", "Videos"], ["/tours", "Virtual Tours"], ["/showcase", "Showcase"], ["/faq", "FAQ"]].map(([href, label]) => (
             <li key={href}>
               <Link href={href} style={{ textDecoration: "none", color: label === "Virtual Tours" ? "var(--accent)" : "var(--text-mute)" }}>{label}</Link>
             </li>
@@ -226,7 +235,7 @@ export default function ToursPage() {
         </div>
         {menuOpen && (
           <div style={{ position: "fixed", top: 64, left: 0, right: 0, background: "rgba(5,6,10,0.98)", backdropFilter: "blur(20px)", borderBottom: "1px solid var(--border)", padding: "8px 24px 20px", zIndex: 999 }}>
-            {[["/dashboard", "Listings"], ["/video", "Videos"], ["/tours", "Virtual Tours"], ["/faq", "FAQ"], ["/#alert", "Set My Alert"]].map(([href, label]) => (
+            {[["/dashboard", "Listings"], ["/video", "Videos"], ["/tours", "Virtual Tours"], ["/showcase", "Showcase"], ["/faq", "FAQ"], ["/#alert", "Set My Alert"]].map(([href, label]) => (
               <Link key={href} href={href} onClick={() => setMenuOpen(false)} style={{ display: "block", padding: "14px 0", borderBottom: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--text-mute)", textDecoration: "none" }}>
                 {label}
               </Link>
@@ -235,53 +244,121 @@ export default function ToursPage() {
         )}
       </nav>
 
-      {/* ── Hero — scroll-expanding 3D Gaussian Splat demo ─────────────── */}
+      {/* ── Hero — scroll-expanding 3D walkthrough demo ────────────────── */}
       <ScrollExpandHero
-        iframeSrc={DEMO_SPLAT_EMBED}
-        title="Scan it. Share it."
+        iframeSrc={DEMO_3D_EMBED}
+        title="Photo tours and 3D walkthroughs."
         date="$49 – $149 CAD"
-        scrollToExpand="Scroll to explore the 3D scan"
+        scrollToExpand="Scroll to explore the 3D demo"
       >
         {/* Revealed after full expansion */}
         <div className="sec-wrap" style={{ maxWidth: 1100, margin: "0 auto", padding: "56px 56px 40px", borderBottom: "1px solid var(--border)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, fontFamily: "var(--mono)", fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.18em", color: "var(--accent)", marginBottom: 20 }}>
             <span style={{ height: 1, width: 28, background: "var(--accent)", flexShrink: 0 }} />
-            Live 3D Demo — drag to explore
+            Live 3D tour demo — drag to explore
           </div>
           <p style={{ fontFamily: "var(--mono)", fontSize: "0.88rem", color: "var(--text-mute)", maxWidth: "60ch", lineHeight: 1.8, marginBottom: 32 }}>
-            Scan your listing with a free app. We host the 3D scene and give you a
-            shareable link. Or paste your listing URL — we&apos;ll classify every room
-            photo and build a hosted tour in under 5 minutes.
+            Choose the lane that fits the listing. Start with a fast photo-based room tour,
+            or bring a real 3D scan and publish it inside the 416Homes viewer. The demo
+            above shows the immersive shell we use for hosted walkthroughs today.
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "18px 32px", borderTop: "1px solid var(--border)", paddingTop: 28, marginBottom: 36 }}>
-            {[["3D Gaussian Splat", "$149 CAD"], ["Photo Room Tour", "$49 CAD"], ["Delivery", "< 5 min"]].map(([l, v]) => (
+            {[["3D Walkthrough", "$149 CAD"], ["Photo Room Tour", "$49 CAD"], ["Delivery", "< 5 min"]].map(([l, v]) => (
               <div key={l}>
                 <div style={{ fontFamily: "var(--mono)", fontSize: "0.5rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--text-dim)", marginBottom: 6 }}>{l}</div>
                 <div style={{ fontFamily: "var(--mono)", fontSize: "1rem", fontWeight: 600, color: "var(--text)" }}>{v}</div>
               </div>
             ))}
           </div>
-          <a href="#order" style={{ display: "inline-block", padding: "13px 28px", background: "var(--accent)", color: "var(--bg)", fontFamily: "var(--mono)", fontSize: "0.78rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", textDecoration: "none" }}>
-            Order a Tour →
-          </a>
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+            <a href="#order" style={{ display: "inline-block", padding: "13px 28px", background: "var(--accent)", color: "var(--bg)", fontFamily: "var(--mono)", fontSize: "0.78rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", textDecoration: "none" }}>
+              Start a Tour →
+            </a>
+            <Link href="/showcase" style={{ display: "inline-block", padding: "13px 28px", border: "1px solid var(--border-strong)", color: "var(--text)", fontFamily: "var(--mono)", fontSize: "0.78rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", textDecoration: "none" }}>
+              Browse Demos →
+            </Link>
+          </div>
         </div>
       </ScrollExpandHero>
 
       <div id="order" className="sec-wrap sec-pad-lg" style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 56px" }}>
 
         {/* Header */}
-        <Eyebrow line>Virtual tour · from $49</Eyebrow>
+        <Eyebrow line>Virtual tours · photo + 3D</Eyebrow>
         <h1 style={{ fontFamily: "var(--mono)", fontSize: "clamp(2rem, 3.2vw, 3.2rem)", fontWeight: 700, lineHeight: 1.02, letterSpacing: "-0.015em", margin: "16px 0 12px" }}>
-          Listing photos →{" "}
+          Choose the format, then{" "}
           <span style={{ color: "var(--accent)", background: "linear-gradient(180deg,transparent 60%,rgba(255,176,0,0.18) 60%)", padding: "0 4px" }}>
-            hosted room-by-room tour.
+            publish a hosted tour.
           </span>
         </h1>
         <p style={{ fontFamily: "var(--mono)", fontSize: "0.85rem", lineHeight: 1.7, color: "var(--text-mute)", maxWidth: "54ch", marginBottom: 40 }}>
-          Gemini Vision classifies every photo by room, assembles a shareable tour,
-          and gives you a public link and embed code. Delivered in under five minutes.
-          Or upload a 3D scan for a full Gaussian Splat experience.
+          Use a listing URL or photo upload for a room-by-room photo tour. If you already
+          have a Matterport-style walkthrough, a Luma or Polycam share link, or a native
+          `.splat` export, publish it as a hosted 3D tour instead.
         </p>
+
+        <div className="showcase-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 40 }}>
+          {[
+            {
+              mode: "upload" as const,
+              badge: "Photo tour",
+              title: "Build a room-by-room listing tour",
+              price: "$49 CAD at launch",
+              desc: "Best for standard listing photos. We group rooms, host the tour, and give you a shareable link in minutes.",
+              bullets: ["Listing URL or uploaded photos", "Hosted room navigation", "Best for normal MLS inventory"],
+              cta: "Start Photo Tour →",
+            },
+            {
+              mode: "splat" as const,
+              badge: "3D tour",
+              title: "Host a real immersive walkthrough",
+              price: "$149 CAD at launch",
+              desc: "Best for scans and immersive assets. Paste a supported 3D share link or upload a native splat file for hosted viewing.",
+              bullets: ["Matterport / Luma / Polycam-style walkthroughs", ".splat, .ply, .ksplat upload", "Hosted 3D viewer shell"],
+              cta: "Start 3D Tour →",
+            },
+          ].map((item) => (
+            <div key={item.mode} className="showcase-card" style={{ border: "1px solid var(--border)", background: "var(--bg-elev)", padding: 28 }}>
+              <div style={{ fontFamily: "var(--mono)", fontSize: "0.56rem", letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 14 }}>
+                {item.badge}
+              </div>
+              <div style={{ fontFamily: "var(--mono)", fontSize: "1.2rem", fontWeight: 700, marginBottom: 10 }}>
+                {item.title}
+              </div>
+              <div style={{ fontFamily: "var(--mono)", fontSize: "0.66rem", color: "var(--text-dim)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 14 }}>
+                {item.price}
+              </div>
+              <div style={{ fontFamily: "var(--mono)", fontSize: "0.72rem", color: "var(--text-mute)", lineHeight: 1.7, marginBottom: 18 }}>
+                {item.desc}
+              </div>
+              <div style={{ display: "grid", gap: 8, marginBottom: 22 }}>
+                {item.bullets.map((bullet) => (
+                  <div key={bullet} style={{ fontFamily: "var(--mono)", fontSize: "0.66rem", color: "var(--text)", display: "flex", gap: 8 }}>
+                    <span style={{ color: "var(--accent)" }}>+</span>
+                    <span>{bullet}</span>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => focusOrderMode(item.mode)}
+                style={{
+                  padding: "12px 16px",
+                  background: "transparent",
+                  border: "1px solid var(--border-strong)",
+                  color: "var(--accent)",
+                  fontFamily: "var(--mono)",
+                  fontSize: "0.68rem",
+                  fontWeight: 700,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  cursor: "pointer",
+                }}
+              >
+                {item.cta}
+              </button>
+            </div>
+          ))}
+        </div>
 
         {/* Demo — dollhouse + sidebar */}
         <div style={{ marginBottom: 48, border: "1px solid var(--border-strong)", overflow: "hidden", background: "var(--bg-elev)" }}>
@@ -396,7 +473,7 @@ export default function ToursPage() {
           <div className="tours-order" style={{ border: "1px solid var(--border-strong)", padding: 32, background: "var(--bg-elev)", height: "fit-content", position: "sticky", top: 100 }}>
             {!paid ? (
               <>
-                <div style={{ fontFamily: "var(--mono)", fontSize: "1.3rem", fontWeight: 700, marginBottom: 20 }}>Order a tour</div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "1.3rem", fontWeight: 700, marginBottom: 20 }}>Create a tour</div>
 
                 {/* Input mode toggle */}
                 <div style={{ display: "flex", marginBottom: 16, border: "1px solid var(--border)" }}>
@@ -408,7 +485,7 @@ export default function ToursPage() {
                       fontFamily: "var(--mono)", fontSize: "0.55rem", fontWeight: 700,
                       letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer",
                     }}>
-                      {mode === "url" ? "Listing URL" : mode === "upload" ? "Upload Photos" : "3D Scan ★"}
+                      {mode === "url" ? "Listing URL" : mode === "upload" ? "Upload Photos" : "3D Tour"}
                     </button>
                   ))}
                 </div>
@@ -454,18 +531,18 @@ export default function ToursPage() {
                     <div style={{ padding: "12px 14px", background: "rgba(200,169,110,0.06)", border: "1px solid rgba(200,169,110,0.2)", marginBottom: 16 }}>
                       <div style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 8 }}>How it works</div>
                       <div style={{ fontFamily: "var(--mono)", fontSize: "0.66rem", color: "var(--text-mute)", lineHeight: 1.7 }}>
-                        1. Scan with <strong style={{ color: "var(--text)" }}>Luma AI</strong> or <strong style={{ color: "var(--text)" }}>Polycam</strong> (free iOS/Android apps)<br />
-                        2. Export as Gaussian Splat or copy the share link<br />
-                        3. Paste the link below — your tour is ready instantly
+                        1. Start with a hosted 3D walkthrough link or a native splat export<br />
+                        2. Paste the walkthrough URL or upload your `.splat`, `.ply`, or `.ksplat` file<br />
+                        3. We host it in the 416Homes viewer and return a shareable link
                       </div>
                     </div>
 
                     {/* Sub-option: embed URL */}
-                    <FormField label="Paste embed URL (Luma AI · Polycam · KIRI Engine)">
+                    <FormField label="Paste supported 3D tour URL (Matterport · Luma · Polycam)">
                       <input
                         value={splatEmbedUrl}
                         onChange={e => { setSplatEmbedUrl(e.target.value); if (e.target.value) setSplatFile(null); }}
-                        placeholder="https://lumalabs.ai/embed/... or https://poly.cam/capture/..."
+                        placeholder="https://my.matterport.com/... or https://lumalabs.ai/..."
                         style={inputStyle}
                       />
                     </FormField>
