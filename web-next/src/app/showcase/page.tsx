@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import HouseLogo from "@/components/HouseLogo";
 import { TOUR_SHOWCASE_ITEMS } from "@/lib/tour-showcase";
 
 export default function ShowcasePage() {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
     <div style={{ minHeight: "100vh", background: "transparent", color: "var(--text)" }}>
       <nav
@@ -59,24 +62,48 @@ export default function ShowcasePage() {
             </li>
           ))}
         </ul>
-        <Link
-          href="/tours#order"
-          className="nav-cta"
-          style={{
-            display: "inline-block",
-            padding: "10px 18px",
-            background: "var(--accent)",
-            color: "var(--bg)",
-            fontFamily: "var(--mono)",
-            fontSize: "0.68rem",
-            fontWeight: 700,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            textDecoration: "none",
-          }}
-        >
-          Start a Tour
-        </Link>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Link
+            href="/tours#order"
+            className="nav-cta"
+            style={{
+              display: "inline-block",
+              padding: "10px 18px",
+              background: "var(--accent)",
+              color: "var(--bg)",
+              fontFamily: "var(--mono)",
+              fontSize: "0.68rem",
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              textDecoration: "none",
+            }}
+          >
+            Start a Tour
+          </Link>
+          <button
+            className="hamburger-btn"
+            onClick={() => setMenuOpen(!menuOpen)}
+            style={{ background: "transparent", border: "none", color: "var(--text)", fontSize: "1.4rem", cursor: "pointer", padding: "4px 8px", lineHeight: 1 }}
+          >
+            {menuOpen ? "✕" : "☰"}
+          </button>
+        </div>
+        {menuOpen && (
+          <div style={{ position: "fixed", top: 64, left: 0, right: 0, background: "rgba(5,6,10,0.98)", backdropFilter: "blur(20px)", borderBottom: "1px solid var(--border)", padding: "8px 24px 20px", zIndex: 999 }}>
+            {[
+              ["/dashboard", "Listings"],
+              ["/video", "Videos"],
+              ["/tours", "Virtual Tours"],
+              ["/showcase", "Showcase"],
+              ["/tours#order", "Start a Tour"],
+            ].map(([href, label]) => (
+              <Link key={href} href={href} onClick={() => setMenuOpen(false)} style={{ display: "block", padding: "14px 0", borderBottom: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.14em", color: href === "/showcase" ? "var(--accent)" : "var(--text-mute)", textDecoration: "none" }}>
+                {label}
+              </Link>
+            ))}
+          </div>
+        )}
       </nav>
 
       <section
@@ -131,7 +158,7 @@ export default function ShowcasePage() {
           3D walkthrough flow for scans and immersive assets. The demos below show the
           current experience we can ship today.
         </p>
-        <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+        <div className="showcase-hero-actions" style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
           <Link
             href="/tours#order"
             style={{

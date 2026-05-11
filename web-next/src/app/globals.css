@@ -144,6 +144,9 @@ select option { background: #ffffff; color: #0a0a08; }
   .demo-card      { grid-template-columns: 1fr !important; min-height: unset !important; }
   .demo-video-col { min-height: 280px !important; }
   .tours-2col     { grid-template-columns: 1fr !important; }
+  .deal-layout    { grid-template-columns: 1fr !important; }
+  .deal-output    { position: static !important; }
+  .strategy-neighborhood-grid { grid-template-columns: 1fr 1fr !important; }
 
   /* Reduce large horizontal padding on tablet */
   .sec-wrap { padding-left: 32px !important; padding-right: 32px !important; }
@@ -195,6 +198,8 @@ select option { background: #ffffff; color: #0a0a08; }
   .product-card:last-child { border-bottom: none !important; }
   .showcase-grid   { grid-template-columns: 1fr !important; }
   .showcase-card   { padding: 0 !important; }
+  .showcase-hero-actions { flex-direction: column !important; align-items: stretch !important; }
+  .showcase-hero-actions > * { text-align: center !important; }
 
   /* ── Footer ── */
   .footer-bar      { flex-direction: column !important; gap: 10px !important;
@@ -212,6 +217,8 @@ select option { background: #ffffff; color: #0a0a08; }
 
   /* ── Video: spec row (4 → 2 col) ── */
   .stats-numbers-grid { grid-template-columns: 1fr 1fr !important; }
+  .video-checkout-bar { flex-direction: column !important; align-items: stretch !important; gap: 16px !important; padding: 20px !important; }
+  .video-checkout-bar button { width: 100% !important; }
 
   /* ── Tours page ── */
   .tours-demo-grid    { grid-template-columns: 1fr !important; }
@@ -281,6 +288,37 @@ select option { background: #ffffff; color: #0a0a08; }
   .map-selected-card { width: calc(100% - 24px) !important;
                        left: 12px !important; right: 12px !important;
                        bottom: 12px !important; }
+
+  /* ── Deal / Strategy pages ── */
+  .deal-layout       { grid-template-columns: 1fr !important; gap: 24px !important; }
+  .deal-search-row   { flex-direction: column !important; }
+  .deal-output       { position: static !important; }
+  .deal-metrics-grid { grid-template-columns: 1fr !important; }
+  .deal-metrics-grid > div { grid-column: auto !important; }
+  .deal-cta-row      { flex-direction: column !important; }
+  .deal-cta-row > *  { width: 100% !important; text-align: center !important; }
+  .strategy-neighborhood-grid { grid-template-columns: 1fr !important; }
+  .strategy-email-row { flex-direction: column !important; }
+  .strategy-email-row > * { width: 100% !important; }
+
+  /* ── Dashboard detail panels ── */
+  .dash-tab-panel         { padding: 32px 20px !important; }
+  .dashboard-form-grid    { grid-template-columns: 1fr !important; }
+  .dashboard-quad-grid    { grid-template-columns: 1fr 1fr !important; }
+  .dashboard-two-grid     { grid-template-columns: 1fr !important; }
+  .dashboard-three-grid   { grid-template-columns: 1fr !important; }
+  .dashboard-two-grid > div,
+  .dashboard-three-grid > div { border-right: none !important; margin-right: 0 !important; padding-right: 20px !important; border-bottom: 1px solid var(--border) !important; }
+  .dashboard-two-grid > div:last-child,
+  .dashboard-three-grid > div:last-child { border-bottom: none !important; padding-bottom: 14px !important; }
+  .dashboard-summary-header { flex-direction: column !important; align-items: flex-start !important; gap: 16px !important; }
+  .dashboard-summary-badges { align-items: flex-start !important; }
+  .dashboard-driver-row   { grid-template-columns: 1fr !important; gap: 8px !important; }
+
+  /* ── Reno calculator ── */
+  .reno-result-grid       { grid-template-columns: 1fr !important; }
+  .reno-result-grid > div { border-right: none !important; }
+  .reno-premium-wrap      { padding: 24px 20px !important; }
 }
 
 /* ── Reduced motion ──────────────────────────────────────────────────── */

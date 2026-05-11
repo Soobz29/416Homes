@@ -494,7 +494,7 @@ export default function VideoPage() {
           </div>
 
           {/* Checkout bar */}
-          <div style={{
+          <div className="video-checkout-bar" style={{
             marginTop: 24, display: "flex", alignItems: "center", justifyContent: "space-between",
             padding: "24px 32px", border: "1px solid var(--border)", background: "var(--bg-elev)",
           }}>

@@ -184,6 +184,7 @@ function selectStrategy(answers: Record<string, string>): Strategy {
 
 /* ── Component ───────────────────────────────────────────────────────── */
 export default function StrategyPage() {
+  const [menuOpen, setMenuOpen] = useState(false);
   const [step, setStep]       = useState(0); // 0 = intro, 1-7 = questions, 8 = result
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<string | null>(null);
@@ -232,15 +233,28 @@ export default function StrategyPage() {
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)" }}>
       {/* Nav */}
-      <nav style={{ borderBottom: "1px solid var(--border)", padding: "0 40px", height: 52, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <nav className="nav-bar" style={{ borderBottom: "1px solid var(--border)", padding: "0 40px", height: 52, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
           <HouseLogo size={22} />
           <span style={{ ...mono, fontSize: "0.7rem", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--text)" }}>416Homes</span>
         </Link>
-        <div style={{ display: "flex", gap: 24 }}>
+        <div className="nav-links" style={{ display: "flex", gap: 24 }}>
           <Link href="/deal"      style={{ ...mono, fontSize: "0.6rem", color: "var(--text-mute)", textDecoration: "none", letterSpacing: "0.12em", textTransform: "uppercase" }}>Deal Calculator</Link>
           <Link href="/dashboard" style={{ ...mono, fontSize: "0.6rem", color: "var(--text-mute)", textDecoration: "none", letterSpacing: "0.12em", textTransform: "uppercase" }}>Listings</Link>
         </div>
+        <button className="hamburger-btn" onClick={() => setMenuOpen(!menuOpen)}
+          style={{ background: "transparent", border: "none", color: "var(--text)", fontSize: "1.4rem", cursor: "pointer", padding: "4px 8px", lineHeight: 1 }}>
+          {menuOpen ? "✕" : "☰"}
+        </button>
+        {menuOpen && (
+          <div style={{ position: "fixed", top: 52, left: 0, right: 0, background: "rgba(5,6,10,0.98)", backdropFilter: "blur(20px)", borderBottom: "1px solid var(--border)", padding: "8px 24px 20px", zIndex: 999 }}>
+            {[["/deal", "Deal Calculator"], ["/dashboard", "Listings"], ["/strategy", "Find My Strategy"]].map(([href, label]) => (
+              <Link key={href} href={href} onClick={() => setMenuOpen(false)} style={{ display: "block", padding: "14px 0", borderBottom: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.14em", color: href === "/strategy" ? "var(--accent)" : "var(--text-mute)", textDecoration: "none" }}>
+                {label}
+              </Link>
+            ))}
+          </div>
+        )}
       </nav>
 
       {/* Progress bar */}
@@ -259,7 +273,7 @@ export default function StrategyPage() {
             <h1 style={{ fontFamily: "var(--serif, Georgia)", fontSize: "2.4rem", fontWeight: 400, marginBottom: 16 }}>Find your GTA investment strategy.</h1>
             <p style={{ ...mono, fontSize: "0.7rem", color: "var(--text-mute)", marginBottom: 40, lineHeight: 1.8 }}>
               7 questions. Instant strategy match.<br />
-              We'll recommend the right approach based on your budget, risk tolerance, and goals.
+              We&apos;ll recommend the right approach based on your budget, risk tolerance, and goals.
             </p>
             <button
               onClick={() => setStep(1)}
@@ -347,7 +361,7 @@ export default function StrategyPage() {
                 <span style={{ ...mono, fontSize: "0.72rem", color: "var(--text)" }}>Your Matched GTA Neighbourhoods</span>
                 <span style={{ ...mono, fontSize: "0.44rem", textTransform: "uppercase", letterSpacing: "0.1em", background: "rgba(200,169,110,0.12)", border: "1px solid var(--border)", padding: "2px 7px", color: "var(--accent)" }}>GTA Data</span>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
+              <div className="strategy-neighborhood-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
                 {strategy.neighbourhoods.map((n) => (
                   <div key={n.name} style={{ border: "1px solid var(--border)", padding: 18, background: "var(--bg-elev)" }}>
                     <div style={{ ...mono, fontSize: "0.72rem", fontWeight: 600, color: "var(--text)", marginBottom: 2 }}>{n.name}</div>
@@ -388,7 +402,7 @@ export default function StrategyPage() {
               {emailSent ? (
                 <div style={{ ...mono, fontSize: "0.65rem", color: "#2ed573" }}>✓ Strategy saved — check your inbox.</div>
               ) : (
-                <div style={{ display: "flex", gap: 10 }}>
+                <div className="strategy-email-row" style={{ display: "flex", gap: 10 }}>
                   <input
                     type="email" value={email} onChange={e => setEmail(e.target.value)}
                     placeholder="your@email.com"

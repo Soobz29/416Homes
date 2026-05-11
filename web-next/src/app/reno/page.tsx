@@ -107,7 +107,7 @@ function ResultPanel({ result }: { result: RenoResult }) {
       </div>
 
       {/* Metrics grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", border: "none" }}>
+      <div className="reno-result-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", border: "none" }}>
         {[
           { label: "Renovation Budget",   value: `$${result.budget.toLocaleString()}`,          color: "var(--text)" },
           { label: "Value Added",          value: `$${result.addedValue.toLocaleString()}`,       color: isPositive ? "#2ed573" : "#cf6357" },
@@ -326,7 +326,7 @@ export default function RenoPage() {
 
         {/* ── Premium CTA (Tier 3) ── */}
         <section style={{ marginTop: 64 }}>
-          <div style={{ border: "1px solid var(--border-strong)", background: "rgba(255,191,0,0.03)", padding: "40px 48px", display: "flex", gap: 48, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
+          <div className="reno-premium-wrap" style={{ border: "1px solid var(--border-strong)", background: "rgba(255,191,0,0.03)", padding: "40px 48px", display: "flex", gap: 48, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
             <div style={{ flex: "1 1 320px" }}>
               <div style={{ ...mono, fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--accent)", marginBottom: 12 }}>
                 416Homes Pro · $99 / month

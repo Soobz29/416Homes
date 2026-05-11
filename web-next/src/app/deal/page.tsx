@@ -11,6 +11,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 const GTA_CITIES = ["Toronto", "Mississauga", "Brampton", "Markham", "Vaughan", "Richmond Hill", "Oakville", "Ajax", "Pickering"];
 
 export default function DealPage() {
+  const [menuOpen, setMenuOpen] = useState(false);
   // ── Inputs ─────────────────────────────────────────────────────────────────
   const [address,    setAddress]    = useState("");
   const [price,      setPrice]      = useState(850000);
@@ -94,15 +95,28 @@ export default function DealPage() {
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)" }}>
       {/* Nav */}
-      <nav style={{ borderBottom: "1px solid var(--border)", padding: "0 40px", height: 52, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <nav className="nav-bar" style={{ borderBottom: "1px solid var(--border)", padding: "0 40px", height: 52, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
           <HouseLogo size={22} />
           <span style={{ ...mono, fontSize: "0.7rem", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--text)" }}>416Homes</span>
         </Link>
-        <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
+        <div className="nav-links" style={{ display: "flex", gap: 24, alignItems: "center" }}>
           <Link href="/dashboard" style={{ ...mono, fontSize: "0.62rem", color: "var(--text-mute)", textDecoration: "none", letterSpacing: "0.12em", textTransform: "uppercase" }}>Listings</Link>
           <Link href="/strategy" style={{ ...mono, fontSize: "0.62rem", color: "var(--text-mute)", textDecoration: "none", letterSpacing: "0.12em", textTransform: "uppercase" }}>Find My Strategy</Link>
         </div>
+        <button className="hamburger-btn" onClick={() => setMenuOpen(!menuOpen)}
+          style={{ background: "transparent", border: "none", color: "var(--text)", fontSize: "1.4rem", cursor: "pointer", padding: "4px 8px", lineHeight: 1 }}>
+          {menuOpen ? "✕" : "☰"}
+        </button>
+        {menuOpen && (
+          <div style={{ position: "fixed", top: 52, left: 0, right: 0, background: "rgba(5,6,10,0.98)", backdropFilter: "blur(20px)", borderBottom: "1px solid var(--border)", padding: "8px 24px 20px", zIndex: 999 }}>
+            {[["/dashboard", "Listings"], ["/strategy", "Find My Strategy"], ["/deal", "Deal Analyzer"]].map(([href, label]) => (
+              <Link key={href} href={href} onClick={() => setMenuOpen(false)} style={{ display: "block", padding: "14px 0", borderBottom: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.14em", color: href === "/deal" ? "var(--accent)" : "var(--text-mute)", textDecoration: "none" }}>
+                {label}
+              </Link>
+            ))}
+          </div>
+        )}
       </nav>
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 32px" }}>
@@ -113,7 +127,7 @@ export default function DealPage() {
           <p style={{ ...mono, fontSize: "0.65rem", color: "var(--text-mute)", margin: 0 }}>Enter any GTA address or adjust inputs to see your deal analysis instantly.</p>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "420px 1fr", gap: 32, alignItems: "start" }}>
+        <div className="deal-layout" style={{ display: "grid", gridTemplateColumns: "420px 1fr", gap: 32, alignItems: "start" }}>
           {/* ── LEFT PANEL: Inputs ── */}
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
@@ -123,7 +137,7 @@ export default function DealPage() {
                 Property Lookup
                 <span style={{ background: "rgba(200,169,110,0.15)", border: "1px solid var(--border)", padding: "1px 6px", fontSize: "0.44rem", letterSpacing: "0.1em" }}>GTA DATA</span>
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
+              <div className="deal-search-row" style={{ display: "flex", gap: 8 }}>
                 <input
                   value={address}
                   onChange={e => setAddress(e.target.value)}
@@ -254,7 +268,7 @@ export default function DealPage() {
           </div>
 
           {/* ── RIGHT PANEL: Output ── */}
-          <div style={{ position: "sticky", top: 24, display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="deal-output" style={{ position: "sticky", top: 24, display: "flex", flexDirection: "column", gap: 16 }}>
 
             {price < 10000 ? (
               <div style={{ ...mono, fontSize: "0.7rem", color: "var(--text-dim)", textAlign: "center", padding: "80px 0" }}>
@@ -283,7 +297,7 @@ export default function DealPage() {
               </div>
 
               {/* Key metrics grid */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+              <div className="deal-metrics-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
                 <div style={{ ...metricBox, gridColumn: "span 3" }}>
                   <div style={label}>Monthly Cash Flow</div>
                   <div style={{ ...mono, fontSize: "1.8rem", color: cfColor, fontWeight: 700 }}>{fmtCashflow(cashflow2)}</div>
@@ -313,7 +327,7 @@ export default function DealPage() {
               </div>
 
               {/* CTA */}
-              <div style={{ display: "flex", gap: 12 }}>
+              <div className="deal-cta-row" style={{ display: "flex", gap: 12 }}>
                 <Link href="/strategy" style={{
                   ...mono, fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.12em",
                   padding: "10px 20px", background: "var(--accent)", color: "var(--bg)",

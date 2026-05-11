@@ -1060,12 +1060,12 @@ export default function DashboardPage() {
 
         {/* ── VALUATION TAB ─────────────────────────────────────────── */}
         {activeTab === "valuation" && (
-          <div style={{ maxWidth: 680, margin: "0 auto", padding: "48px 40px" }}>
+          <div className="dash-tab-panel" style={{ maxWidth: 680, margin: "0 auto", padding: "48px 40px" }}>
             <div style={{ fontFamily: "var(--serif)", fontSize: "clamp(1.4rem,2vw,2.2rem)", fontWeight: 500, marginBottom: 8 }}>Property Valuation</div>
             <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", color: "var(--text-dim)", marginBottom: 28 }}>LightGBM model trained on GTA sold comps · $600/sqft fallback when model unavailable</div>
 
             {/* Input grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
+            <div className="dashboard-form-grid" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
               {[
                 { label: "City", key: "city", placeholder: "Toronto" },
                 { label: "Neighbourhood", key: "neighbourhood", placeholder: "King West" },
@@ -1090,7 +1090,7 @@ export default function DashboardPage() {
             {/* Property condition slider */}
             <div style={{ marginTop: 20 }}>
               <div style={{ fontFamily: "var(--mono)", fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)", marginBottom: 10 }}>Property Condition</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 0, border: "1px solid var(--border)", overflow: "hidden" }}>
+              <div className="dashboard-quad-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 0, border: "1px solid var(--border)", overflow: "hidden" }}>
                 {(["poor","fair","good","excellent"] as const).map((c, i) => {
                   const labels = { poor: "Poor\n−18%", fair: "Fair\n−8%", good: "Good\n±0%", excellent: "Excellent\n+12%" };
                   const active = valuationCondition === c;
@@ -1157,7 +1157,7 @@ export default function DashboardPage() {
                 <div style={{ marginTop: 24, border: "1px solid var(--border)", overflow: "hidden" }}>
                   {/* Header */}
                   <div style={{ padding: "20px 24px", borderBottom: "1px solid var(--border)", background: "var(--bg-elev)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div className="dashboard-summary-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                       <div>
                         <div style={{ fontFamily: "var(--mono)", fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--text-dim)", marginBottom: 6 }}>
                           Estimated Value · {valuationCondition.charAt(0).toUpperCase() + valuationCondition.slice(1)} condition
@@ -1169,7 +1169,7 @@ export default function DashboardPage() {
                           Range: ${rangeLow.toLocaleString("en-CA")} – ${rangeHigh.toLocaleString("en-CA")}
                         </div>
                       </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+                      <div className="dashboard-summary-badges" style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
                         {/* Confidence badge */}
                         <span style={{ border: `1px solid ${confColor}`, padding: "4px 10px", fontFamily: "var(--mono)", fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: "0.12em", color: confColor }}>
                           {confLabel} confidence · {Math.round(conf * 100)}%
@@ -1184,7 +1184,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   {/* Details row */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)" }}>
+                  <div className="dashboard-three-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)" }}>
                     {[
                       { label: "$/sqft", value: valuationResult.price_per_sqft ? `$${Math.round(valuationResult.price_per_sqft * condMult).toLocaleString()}` : "—" },
                       { label: "Condition adj.", value: condMult !== 1 ? `${condMult > 1 ? "+" : ""}${Math.round((condMult - 1) * 100)}%` : "None (Good)" },
@@ -1217,7 +1217,7 @@ export default function DashboardPage() {
                         const isPos = delta >= 0;
                         const barPct = Math.abs(delta) / maxAbs * 100;
                         return (
-                          <div key={feat} style={{ display: "grid", gridTemplateColumns: "130px 1fr 90px", gap: 12, alignItems: "center", padding: "8px 20px", borderBottom: "1px solid var(--border)" }}>
+                          <div key={feat} className="dashboard-driver-row" style={{ display: "grid", gridTemplateColumns: "130px 1fr 90px", gap: 12, alignItems: "center", padding: "8px 20px", borderBottom: "1px solid var(--border)" }}>
                             <div style={{ fontFamily: "var(--mono)", fontSize: "0.6rem", color: "var(--text-mute)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{feat}</div>
                             <div style={{ position: "relative", height: 5, background: "var(--bg-elev)" }}>
                               <div style={{ position: "absolute", [isPos ? "left" : "right"]: 0, width: `${barPct}%`, height: "100%", background: isPos ? "rgba(46,213,115,0.5)" : "rgba(207,99,87,0.5)" }} />
@@ -1262,7 +1262,7 @@ export default function DashboardPage() {
                           <div style={{ fontFamily: "var(--mono)", fontSize: "1.4rem", color: v.color, fontWeight: 700, lineHeight: 1 }}>{v.score}<span style={{ fontSize: "0.6rem", color: "var(--text-dim)" }}>/100</span></div>
                         </div>
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)" }}>
+                      <div className="dashboard-three-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)" }}>
                         {([
                           ["Cash Flow/mo", fmtCashflow(m.cashflow), cfColor],
                           ["Cap Rate",     `${m.capRate.toFixed(1)}%`, m.capRate >= 4 ? "#7bed9f" : "var(--text-mute)"],
@@ -1280,7 +1280,7 @@ export default function DashboardPage() {
                       <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--border)", background: "var(--bg-elev)", fontFamily: "var(--mono)", fontSize: "0.56rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--text-dim)" }}>
                         ◈ Investor Analysis · 20% down · 25yr amort · 6.5% rate
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 0 }}>
+                      <div className="dashboard-three-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 0 }}>
                         {rows.map(([label, value, color], i) => (
                           <div key={label} style={{ padding: "14px 20px", borderRight: i%3 < 2 ? "1px solid var(--border)" : "none", borderBottom: i < 3 ? "1px solid var(--border)" : "none" }}>
                             <div style={{ fontFamily: "var(--mono)", fontSize: "0.54rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)", marginBottom: 4 }}>{label}</div>
@@ -1302,7 +1302,7 @@ export default function DashboardPage() {
 
         {/* ── VIDEOS TAB ────────────────────────────────────────────── */}
         {activeTab === "videos" && (
-          <div style={{ padding: "80px 40px", textAlign: "center", maxWidth: 640, margin: "0 auto" }}>
+          <div className="dash-tab-panel" style={{ padding: "80px 40px", textAlign: "center", maxWidth: 640, margin: "0 auto" }}>
             <div style={{ fontFamily: "var(--mono)", fontSize: "0.68rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--text-dim)", marginBottom: 20 }}>
               Professional listing videos · GTA agents
             </div>
@@ -1321,7 +1321,7 @@ export default function DashboardPage() {
         )}
         {/* ── RENO ROI TAB ───────────────────────────────────────── */}
         {activeTab === "reno" && (
-          <div style={{ maxWidth: 960, margin: "0 auto", padding: "48px 40px" }}>
+          <div className="dash-tab-panel" style={{ maxWidth: 960, margin: "0 auto", padding: "48px 40px" }}>
             <div style={{ fontFamily: "var(--serif)", fontSize: "clamp(1.4rem,2vw,2.2rem)", fontWeight: 500, marginBottom: 8 }}>Renovation ROI Calculator</div>
             <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", color: "var(--text-dim)", marginBottom: 32 }}>GTA market averages · select a renovation type, enter your numbers</div>
 
@@ -1342,7 +1342,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Inputs */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+            <div className="dashboard-two-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
               {[
                 { label: "Current home value ($)", val: renoHomeValue, set: setRenoHomeValue, placeholder: "850000" },
                 { label: "Renovation budget ($)", val: renoBudget, set: setRenoBudget, placeholder: "40000" },
@@ -1385,7 +1385,7 @@ export default function DashboardPage() {
                     <span style={{ fontFamily: "var(--mono)", fontSize: "0.72rem", color: "var(--text-mute)" }}>return on renovation spend</span>
                   </div>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
+                <div className="dashboard-two-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
                   {[
                     { label: "Renovation Budget",   value: `$${Number(renoBudget).toLocaleString()}`,            color: "var(--text)" },
                     { label: "Value Added",          value: `$${renoResult.addedValue.toLocaleString()}`,          color: renoResult.roiDollars >= 0 ? "#2ed573" : "#cf6357" },
@@ -1412,7 +1412,7 @@ export default function DashboardPage() {
 
         {/* ── VIRTUAL TOUR TAB ────────────────────────────────────── */}
         {activeTab === "tour" && (
-          <div style={{ maxWidth: 600, margin: "0 auto", padding: "80px 40px", textAlign: "center" }}>
+          <div className="dash-tab-panel" style={{ maxWidth: 600, margin: "0 auto", padding: "80px 40px", textAlign: "center" }}>
             <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 16 }}>◆ Virtual Tours</div>
             <div style={{ fontFamily: "var(--mono)", fontSize: "1.5rem", fontWeight: 700, marginBottom: 16 }}>Order on the dedicated tours page.</div>
             <p style={{ fontFamily: "var(--mono)", fontSize: "0.78rem", lineHeight: 1.7, color: "var(--text-mute)", maxWidth: "42ch", margin: "0 auto 32px" }}>
