@@ -770,7 +770,24 @@ async def get_listings(
                 if types_set:
                     row_type = (r.get("property_type") or r.get("strategy") or "").lower()
                     row_type = row_type.replace("-", " ").replace("_", " ")
-                    if not any(t in row_type or row_type in t for t in types_set):
+                    # Alias mapping: detached / semi-detached / semi → "house"
+                    # so that selecting "Detached" or "Semi-Detached" matches inferred "House"
+                    _HOUSE_ALIASES = {"detached", "semi detached", "semi", "house", "freehold"}
+                    normalised_types_set = set()
+                    for t in types_set:
+                        if t in _HOUSE_ALIASES:
+                            normalised_types_set.add("house")
+                        else:
+                            normalised_types_set.add(t)
+                    normalised_row = "house" if row_type in _HOUSE_ALIASES else row_type
+                    # Also infer from address when row_type is still unknown
+                    if normalised_row in ("unknown", ""):
+                        _addr_check = (r.get("address") or "").lower()
+                        if re.search(r"\b\d{1,4}[-–]\d{1,5}\b|^\d{1,4}-|#\s*\d|\bunit\b|\bapt\b|\bph\b|\bsuite\b", _addr_check):
+                            normalised_row = "condo"
+                        else:
+                            normalised_row = "house"
+                    if not any(t in normalised_row or normalised_row in t for t in normalised_types_set):
                         continue
 
             if is_assignment is not None:
@@ -1978,6 +1995,29 @@ def _normalise_listing(row: dict) -> dict:
     else:
         fair_value_out = None
 
+    # Infer property_type from stored value or address pattern when not set.
+    # Scrapers don't currently populate property_type, so we derive it:
+    #   - explicit stored value → use it
+    #   - address contains unit/apt/# pattern → "Condo"
+    #   - address contains "Townhouse" hint → "Townhouse"
+    #   - otherwise → "House" (covers Detached & Semi-Detached)
+    _stored_type = (row.get("property_type") or "").strip()
+    if _stored_type and _stored_type.lower() not in ("unknown", ""):
+        inferred_type = _stored_type
+    else:
+        _addr_lower = addr.lower()
+        _rd2 = row.get("raw_data") or {}
+        _raw_type = (_rd2.get("property_type") or _rd2.get("PropertyType") or
+                     _rd2.get("type") or _rd2.get("propertyType") or "")
+        if _raw_type and str(_raw_type).lower() not in ("unknown", ""):
+            inferred_type = str(_raw_type).strip()
+        elif re.search(r"\b\d{1,4}[-–]\d{1,5}\b|^\d{1,4}-|#\s*\d|\bunit\b|\bapt\b|\bph\b|\bsuite\b|\bpenth", _addr_lower):
+            inferred_type = "Condo"
+        elif "townhouse" in _addr_lower or "town house" in _addr_lower:
+            inferred_type = "Townhouse"
+        else:
+            inferred_type = "House"
+
     return {
         "id":             row.get("id", ""),
         "address":        addr,
@@ -1994,6 +2034,7 @@ def _normalise_listing(row: dict) -> dict:
         "url":            row.get("url", ""),
         "scraped_at":     str(row.get("scraped_at") or ""),
         "strategy":       row.get("strategy", "unknown"),
+        "property_type":  inferred_type,
         "photos":         _extract_listing_photos(row),
         "transit_score":  _resolve_transit_score(
                               row.get("neighbourhood") or row.get("area_name"),

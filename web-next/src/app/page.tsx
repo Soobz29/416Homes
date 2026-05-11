@@ -451,10 +451,9 @@ export default function HomePage() {
               onChange={e => setSearchType(e.target.value)}
               style={{ padding: "16px 14px", background: "rgba(5,6,10,0.90)", border: "none", borderLeft: "1px solid rgba(255,176,0,0.22)", color: "#fff", fontFamily: "var(--mono)", fontSize: "0.76rem", cursor: "pointer", outline: "none", whiteSpace: "nowrap" }}
             >
-              <option value="">Type</option>
-              <option value="Detached">Detached</option>
-              <option value="Semi-Detached">Semi-Detached</option>
-              <option value="Condo">Condo</option>
+              <option value="">Any Type</option>
+              <option value="Condo">Condo / Apt</option>
+              <option value="House">House / Detached</option>
               <option value="Townhouse">Townhouse</option>
             </select>
             <select
