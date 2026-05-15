@@ -2,6 +2,8 @@ import uuid
 import asyncio
 import time
 import re
+import hashlib
+from dataclasses import dataclass
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Header, Request, UploadFile, File, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -70,6 +72,19 @@ _ALLOWED_TOUR_EMBED_HOSTS = {
     "poly.cam",
 }
 
+# ---------------------------------------------------------------------------
+# In-process TTL cache for /api/listings (cache-aside pattern)
+# Keyed by MD5 of filter params; entries expire after LISTINGS_CACHE_TTL_SECONDS.
+# Eliminates repeated Supabase round-trips for the same filter combo within 2 min.
+# ---------------------------------------------------------------------------
+@dataclass
+class _CacheEntry:
+    data: dict
+    expires_at: float
+
+_LISTINGS_CACHE: dict[str, _CacheEntry] = {}
+_LISTINGS_CACHE_TTL = int(os.getenv("LISTINGS_CACHE_TTL_SECONDS", "120"))
+
 
 def _normalize_public_email(raw_email: str) -> str:
     email = (raw_email or "").strip().lower()
@@ -129,6 +144,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    """Attach a unique request ID to every response and log method/path/status/duration."""
+    rid = request.headers.get("x-request-id") or str(uuid.uuid4())[:8]
+    start = time.time()
+    response = await call_next(request)
+    duration_ms = int((time.time() - start) * 1000)
+    response.headers["X-Request-ID"] = rid
+    logger.info(
+        "%s %s %d %dms rid=%s",
+        request.method, request.url.path, response.status_code, duration_ms, rid,
+    )
+    return response
+
 
 # Video job processing is owned by the dedicated worker at
 # video_pipeline/worker.py (defined in Procfile / DO worker component).
@@ -454,12 +485,28 @@ async def root():
 @app.get("/health")
 @app.get("/api/health")
 async def health_check():
-    """Health check endpoint — registered at both /health and /api/health."""
-    return {
-        "status": "healthy",
-        "service": "416Homes API",
-        "version": "1.0.0"
-    }
+    """Deep health check — verifies Supabase connectivity. Returns 503 if degraded."""
+    checks: dict[str, str] = {"api": "ok"}
+    http_status = 200
+    if supabase_client:
+        try:
+            supabase_client.table("listings").select("id").limit(1).execute()
+            checks["supabase"] = "ok"
+        except Exception as e:
+            checks["supabase"] = f"degraded: {e}"
+            http_status = 503
+    else:
+        checks["supabase"] = "not configured"
+        http_status = 503
+    return JSONResponse(
+        content={
+            "status": "healthy" if http_status == 200 else "degraded",
+            "service": "416Homes API",
+            "version": "1.0.0",
+            "checks": checks,
+        },
+        status_code=http_status,
+    )
 
 
 def _ensure_supabase() -> Client:
@@ -664,9 +711,19 @@ async def get_listings(
     Get property listings with optional filters.
 
     Preference order:
-    1. Supabase `listings` table (shared across hosts and Telegram/API).
-    2. Local last-scan JSON snapshot if Supabase is empty/unavailable.
+    1. In-process TTL cache (120s default) — avoids repeated Supabase round-trips.
+    2. Supabase `listings` table (shared across hosts and Telegram/API).
+    3. Local last-scan JSON snapshot if Supabase is empty/unavailable.
     """
+    # --- Cache-aside: return cached result if still fresh ---
+    _cache_key = hashlib.md5(
+        f"{city}:{limit}:{offset}:{min_price}:{max_price}:{bedrooms}:{bathrooms}:{property_types}:{is_assignment}".encode()
+    ).hexdigest()
+    _now = time.time()
+    _entry = _LISTINGS_CACHE.get(_cache_key)
+    if _entry and _entry.expires_at > _now:
+        return _entry.data
+
     try:
         # Treat GTA / empty as no city filter (All GTA).
         city_filter = None if (not city or city.lower() == "gta") else city.strip()
@@ -838,13 +895,18 @@ async def get_listings(
         total = len(filtered)
         limited = filtered[offset : offset + limit]
         normalised = [_normalise_listing(r) for r in limited]
-        return {
+        result = {
             "listings": normalised,
             "total": total,
             "limit": limit,
             "offset": offset,
             "scan_time": scan_at,
         }
+        # Store in TTL cache
+        _LISTINGS_CACHE[_cache_key] = _CacheEntry(data=result, expires_at=time.time() + _LISTINGS_CACHE_TTL)
+        response = JSONResponse(content=result)
+        response.headers["Cache-Control"] = f"public, max-age={_LISTINGS_CACHE_TTL}"
+        return response
 
     except Exception as e:
         logger.error(f"Error fetching listings: {e}")
@@ -1438,6 +1500,9 @@ async def create_tour_job(request: TourJobRequest, background_tasks: BackgroundT
     except Exception as e:
         logger.error("Failed to create tour job: %s", e)
         raise HTTPException(status_code=500, detail="Failed to create tour job")
+    # Dev fallback: run in-process via BackgroundTasks.
+    # In production, tour_pipeline/worker.py picks this up via Supabase polling
+    # (more reliable — jobs survive API restarts and deploys).
     background_tasks.add_task(_run_tour_job, jid)
     return {"id": jid, "status": "pending"}
 
