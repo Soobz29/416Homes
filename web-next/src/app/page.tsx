@@ -5,59 +5,11 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { fetchListings } from "@/lib/api";
 import HouseLogo from "@/components/HouseLogo";
+import { TerminalButton, Eyebrow } from "@/components/ui/terminal";
 
-/* ─── Shared primitives ─────────────────────────────────────────────── */
-
-function Eyebrow({ children, line }: { children: React.ReactNode; line?: boolean }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, fontFamily: "var(--mono)", fontSize: "0.62rem", textTransform: "uppercase", letterSpacing: "0.18em", color: "var(--accent)" }}>
-      {line && <span style={{ height: 1, width: 28, background: "var(--accent)", flexShrink: 0 }} />}
-      {children}
-    </div>
-  );
-}
-
-function PrimaryBtn({ children, onClick, small, href }: { children: React.ReactNode; onClick?: () => void; small?: boolean; href?: string }) {
-  const style: React.CSSProperties = {
-    display: "inline-block",
-    padding: small ? "10px 18px" : "14px 28px",
-    background: "var(--accent)",
-    border: "none",
-    color: "var(--bg)",
-    fontFamily: "var(--mono)",
-    fontWeight: 700,
-    fontSize: small ? "0.68rem" : "0.82rem",
-    letterSpacing: "0.08em",
-    textTransform: "uppercase",
-    cursor: "pointer",
-    textDecoration: "none",
-    boxShadow: "0 0 22px rgba(255,176,0,0.30), inset 0 1px 0 rgba(255,255,255,0.14)",
-    transition: "background 0.2s",
-    whiteSpace: "nowrap" as const,
-  };
-  if (href) return <Link href={href} style={style}>{children}</Link>;
-  return <button onClick={onClick} style={style}>{children}</button>;
-}
-
-function GhostBtn({ children, onClick, href }: { children: React.ReactNode; onClick?: () => void; href?: string }) {
-  const style: React.CSSProperties = {
-    display: "inline-block",
-    padding: "14px 28px",
-    background: "transparent",
-    border: "1px solid var(--border-strong)",
-    color: "var(--text)",
-    fontFamily: "var(--mono)",
-    fontSize: "0.72rem",
-    letterSpacing: "0.12em",
-    textTransform: "uppercase",
-    cursor: "pointer",
-    textDecoration: "none",
-    transition: "border-color 0.2s, color 0.2s",
-    whiteSpace: "nowrap" as const,
-  };
-  if (href) return <Link href={href} style={style}>{children}</Link>;
-  return <button onClick={onClick} style={style}>{children}</button>;
-}
+/* ─── Page-local style helpers ─────────────────────────────────────── */
+// Button + Eyebrow primitives moved to `@/components/ui/terminal` so they can
+// be reused by dashboard / video / tours pages with consistent styling.
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -152,7 +104,7 @@ function TopNav({ active }: { active?: string }) {
         >
           {menuOpen ? "✕" : "☰"}
         </button>
-        <PrimaryBtn href="/#alert" small>Set My Alert</PrimaryBtn>
+        <TerminalButton href="/#alert" size="sm">Set My Alert</TerminalButton>
       </div>
       {menuOpen && (
         <div style={{ position: "fixed", top: 64, left: 0, right: 0, background: "rgba(5,6,10,0.98)", backdropFilter: "blur(20px)", borderBottom: "1px solid var(--border)", padding: "8px 24px 20px", zIndex: 999 }}>

@@ -608,6 +608,29 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* ── Section subtitle (listings tab only) ──────────────────────── */}
+      {activeTab === "listings" && (
+        <div style={{
+          padding: "18px 24px 4px",
+          borderBottom: "1px solid var(--border)",
+        }}>
+          <div style={{
+            fontFamily: "var(--mono)", fontSize: "0.58rem",
+            letterSpacing: "0.18em", textTransform: "uppercase",
+            color: "var(--accent)",
+          }}>
+            ◆ Live feed · GTA only
+          </div>
+          <div style={{
+            fontFamily: "var(--mono)", fontSize: "0.78rem",
+            color: "var(--text-mute)", marginTop: 6,
+          }}>
+            Active GTA listings, filtered to your criteria. Updated every 30 minutes from
+            Realtor.ca · Zoocasa · Condos.ca · Kijiji · Redfin.
+          </div>
+        </div>
+      )}
+
       {/* ── Filter bar (listings tab only) ────────────────────────────── */}
       {activeTab === "listings" && (
         <div className="filter-bar" style={{
