@@ -43,15 +43,23 @@ logger = logging.getLogger(__name__)
 # and READ time (post-filter when no specific city requested).
 # ---------------------------------------------------------------------------
 _GTA_CITIES_NORMALISED = {
+    # 416 Toronto + sub-areas
     "toronto", "north york", "scarborough", "etobicoke", "downtown",
     "east york", "york",
-    "mississauga", "brampton", "vaughan", "markham", "richmond hill",
-    "oakville", "burlington", "ajax", "ajax & pickering", "pickering",
-    "whitby", "oshawa", "milton", "hamilton", "richmond",
-    "newmarket", "aurora", "georgina", "king", "king city", "caledon",
-    "halton hills", "grimsby",
-    "stouffville", "whitchurch-stouffville", "bradford",
-    "east gwillimbury", "keswick",
+    # Peel
+    "mississauga", "brampton", "caledon",
+    # York
+    "vaughan", "markham", "richmond hill", "newmarket", "aurora", "georgina",
+    "king", "king city", "stouffville", "whitchurch-stouffville", "bradford",
+    "east gwillimbury", "keswick", "richmond",
+    # Halton
+    "oakville", "burlington", "milton", "halton hills",
+    # Durham
+    "ajax", "ajax & pickering", "pickering", "whitby", "oshawa",
+    # Hamilton (incl. amalgamated sub-areas — Ancaster, Dundas, Stoney Creek,
+    # Flamborough, Binbrook are part of the city of Hamilton)
+    "hamilton", "ancaster", "dundas", "stoney creek", "flamborough", "binbrook",
+    "grimsby",
 }
 
 _NON_GTA_ADDR_KEYWORDS = {
@@ -63,6 +71,22 @@ _NON_GTA_ADDR_KEYWORDS = {
     "gloucester", "owen sound", "north bay", "timmins",
     "sault ste. marie", "sault ste marie", "shelburne", "dundalk",
     "mount forest",
+    # Dufferin County + Wellington / fringe — NOT part of GTA
+    "orangeville", "fergus", "elora", "erin", "shelburne", "grand valley",
+    # Simcoe County (north of GTA boundary)
+    "innisfil", "alliston", "new tecumseth", "wasaga beach", "midland",
+    "penetanguishene", "tottenham", "beeton",
+    # Northumberland / Kawartha
+    "port hope", "lindsay", "fenelon falls", "bobcaygeon", "lakefield",
+    # Niagara region (not GTA)
+    "niagara-on-the-lake", "fort erie", "welland", "thorold", "pelham",
+    "lincoln", "west lincoln",
+    # Other Southern Ontario — Hamilton sub-areas (Ancaster, Dundas, Stoney
+    # Creek, Flamborough, Binbrook) intentionally NOT here — they're part of
+    # the GTA via Hamilton (see _GTA_CITIES_NORMALISED).
+    "guelph eramosa", "rockwood", "puslinch",
+    "woodstock", "ingersoll", "tillsonburg", "simcoe", "port dover",
+    "chatham", "leamington", "kingsville",
 }
 
 

@@ -730,11 +730,19 @@ async def get_listings(
 
         # Map UI city names → DB variants (handles boroughs + scrapers that store region names).
         CITY_ALIASES: dict[str, list[str]] = {
-            "toronto":       ["Toronto", "Downtown", "North York", "Scarborough", "Etobicoke"],
-            "downtown":      ["Downtown", "Toronto"],
-            "north york":    ["North York", "Toronto"],
-            "scarborough":   ["Scarborough", "Toronto"],
-            "etobicoke":     ["Etobicoke", "Toronto"],
+            "toronto":       ["Toronto", "Downtown", "North York", "Scarborough", "Etobicoke", "East York", "York"],
+            # Toronto SUB-AREAS: only match listings whose city column literally
+            # says that sub-area. The ALL-Toronto rows are surfaced via the
+            # paired address ILIKE (e.g. `address.ilike.%Etobicoke%`), so users
+            # selecting "Etobicoke" get real Etobicoke addresses — not every
+            # row tagged `city="Toronto"` (which would include Orangeville rows
+            # that the scraper mis-tagged).
+            "downtown":      ["Downtown"],
+            "north york":    ["North York"],
+            "scarborough":   ["Scarborough"],
+            "etobicoke":     ["Etobicoke"],
+            "east york":     ["East York"],
+            "york":          ["York"],
             "mississauga":   ["Mississauga"],
             "brampton":      ["Brampton"],
             "vaughan":       ["Vaughan"],
@@ -789,6 +797,9 @@ async def get_listings(
                 if address_ilike:
                     # Combined query: rows where city IN aliases OR address
                     # ILIKE %ilike%. Supabase-py supports this via .or_().
+                    # ILIKE is a substring match, so "Milton" matches "haMILTON"
+                    # — we post-filter with a strict comma-component check
+                    # to reject those false positives.
                     try:
                         query = supabase_client.table("listings").select("*")
                         if cities_filter:
@@ -810,9 +821,31 @@ async def get_listings(
                         rows = result.data or []
                         from memory.store import _is_gta_listing
                         rows = [r for r in rows if _is_gta_listing(r)]
+
+                        # Post-fetch strict city-name match: an address satisfies
+                        # the city filter only if the city name appears as a
+                        # comma-delimited COMPONENT (e.g. ", Milton,") OR the
+                        # row's city column is in the alias list. This rejects
+                        # "Hamilton" when the user asked for "Milton".
+                        target_lc = address_ilike.lower()
+                        alias_set_lc = {a.lower() for a in (cities_filter or [])}
+
+                        def _matches_target_city(row: dict) -> bool:
+                            city_val = (row.get("city") or "").strip().lower()
+                            if city_val and city_val in alias_set_lc:
+                                return True
+                            addr = (row.get("address") or "").lower()
+                            for part in addr.split(","):
+                                bare = part.strip().split("(", 1)[0].strip()
+                                if bare == target_lc or bare.startswith(target_lc + " "):
+                                    return True
+                            return False
+
+                        before_strict = len(rows)
+                        rows = [r for r in rows if _matches_target_city(r)]
                         logger.info(
-                            "City+address query for '%s' (aliases=%s) → %d rows",
-                            city_filter, cities_filter, len(rows),
+                            "City+address query for '%s' (aliases=%s) -> %d rows (strict filter dropped %d substring false-positives)",
+                            city_filter, cities_filter, len(rows), before_strict - len(rows),
                         )
                     except Exception as e:
                         logger.warning("City+address query failed (%s) — falling back to alias-only", e)
