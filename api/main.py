@@ -749,28 +749,32 @@ async def get_listings(
             "milton":        ["Milton"],
             "hamilton":      ["Hamilton"],
         }
-        # `cities_filter` resolves the user's input to canonical DB city values
-        # via CITY_ALIASES. If the input is NOT a known GTA city (e.g. a
-        # neighbourhood like "Yorkville", "King West", "Liberty Village"), we
-        # treat it as a free-text neighbourhood query and ILIKE the address
-        # column instead — see `neighbourhood_query` below. This makes every
-        # search populate listings instead of returning 0 results.
-        neighbourhood_query: Optional[str] = None
+        # ── Resolve the city input ────────────────────────────────────────
+        # Three cases we handle:
+        # 1. Known GTA city in CITY_ALIASES (e.g. "Toronto", "Mississauga") →
+        #    query `city IN (aliases) OR address ILIKE %city%` so we catch both
+        #    rows that store the canonical city name AND rows where the scraper
+        #    tagged the parent municipality (e.g. Whitby listings stored as
+        #    `city="Toronto"` but whose address contains "Whitby, ON").
+        # 2. Toronto sub-area (Downtown, North York, Scarborough, Etobicoke) →
+        #    same OR query — scrapers store these as `city="Toronto"` so the
+        #    address ILIKE is what surfaces them.
+        # 3. Free-text neighbourhood (Yorkville, King West, Liberty Village) →
+        #    falls through to ILIKE-only since there's no canonical city alias.
+        cities_filter: Optional[List[str]] = None
+        address_ilike: Optional[str] = None
         if city_filter:
             alias_match = CITY_ALIASES.get(city_filter.lower())
             if alias_match is not None:
-                cities_filter: Optional[List[str]] = alias_match
+                cities_filter = alias_match
+                # ALWAYS pair the alias query with an address ILIKE so the
+                # 8 "ZERO listings" dropdown options (Downtown, North York,
+                # Scarborough, Etobicoke, Pickering, Whitby, Oshawa, Milton)
+                # populate via address matching instead of returning empty.
+                address_ilike = city_filter.strip()
             else:
-                # Unknown "city" — probably a neighbourhood. Drop the strict
-                # city filter and search the address column instead.
-                cities_filter = None
-                neighbourhood_query = city_filter.strip()
-                logger.info(
-                    "Unknown city '%s' — treating as neighbourhood ILIKE query",
-                    city_filter,
-                )
-        else:
-            cities_filter = None
+                # Free-text neighbourhood
+                address_ilike = city_filter.strip()
 
         rows: list[dict] = []
         scan_at: Optional[str] = None
@@ -782,12 +786,18 @@ async def get_listings(
                 min_beds = float(bedrooms) if bedrooms and str(bedrooms).strip() else None
                 min_baths = float(bathrooms) if bathrooms and str(bathrooms).strip() else None
 
-                if neighbourhood_query:
-                    # Free-text neighbourhood — ILIKE address column directly.
-                    # Returns all GTA rows whose address contains the query.
+                if address_ilike:
+                    # Combined query: rows where city IN aliases OR address
+                    # ILIKE %ilike%. Supabase-py supports this via .or_().
                     try:
                         query = supabase_client.table("listings").select("*")
-                        query = query.ilike("address", f"%{neighbourhood_query}%")
+                        if cities_filter:
+                            in_list = ",".join(f'"{c}"' for c in cities_filter)
+                            query = query.or_(
+                                f"city.in.({in_list}),address.ilike.%{address_ilike}%"
+                            )
+                        else:
+                            query = query.ilike("address", f"%{address_ilike}%")
                         if min_price:
                             query = query.gte("price", min_price)
                         if max_price:
@@ -798,21 +808,29 @@ async def get_listings(
                             query = query.gte("bathrooms", min_baths)
                         result = query.order("scraped_at", desc=True).range(0, 999).execute()
                         rows = result.data or []
-                        # Apply centralised GTA filter so non-GTA partial-match
-                        # rows (if any sneak in) still get dropped.
                         from memory.store import _is_gta_listing
                         rows = [r for r in rows if _is_gta_listing(r)]
                         logger.info(
-                            "Neighbourhood search '%s' → %d address-match rows",
-                            neighbourhood_query, len(rows),
+                            "City+address query for '%s' (aliases=%s) → %d rows",
+                            city_filter, cities_filter, len(rows),
                         )
                     except Exception as e:
-                        logger.warning("Neighbourhood ILIKE query failed: %s", e)
-                        rows = []
+                        logger.warning("City+address query failed (%s) — falling back to alias-only", e)
+                        # Fall back to the original alias-only path so we don't
+                        # silently return 0 if .or_() syntax errors.
+                        rows = await memory_store.get_listings(
+                            city=city_filter if not cities_filter else None,
+                            cities=cities_filter,
+                            limit=1000,
+                            min_price=min_price,
+                            max_price=max_price,
+                            min_beds=min_beds,
+                            min_baths=min_baths,
+                        )
                 else:
                     rows = await memory_store.get_listings(
-                        city=city_filter if not cities_filter else None,
-                        cities=cities_filter,
+                        city=None,
+                        cities=None,
                         limit=1000,
                         min_price=min_price,
                         max_price=max_price,
