@@ -485,6 +485,19 @@ class ListingAgent:
                 # Strict enrichment so Telegram never shows UNKNOWN.
                 listings = await enrich_listings_strict(listings)
 
+                # GTA-only filter — must run BEFORE Supabase push so non-GTA
+                # listings (Ottawa, Guelph, London) never leak into alerts.
+                try:
+                    from memory.store import _is_gta_listing
+                    before = len(listings)
+                    listings = [l for l in listings if _is_gta_listing(l)]
+                    dropped = before - len(listings)
+                    if dropped:
+                        logger.info(f"GTA filter dropped {dropped}/{before} non-GTA listings from scan")
+                        log_activity("FILTER", f"Dropped {dropped} non-GTA listings from scan")
+                except Exception as e:
+                    logger.warning(f"GTA filter failed (non-fatal): {e}")
+
                 # Persist for /listings command (cap at 500 to keep file small)
                 _persist_last_scan_listings(listings)
 
@@ -776,38 +789,113 @@ class ListingAgent:
             log_activity("ALERT", f"Telegram sent to chat_id for {alert.id} (HIGH)")
 
     def _is_new(self, listing: Dict[str, Any], source: str) -> bool:
-        """Check if listing has been seen before using a persisted content hash."""
+        """Check if listing has been seen before using a persisted content hash.
+
+        Hashes are stored in Supabase (table: agent_seen_hashes), so the agent
+        survives DigitalOcean worker redeploys without re-marking everything as
+        seen on first scan (which previously caused "no new listings for 48h").
+        """
         content = f"{listing.get('address','')}{listing.get('price','')}{source}"
         h = hashlib.md5(content.encode()).hexdigest()
         if h in self.seen_hashes:
             return False
-        self.seen_hashes[h] = datetime.utcnow().isoformat()
-        self._save_seen_hashes()
+        ts = datetime.utcnow().isoformat()
+        self.seen_hashes[h] = ts
+        # Persist single row to Supabase immediately so it survives restart.
+        self._mark_seen_in_supabase(h, ts)
         return True
 
+    def _supabase_client(self):
+        """Lazy Supabase client for seen-hash persistence."""
+        if getattr(self, "_sb", None) is not None:
+            return self._sb
+        try:
+            from supabase import create_client
+            url = os.getenv("SUPABASE_URL")
+            key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+            if not url or not key:
+                self._sb = None
+                return None
+            self._sb = create_client(url, key)
+            return self._sb
+        except Exception as e:
+            logger.warning(f"Supabase client init failed (seen_hashes will fall back to local file): {e}")
+            self._sb = None
+            return None
+
+    def _mark_seen_in_supabase(self, hash_val: str, ts: str) -> None:
+        """Upsert a single seen hash to Supabase. Falls back to local file on failure."""
+        sb = self._supabase_client()
+        if sb is None:
+            # Fallback: write to local JSON (legacy behaviour)
+            self._save_seen_hashes_local()
+            return
+        try:
+            sb.table("agent_seen_hashes").upsert(
+                {"hash": hash_val, "seen_at": ts},
+                on_conflict="hash",
+            ).execute()
+        except Exception as e:
+            logger.warning(f"Supabase upsert of seen_hash failed (falling back to local): {e}")
+            self._save_seen_hashes_local()
+
     def _load_seen_hashes(self) -> Dict[str, str]:
-        """Load persisted seen-hashes dict (hash → ISO timestamp)."""
+        """Load seen-hashes from Supabase (preferred) or local file (fallback).
+
+        Loads only hashes from the last 48h (matches _purge_old_seen_hashes window).
+        """
+        # Try Supabase first
+        try:
+            from supabase import create_client
+            url = os.getenv("SUPABASE_URL")
+            key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+            if url and key:
+                sb = create_client(url, key)
+                cutoff = (datetime.utcnow() - timedelta(hours=48)).isoformat()
+                rows = (
+                    sb.table("agent_seen_hashes")
+                    .select("hash, seen_at")
+                    .gte("seen_at", cutoff)
+                    .execute()
+                )
+                data = rows.data or []
+                if data:
+                    logger.info(f"Loaded {len(data)} seen hashes from Supabase (last 48h)")
+                    return {r["hash"]: r["seen_at"] for r in data}
+                logger.info("agent_seen_hashes table is empty or new; starting fresh")
+                return {}
+        except Exception as e:
+            logger.warning(f"Failed to load seen_hashes from Supabase, falling back to local file: {e}")
+
+        # Fallback to local file (legacy)
         if SEEN_HASHES_FILE.exists():
             try:
                 with open(SEEN_HASHES_FILE, "r") as f:
                     data = json.load(f)
-                    # Legacy: if it was stored as a list of strings, migrate
                     if isinstance(data, list):
                         ts = datetime.utcnow().isoformat()
                         return {h: ts for h in data}
                     return data
             except Exception as e:
-                logger.error(f"Error loading seen hashes: {e}")
+                logger.error(f"Error loading seen hashes from local file: {e}")
         return {}
 
     def _save_seen_hashes(self) -> None:
-        """Persist seen-hashes dict to disk."""
+        """Kept for backwards compatibility — Supabase upserts happen per-hash in _is_new.
+
+        Bulk-save is no longer needed because _mark_seen_in_supabase persists
+        each new hash immediately. This still updates the local file as a safety net.
+        """
+        self._save_seen_hashes_local()
+
+    def _save_seen_hashes_local(self) -> None:
+        """Persist seen-hashes dict to local disk (fallback when Supabase unavailable)."""
         try:
             SEEN_HASHES_FILE.parent.mkdir(parents=True, exist_ok=True)
             with open(SEEN_HASHES_FILE, "w") as f:
                 json.dump(self.seen_hashes, f)
         except Exception as e:
-            logger.error(f"Error saving seen hashes: {e}")
+            logger.error(f"Error saving seen hashes to local file: {e}")
 
     def _purge_old_seen_hashes(self) -> None:
         """Remove hashes older than 48 hours so genuinely re-listed properties resurface."""

@@ -676,7 +676,13 @@ async def _scrape_realtor_scrapling(area: str) -> List[Dict[str, Any]]:
 
 
 async def scrape_realtor_ca(area: str = "gta") -> list:
-    """Wrapper: httpx first, then Scrapling v0.3 fallback, then DrissionPage fallback."""
+    """Wrapper: httpx first, then Scrapling v0.3 fallback, then DrissionPage fallback.
+
+    Tracks per-strategy failures. If EVERY strategy raised an exception (i.e. all
+    of them are broken — not just "found no listings"), raises ScraperError so
+    the orchestrator can surface it to GitHub Actions instead of silently
+    returning [] and looking like a clean "no new listings" run.
+    """
     if area == "toronto":
         regions = [
             "Toronto Downtown",
@@ -689,26 +695,37 @@ async def scrape_realtor_ca(area: str = "gta") -> list:
     else:
         regions = None  # all GTA
 
-    listings = await scrape_listings(regions=regions)
+    strategy_failures: list[str] = []
+    listings: list = []
+
+    # Strategy 1: httpx via Realtor.ca's JSON map endpoint
+    try:
+        listings = await scrape_listings(regions=regions)
+    except Exception as e:
+        strategy_failures.append(f"httpx: {e}")
+        logger.warning(f"Realtor.ca httpx strategy raised: {e}")
+
+    # Strategy 2: Scrapling
     if not listings and _scrapling_available():
-        logger.warning(
-            "Realtor.ca httpx returned 0 listings; trying Scrapling v0.3 fallback."
-        )
+        logger.warning("Realtor.ca httpx returned 0; trying Scrapling v0.3 fallback.")
         try:
             listings = await _scrape_realtor_scrapling(area)
         except Exception as e:
+            strategy_failures.append(f"scrapling: {e}")
             logger.error(f"Realtor.ca Scrapling fallback failed: {e}")
+
+    # Strategy 3: DrissionPage browser
     if not listings:
-        logger.warning(
-            "Realtor.ca Scrapling returned 0; falling back to DrissionPage browser."
-        )
+        logger.warning("Realtor.ca Scrapling returned 0; falling back to DrissionPage browser.")
         try:
             browser_listings = await scrape_realtor_browser(area)
             if browser_listings:
                 listings = browser_listings
         except Exception as e:
+            strategy_failures.append(f"browser: {e}")
             logger.error(f"Realtor.ca browser fallback failed: {e}")
 
+    # Strategy 4: Crawler (Firecrawl/Cloudflare proxy)
     if not listings:
         try:
             crawler_listings = await _scrape_realtor_via_crawler(area)
@@ -716,7 +733,21 @@ async def scrape_realtor_ca(area: str = "gta") -> list:
                 listings = crawler_listings
                 logger.info(f"Realtor.ca crawler fallback: {len(listings)} listings")
         except Exception as e:
+            strategy_failures.append(f"crawler: {e}")
             logger.warning(f"Realtor.ca crawler fallback failed: {e}")
+
+    # If we got listings, return them — strategy_failures is informational only.
+    if listings:
+        return listings
+
+    # No listings AND every strategy errored → ScraperError so the orchestrator
+    # can flag the pipeline as broken. If no strategies errored, this is just
+    # a legitimate empty result (e.g. site temporarily has no GTA listings).
+    if len(strategy_failures) >= 3:
+        from .orchestrator import ScraperError
+        raise ScraperError(
+            "realtor_ca: all fetch strategies failed — " + "; ".join(strategy_failures)
+        )
 
     return listings
 

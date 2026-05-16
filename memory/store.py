@@ -36,6 +36,62 @@ def _load_genai():
 load_dotenv()
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Centralised GTA filter — single source of truth used by API, agent, telegram.
+# Previously each layer had its own list (or skipped the check entirely), letting
+# Ottawa/Guelph/London listings leak in. Apply at WRITE time (drop before insert)
+# and READ time (post-filter when no specific city requested).
+# ---------------------------------------------------------------------------
+_GTA_CITIES_NORMALISED = {
+    "toronto", "north york", "scarborough", "etobicoke", "downtown",
+    "east york", "york",
+    "mississauga", "brampton", "vaughan", "markham", "richmond hill",
+    "oakville", "burlington", "ajax", "ajax & pickering", "pickering",
+    "whitby", "oshawa", "milton", "hamilton", "richmond",
+    "newmarket", "aurora", "georgina", "king", "king city", "caledon",
+    "halton hills", "grimsby",
+    "stouffville", "whitchurch-stouffville", "bradford",
+    "east gwillimbury", "keswick",
+}
+
+_NON_GTA_ADDR_KEYWORDS = {
+    "ottawa", "london", "kingston", "guelph", "kitchener", "waterloo",
+    "windsor", "sudbury", "thunder bay", "barrie", "orillia",
+    "collingwood", "peterborough", "cobourg", "belleville",
+    "niagara falls", "st. catharines", "brantford", "cambridge",
+    "stratford", "sarnia", "stittsville", "kanata", "nepean",
+    "gloucester", "owen sound", "north bay", "timmins",
+    "sault ste. marie", "sault ste marie", "shelburne", "dundalk",
+    "mount forest",
+}
+
+
+def _is_gta_listing(row: Dict[str, Any]) -> bool:
+    """Return True if the listing is within the GTA, False otherwise.
+
+    Centralised so every read/write path applies the same definition.
+
+    Address scan: splits by comma and only matches the keyword if it appears as
+    a CITY component (exact match or "<city> <district>"). This avoids the
+    false-positive on Toronto street names like "Peterborough Ave" or
+    "Sudbury Street" (real Toronto streets, NOT the non-GTA cities).
+    """
+    city = (row.get("city") or "").strip().lower()
+    if city and city not in _GTA_CITIES_NORMALISED:
+        return False
+    addr = (row.get("address") or "").lower()
+    if not addr:
+        return True
+    parts = [p.strip() for p in addr.split(",")]
+    for part in parts:
+        # Strip parenthetical districts ("london north (north r)" → "london north")
+        bare = part.split("(", 1)[0].strip()
+        for kw in _NON_GTA_ADDR_KEYWORDS:
+            if bare == kw or bare.startswith(kw + " "):
+                return False
+    return True
+
+
 class MemoryStore:
     """Supabase-backed memory store with pgvector embeddings"""
     
@@ -411,13 +467,20 @@ class MemoryStore:
             return False
     
     async def embed_and_store_listings(self, listings: List[Dict[str, Any]]) -> int:
-        """Store multiple listings concurrently"""
+        """Store multiple listings concurrently. Drops non-GTA rows before write."""
+        # Drop non-GTA listings at the write layer so they never enter the DB.
+        before = len(listings)
+        listings = [l for l in listings if _is_gta_listing(l)]
+        dropped = before - len(listings)
+        if dropped:
+            logger.info(f"GTA filter dropped {dropped}/{before} non-GTA listings before write")
+
         tasks = [self.embed_and_store_listing(listing) for listing in listings]
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         success_count = sum(1 for result in results if result is True)
         logger.info(f"Stored {success_count}/{len(listings)} listings successfully")
-        
+
         return success_count
 
     async def clear_listings(self) -> int:
@@ -527,7 +590,11 @@ class MemoryStore:
             return []
     
     async def get_listings(self, city: str = None, cities: List[str] = None, limit: int = 20, offset: int = 0, min_price: int = None, max_price: int = None, min_beds: float = None, min_baths: float = None) -> List[Dict[str, Any]]:
-        """Get listings with filters. Pass city (single) or cities (list) for location. offset/limit for pagination."""
+        """Get listings with filters. Pass city (single) or cities (list) for location. offset/limit for pagination.
+
+        When neither `city` nor `cities` is provided, results are auto-filtered to
+        the GTA via `_is_gta_listing()` (centralised whitelist + non-GTA address scan).
+        """
         try:
             if not self.supabase:
                 return []
@@ -544,11 +611,23 @@ class MemoryStore:
                 query = query.gte("bedrooms", min_beds)
             if min_baths:
                 query = query.gte("bathrooms", min_baths)
-            # range is 0-indexed inclusive: range(offset, offset+limit-1) gives `limit` rows
+
+            # When no specific city filter was passed, overfetch and apply the
+            # GTA filter in-memory (centralised — used everywhere).
+            no_city_filter = not city and not cities
+            if no_city_filter:
+                # Overfetch to compensate for non-GTA rows we'll filter out.
+                # Cap at 1000 to avoid pathological queries.
+                end = min(offset + max(limit * 3, 200), 1000) - 1
+                result = query.order("scraped_at", desc=True).range(0, end).execute()
+                rows = result.data or []
+                rows = [r for r in rows if _is_gta_listing(r)]
+                return rows[offset : offset + limit]
+
             end = offset + limit - 1
             result = query.order("scraped_at", desc=True).range(offset, end).execute()
             return result.data or []
-            
+
         except Exception as e:
             logger.error(f"Failed to get listings: {e}")
             return []

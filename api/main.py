@@ -807,39 +807,17 @@ async def get_listings(
                 return None
 
         # GTA-only city whitelist — drop listings whose stored city is outside the GTA.
-        # (Scrapers like Kijiji/Redfin occasionally capture non-GTA listings.)
-        _GTA_CITIES = {
-            "toronto", "north york", "scarborough", "etobicoke", "downtown",
-            "mississauga", "brampton", "vaughan", "markham", "richmond hill",
-            "oakville", "burlington", "ajax", "ajax & pickering", "pickering",
-            "whitby", "oshawa", "milton", "hamilton", "richmond",
-            "newmarket", "aurora", "georgina", "king", "caledon",
-            "halton hills", "grimsby",
-        }
+        # GTA filter is now centralised in memory/store.py (`_is_gta_listing`)
+        # and applied at the read AND write layers. Re-apply here as a final
+        # belt-and-braces safety net for rows coming from the JSON snapshot
+        # fallback (which doesn't pass through memory_store.get_listings).
+        from memory.store import _is_gta_listing
 
         # Apply filters in-memory
         filtered = []
         for r in rows:
-            # Drop non-GTA listings unless a specific city is requested.
-            # Old scrapers stored city='Toronto' even for Ottawa/Guelph listings,
-            # so we ALWAYS check the address regardless of what city says.
             if not city_filter:
-                _row_city = (r.get("city") or "").strip().lower()
-                # Stage 1: city column is set and not in GTA whitelist → drop
-                if _row_city and _row_city not in _GTA_CITIES:
-                    continue
-                # Stage 2: always scan the address for explicit non-GTA city names
-                # (catches old rows that have city='Toronto' but address says 'Ottawa')
-                _addr_low = (r.get("address") or "").lower()
-                _NON_GTA_ADDR = {
-                    "ottawa", "london", "kingston", "guelph", "kitchener",
-                    "waterloo", "windsor", "sudbury", "thunder bay",
-                    "barrie", "orillia", "collingwood", "peterborough",
-                    "cobourg", "belleville", "niagara falls", "st. catharines",
-                    "brantford", "cambridge", "stratford", "sarnia",
-                    "stittsville", "kanata", "nepean", "gloucester",
-                }
-                if any(f", {c}," in _addr_low or _addr_low.endswith(f", {c}") for c in _NON_GTA_ADDR):
+                if not _is_gta_listing(r):
                     continue
 
             p = _num(r.get("price"))

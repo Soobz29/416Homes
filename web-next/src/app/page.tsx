@@ -535,11 +535,11 @@ export default function HomePage() {
           </p>
           <div style={{ borderTop: "1px solid var(--border)" }}>
             {[
-              ["Listing search", "Realtor.ca · Zoocasa · Condos.ca · Kijiji"],
-              ["Price checks", "vs real sold comps from HouseSigma"],
-              ["Agent outreach", "Professional email sent on your behalf"],
-              ["Morning digest", "New matches in your inbox daily"],
-              ["Dashboard", "Listings, alerts, history"],
+              ["Five-source feed", "Realtor.ca · Zoocasa · Condos.ca · Kijiji · Redfin"],
+              ["Sold-comp pricing", "Real closes from HouseSigma — not Zestimates"],
+              ["Transit scoring", "TTC · Crosstown · Ontario Line proximity per listing"],
+              ["Agent outreach", "Professional email drafted & sent on your behalf"],
+              ["Telegram + email", "New matches the moment they hit the wire"],
             ].map(([n, r]) => (
               <div key={n} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 0", borderBottom: "1px solid var(--border)" }}>
                 <div>
@@ -575,7 +575,7 @@ export default function HomePage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 0, border: "1px solid var(--border)" }} className="how-grid">
           {[
             ["01", "Define", "Cities, budget, beds, neighbourhoods. Ninety seconds, tops.", "01/04"],
-            ["02", "Scan", "Realtor.ca · Zoocasa · Condos.ca · Kijiji, every 30 minutes.", "02/04"],
+            ["02", "Scan", "5 sources scanned every 30 min · TTC + Crosstown transit scoring layered in.", "02/04"],
             ["03", "Value", "Every listing compared to real sold comps in that exact pocket.", "03/04"],
             ["04", "Reach", "When a match appears, a professional email is sent to the listing agent.", "04/04"],
           ].map(([n, t, d, f], i) => (
@@ -632,17 +632,46 @@ export default function HomePage() {
 
       {/* ── Products strip ── */}
       <section className="sec-wrap" style={{ maxWidth: 1320, margin: "0 auto", padding: "64px 56px 96px", borderBottom: "1px solid var(--border)" }}>
-        <Eyebrow line>Optional add-ons</Eyebrow>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, marginTop: 32, border: "1px solid var(--border)" }} className="products-grid">
+        <Eyebrow line>For sellers & agents · Optional add-ons</Eyebrow>
+        <h2 style={{ fontFamily: "var(--mono)", fontSize: "clamp(1.8rem, 2.6vw, 2.6rem)", fontWeight: 700, lineHeight: 1.05, letterSpacing: "-0.01em", margin: "16px 0 8px", maxWidth: "26ch" }}>
+          Three tools to <span className="accent-highlight">market your listing</span> in minutes.
+        </h2>
+        <p style={{ fontFamily: "var(--mono)", fontSize: "0.78rem", lineHeight: 1.7, color: "var(--text-mute)", maxWidth: "62ch", marginBottom: 32 }}>
+          AI-generated video, hosted room-by-room photo tours, and photorealistic 3D Gaussian-splat scans —
+          all delivered the same day. Built on the same scraping + AI stack that powers buyer alerts.
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0, border: "1px solid var(--border)" }} className="products-grid">
           {[
-            { tag: "Listing video", title: "Any listing URL → 30-second MP4", price: "from $99", desc: "Paste a Realtor.ca link. We write the script, record narration, and deliver an MP4 — in under 15 minutes.", cta: "See samples →", href: "/video", right: false },
-            { tag: "Virtual tour", title: "Photos → hosted room-by-room tour", price: "$49", desc: "Your listing photos, classified by room and published as a hosted tour. Shareable link and embed code. Delivered in 5 minutes.", cta: "Order a tour →", href: "/tours", right: true },
-          ].map(p => (
-            <div key={p.tag} className="product-card" style={{ padding: 48, borderRight: p.right ? "none" : "1px solid var(--border)" }}>
+            {
+              tag: "Cinematic video",
+              title: "Listing URL → 30-sec MP4",
+              price: "from $99",
+              desc: "Paste any Realtor.ca link. AI writes the script, ElevenLabs narrates, ffmpeg renders, and you get a social-ready MP4 in under 15 minutes.",
+              cta: "Order a video →",
+              href: "/video",
+            },
+            {
+              tag: "Photo tour",
+              title: "Photos → room-by-room walkthrough",
+              price: "$49",
+              desc: "Upload your listing photos (or paste a URL). Gemini Vision classifies each room and publishes a hosted tour with shareable link + embed code. ~5 minutes.",
+              cta: "Order a photo tour →",
+              href: "/tours",
+            },
+            {
+              tag: "3D scan",
+              title: "Phone scan → photorealistic 3D tour",
+              price: "$149",
+              desc: "Scan the home with Luma AI or Polycam (free apps). Buyers walk through a true 3D Gaussian-splat scene in any browser — no headset, no app install.",
+              cta: "Order a 3D tour →",
+              href: "/tours",
+            },
+          ].map((p, i, arr) => (
+            <div key={p.tag} className="product-card" style={{ padding: 40, borderRight: i < arr.length - 1 ? "1px solid var(--border)" : "none" }}>
               <div style={{ fontFamily: "var(--mono)", fontSize: "0.62rem", letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--accent)" }}>{p.tag}</div>
-              <div style={{ fontFamily: "var(--mono)", fontSize: "1.7rem", fontWeight: 600, margin: "10px 0 12px", lineHeight: 1.15 }}>{p.title}</div>
+              <div style={{ fontFamily: "var(--mono)", fontSize: "1.4rem", fontWeight: 600, margin: "10px 0 12px", lineHeight: 1.2 }}>{p.title}</div>
               <div style={{ fontFamily: "var(--mono)", fontSize: "1rem", color: "var(--accent)", marginBottom: 12 }}>{p.price}</div>
-              <div style={{ fontFamily: "var(--mono)", fontSize: "0.76rem", lineHeight: 1.7, color: "var(--text-mute)", maxWidth: "48ch", marginBottom: 24 }}>{p.desc}</div>
+              <div style={{ fontFamily: "var(--mono)", fontSize: "0.76rem", lineHeight: 1.7, color: "var(--text-mute)", marginBottom: 24 }}>{p.desc}</div>
               <Link href={p.href} style={{
                 display: "inline-block",
                 background: "transparent", border: "1px solid var(--border-strong)",

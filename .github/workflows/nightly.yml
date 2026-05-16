@@ -34,6 +34,31 @@ jobs:
         echo "Starting nightly scraper run..."
         python -m scraper.run_all --source all --area gta
         echo "Scraper run completed"
+    - name: Verify minimum listings scraped
+      if: always()
+      run: |
+        if [ ! -f scraper/last_run_summary.json ]; then
+          echo "::error::scraper/last_run_summary.json was not produced — orchestrator never wrote a summary"
+          exit 1
+        fi
+        echo "--- Scrape summary ---"
+        cat scraper/last_run_summary.json
+        echo "----------------------"
+        COUNT=$(python -c "import json; print(json.load(open('scraper/last_run_summary.json')).get('total_listings', 0))")
+        echo "Total listings scraped: $COUNT"
+        if [ "$COUNT" -lt 20 ]; then
+          echo "::error::Scraper produced only $COUNT listings — pipeline is likely broken"
+          exit 1
+        fi
+        FAILED=$(python -c "import json; print(','.join(json.load(open('scraper/last_run_summary.json')).get('failed_sources', [])) or 'none')")
+        echo "Failed sources: $FAILED"
+    - name: Upload run summary artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: scraper-run-summary
+        path: scraper/last_run_summary.json
+        if-no-files-found: warn
 
   # ── Step 2a: Train valuation model (runs in parallel with scrape) ──────────
   train-model:
