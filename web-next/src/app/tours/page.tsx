@@ -476,18 +476,28 @@ export default function ToursPage() {
                 <div style={{ fontFamily: "var(--mono)", fontSize: "1.3rem", fontWeight: 700, marginBottom: 20 }}>Create a tour</div>
 
                 {/* Input mode toggle */}
-                <div style={{ display: "flex", marginBottom: 16, border: "1px solid var(--border)" }}>
-                  {(["url", "upload", "splat"] as const).map(mode => (
-                    <button key={mode} onClick={() => setInputMode(mode)} style={{
-                      flex: 1, padding: "9px 4px", border: "none",
-                      background: inputMode === mode ? "var(--accent)" : "transparent",
-                      color: inputMode === mode ? "var(--bg)" : "var(--text-mute)",
-                      fontFamily: "var(--mono)", fontSize: "0.55rem", fontWeight: 700,
-                      letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer",
-                    }}>
-                      {mode === "url" ? "Listing URL" : mode === "upload" ? "Upload Photos" : "3D Tour"}
-                    </button>
-                  ))}
+                <div role="tablist" aria-label="Tour input method" style={{ display: "flex", marginBottom: 16, border: "1px solid var(--border)" }}>
+                  {(["url", "upload", "splat"] as const).map(mode => {
+                    const selected = inputMode === mode;
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        role="tab"
+                        aria-selected={selected}
+                        onClick={() => setInputMode(mode)}
+                        style={{
+                          flex: 1, padding: "12px 6px", minHeight: 44, border: "none",
+                          background: selected ? "var(--accent)" : "transparent",
+                          color: selected ? "var(--bg)" : "var(--text-mute)",
+                          fontFamily: "var(--mono)", fontSize: "0.72rem", fontWeight: 700,
+                          letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer",
+                        }}
+                      >
+                        {mode === "url" ? "Listing URL" : mode === "upload" ? "Upload Photos" : "3D Tour"}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {inputMode === "url" && (

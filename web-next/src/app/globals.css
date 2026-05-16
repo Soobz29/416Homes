@@ -131,8 +131,17 @@ textarea:focus-visible,
 }
 .ticker-track { width: max-content; will-change: transform; }
 
-/* Pause moving content on hover / keyboard focus (WCAG 2.2.2). */
-.ticker-track:hover, .ticker-track:focus-within { animation-play-state: paused; }
+/* Pause moving content on hover, keyboard focus, OR touch (WCAG 2.2.2).
+   `:active` covers touch — tap-and-hold pauses; release resumes.
+   `:focus-within` covers keyboard tab. */
+.ticker-track:hover,
+.ticker-track:focus-within,
+.ticker-track:active { animation-play-state: paused; }
+
+/* If the user has reduced-motion enabled, freeze the ticker entirely. */
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track { animation: none !important; transform: none !important; }
+}
 
 /* ── Card entrance ──────────────────────────────────────────────────── */
 @keyframes card-in {

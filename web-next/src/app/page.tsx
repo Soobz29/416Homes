@@ -81,6 +81,21 @@ const TOP_NAV_LINKS: [string, string][] = [
 
 function TopNav({ active }: { active?: string }) {
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Lock body scroll while the mobile drawer is open + close it on Escape.
+  // Without this the page underneath scrolls under the open drawer on mobile.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function handleEsc(e: KeyboardEvent) { if (e.key === "Escape") setMenuOpen(false); }
+    document.addEventListener("keydown", handleEsc);
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, [menuOpen]);
+
   return (
     <nav className="nav-bar" aria-label="Primary" style={{
       position: "sticky", top: 0, zIndex: 40,
@@ -129,10 +144,23 @@ function TopNav({ active }: { active?: string }) {
           id="primary-mobile-nav"
           role="navigation"
           aria-label="Mobile primary"
-          style={{ position: "fixed", top: 64, left: 0, right: 0, background: "rgba(5,6,10,0.98)", backdropFilter: "blur(20px)", borderBottom: "1px solid var(--border)", padding: "8px 24px 20px", zIndex: 999 }}
+          style={{
+            position: "fixed", top: 64, left: 0, right: 0,
+            // Constrain to viewport so all links remain reachable even with the
+            // browser chrome / keyboard taking space. `dvh` accounts for the
+            // dynamic mobile viewport (Safari/Chrome address bar).
+            maxHeight: "calc(100dvh - 64px)",
+            overflowY: "auto",
+            paddingBottom: "max(20px, env(safe-area-inset-bottom))",
+            background: "rgba(5,6,10,0.98)",
+            backdropFilter: "blur(20px)",
+            borderBottom: "1px solid var(--border)",
+            paddingLeft: 24, paddingRight: 24, paddingTop: 8,
+            zIndex: 999,
+          }}
         >
           {[...TOP_NAV_LINKS, ["/#alert", "Set My Alert"]].map(([href, label]) => (
-            <Link key={href} href={href} onClick={() => setMenuOpen(false)} style={{ display: "block", padding: "14px 0", borderBottom: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.95rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--text-mute)", textDecoration: "none", minHeight: 44 }}>
+            <Link key={href} href={href} onClick={() => setMenuOpen(false)} style={{ display: "flex", alignItems: "center", padding: "14px 0", borderBottom: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.95rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--text-mute)", textDecoration: "none", minHeight: 44 }}>
               {label}
             </Link>
           ))}
