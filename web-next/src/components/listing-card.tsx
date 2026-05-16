@@ -196,10 +196,20 @@ export function TransitChip({ score }: { score: number }) {
 export function ListRow({ listing, active = false, onClick, onOpen, onValuate }: ListRowProps) {
   const photo        = listing.photos?.[0];
   const fairValuePct = listing.fair_value != null ? listing.fair_value : null;
+  const labelText    = `${listing.address ?? "Listing"} — ${listing.price != null ? formatPrice(listing.price) : "price pending"}`;
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Open details for ${labelText}`}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if ((e.key === "Enter" || e.key === " ") && onClick) {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       style={{
         display: "grid", gridTemplateColumns: "120px 1fr",
         gap: 14, padding: 16,
@@ -213,7 +223,13 @@ export function ListRow({ listing, active = false, onClick, onOpen, onValuate }:
       {/* Thumbnail */}
       <div style={{ position: "relative", aspectRatio: "4/3", overflow: "hidden", background: "var(--bg-elev)" }}>
         {photo ? (
-          <img src={photo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          <img
+            src={photo}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          />
         ) : (
           <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <span style={{ fontFamily: "var(--mono)", fontSize: "0.6rem", color: "var(--text-dim)" }}>—</span>
@@ -339,7 +355,10 @@ export function ListingCard({ listing, index = 0, onValuate }: ListingCardProps)
         )}
         {showPhoto && (
           <img
-            src={photo} alt={listing.address}
+            src={photo}
+            alt={`Photo of ${listing.address}`}
+            loading="lazy"
+            decoding="async"
             style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: imgLoaded ? 1 : 0, transition: "opacity 0.5s" }}
             onLoad={() => setImgLoaded(true)}
             onError={() => setImgError(true)}

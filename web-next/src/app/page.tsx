@@ -22,10 +22,14 @@ const inputStyle: React.CSSProperties = {
   outline: "none",
 };
 
-function FormField({ label, children }: { label: string; children: React.ReactNode }) {
+/**
+ * FormField — wraps a labelled input. Pass `htmlFor` to associate the label
+ * with the input via id; screen readers + click-on-label both work.
+ */
+function FormField({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 16 }}>
-      <label style={{ display: "block", fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-mute)", marginBottom: 6 }}>
+      <label htmlFor={htmlFor} style={{ display: "block", fontFamily: "var(--mono)", fontSize: "0.62rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-mute)", marginBottom: 6 }}>
         {label}
       </label>
       {children}
@@ -78,7 +82,7 @@ const TOP_NAV_LINKS: [string, string][] = [
 function TopNav({ active }: { active?: string }) {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
-    <nav className="nav-bar" style={{
+    <nav className="nav-bar" aria-label="Primary" style={{
       position: "sticky", top: 0, zIndex: 40,
       display: "flex", alignItems: "center", justifyContent: "space-between",
       padding: "0 56px", height: 64,
@@ -86,11 +90,11 @@ function TopNav({ active }: { active?: string }) {
       backdropFilter: "blur(20px)",
       borderBottom: "1px solid var(--border)",
     }}>
-      <Link href="/" style={{ textDecoration: "none" }}><HouseLogo size={32} sub /></Link>
+      <Link href="/" aria-label="416Homes — home" style={{ textDecoration: "none" }}><HouseLogo size={32} sub /></Link>
       <ul className="nav-links" style={{ display: "flex", listStyle: "none", gap: 36, margin: 0, padding: 0, fontFamily: "var(--mono)", fontSize: "0.68rem", letterSpacing: "0.14em", textTransform: "uppercase" }}>
         {TOP_NAV_LINKS.map(([href, label]) => (
           <li key={href}>
-            <Link href={href} style={{ textDecoration: "none", color: active === label ? "var(--accent)" : "var(--text-mute)", transition: "color 0.2s" }}>
+            <Link href={href} aria-current={active === label ? "page" : undefined} style={{ textDecoration: "none", color: active === label ? "var(--accent)" : "var(--text-mute)", transition: "color 0.2s" }}>
               {label}
             </Link>
           </li>
@@ -98,18 +102,37 @@ function TopNav({ active }: { active?: string }) {
       </ul>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <button
+          type="button"
           className="hamburger-btn"
           onClick={() => setMenuOpen(!menuOpen)}
-          style={{ background: "transparent", border: "none", color: "var(--text)", fontSize: "1.4rem", cursor: "pointer", padding: "4px 8px", lineHeight: 1 }}
+          aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
+          aria-expanded={menuOpen}
+          aria-controls="primary-mobile-nav"
+          style={{
+            background: "transparent",
+            border: "none",
+            color: "var(--text)",
+            fontSize: "1.4rem",
+            cursor: "pointer",
+            // 44px min tap target (Apple HIG / WCAG 2.5.5)
+            minWidth: 44, minHeight: 44,
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+            lineHeight: 1,
+          }}
         >
-          {menuOpen ? "✕" : "☰"}
+          <span aria-hidden="true">{menuOpen ? "✕" : "☰"}</span>
         </button>
         <TerminalButton href="/#alert" size="sm">Set My Alert</TerminalButton>
       </div>
       {menuOpen && (
-        <div style={{ position: "fixed", top: 64, left: 0, right: 0, background: "rgba(5,6,10,0.98)", backdropFilter: "blur(20px)", borderBottom: "1px solid var(--border)", padding: "8px 24px 20px", zIndex: 999 }}>
+        <div
+          id="primary-mobile-nav"
+          role="navigation"
+          aria-label="Mobile primary"
+          style={{ position: "fixed", top: 64, left: 0, right: 0, background: "rgba(5,6,10,0.98)", backdropFilter: "blur(20px)", borderBottom: "1px solid var(--border)", padding: "8px 24px 20px", zIndex: 999 }}
+        >
           {[...TOP_NAV_LINKS, ["/#alert", "Set My Alert"]].map(([href, label]) => (
-            <Link key={href} href={href} onClick={() => setMenuOpen(false)} style={{ display: "block", padding: "14px 0", borderBottom: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--text-mute)", textDecoration: "none" }}>
+            <Link key={href} href={href} onClick={() => setMenuOpen(false)} style={{ display: "block", padding: "14px 0", borderBottom: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "0.95rem", textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--text-mute)", textDecoration: "none", minHeight: 44 }}>
               {label}
             </Link>
           ))}
@@ -210,38 +233,86 @@ function AlertForm() {
   }
 
   return (
-    <div id="alert" style={{ border: "1px solid var(--border)", padding: 40, background: "var(--bg-elev)" }}>
-      <div style={{ fontFamily: "var(--mono)", fontSize: "1.3rem", fontWeight: 700, marginBottom: 8 }}>Create your alert</div>
-      <p style={{ fontFamily: "var(--mono)", fontSize: "0.72rem", color: "var(--text-mute)", lineHeight: 1.6, marginBottom: 28 }}>
+    <form
+      id="alert"
+      onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }}
+      style={{ border: "1px solid var(--border)", padding: 40, background: "var(--bg-elev)" }}
+    >
+      <h2 style={{ fontFamily: "var(--mono)", fontSize: "1.3rem", fontWeight: 700, marginBottom: 8, marginTop: 0 }}>Create your alert</h2>
+      <p style={{ fontFamily: "var(--mono)", fontSize: "0.82rem", color: "var(--text-mute)", lineHeight: 1.6, marginBottom: 28 }}>
         We&apos;ll watch the entire GTA every thirty minutes and send you matches every morning.
       </p>
 
-      <FormField label="Email address">
-        <input value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" style={inputStyle} />
+      <FormField label="Email address" htmlFor="alert-email">
+        <input
+          id="alert-email"
+          name="email"
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          required
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          placeholder="you@example.com"
+          style={inputStyle}
+        />
       </FormField>
       <FormField label="Cities to monitor">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "10px 20px", fontFamily: "var(--mono)", fontSize: "0.76rem", color: "var(--text)" }}>
-          {(Object.keys(cities) as Array<keyof typeof cities>).map(c => (
-            <label key={c} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-              <input type="checkbox" checked={cities[c]} onChange={e => setCities({ ...cities, [c]: e.target.checked })} style={{ accentColor: "var(--accent)" }} />
-              {c}
-            </label>
-          ))}
-        </div>
+        <fieldset style={{ border: "none", padding: 0, margin: 0 }}>
+          <legend className="sr-only">Choose which GTA cities to monitor</legend>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "10px 20px", fontFamily: "var(--mono)", fontSize: "0.82rem", color: "var(--text)" }}>
+            {(Object.keys(cities) as Array<keyof typeof cities>).map(c => (
+              <label key={c} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", minHeight: 32 }}>
+                <input
+                  type="checkbox"
+                  checked={cities[c]}
+                  onChange={e => setCities({ ...cities, [c]: e.target.checked })}
+                  style={{ accentColor: "var(--accent)", width: 18, height: 18 }}
+                />
+                {c}
+              </label>
+            ))}
+          </div>
+        </fieldset>
       </FormField>
       <div className="form-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <FormField label="Min price">
-          <input value={minPrice} onChange={e => setMinPrice(e.target.value)} placeholder="$500,000" style={inputStyle} />
+        <FormField label="Min price" htmlFor="alert-min-price">
+          <input
+            id="alert-min-price"
+            name="minPrice"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9,$]*"
+            autoComplete="off"
+            value={minPrice}
+            onChange={e => setMinPrice(e.target.value)}
+            placeholder="$500,000"
+            style={inputStyle}
+          />
         </FormField>
-        <FormField label="Max price">
-          <input value={maxPrice} onChange={e => setMaxPrice(e.target.value)} placeholder="$1,200,000" style={inputStyle} />
+        <FormField label="Max price" htmlFor="alert-max-price">
+          <input
+            id="alert-max-price"
+            name="maxPrice"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9,$]*"
+            autoComplete="off"
+            value={maxPrice}
+            onChange={e => setMaxPrice(e.target.value)}
+            placeholder="$1,200,000"
+            style={inputStyle}
+          />
         </FormField>
       </div>
       <button
+        type="submit"
         onClick={handleSubmit}
         disabled={submitting || !email}
+        aria-disabled={submitting || !email}
         style={{
           width: "100%", marginTop: 16, padding: "16px",
+          minHeight: 48,
           background: "var(--accent)", border: "none", color: "var(--bg)",
           fontFamily: "var(--mono)", fontSize: "0.88rem", fontWeight: 700,
           letterSpacing: "0.08em", textTransform: "uppercase",
@@ -252,15 +323,19 @@ function AlertForm() {
         {submitting ? "Activating…" : "Activate My Alert →"}
       </button>
       {submitError && (
-        <div style={{
-          marginTop: 14, padding: "12px 14px",
-          border: "1px solid #cf6357", background: "rgba(207,99,87,0.08)",
-          color: "#ffb4a8", fontFamily: "var(--mono)", fontSize: "0.74rem", lineHeight: 1.5,
-        }}>
+        <div
+          role="alert"
+          aria-live="assertive"
+          style={{
+            marginTop: 14, padding: "12px 14px",
+            border: "1px solid #cf6357", background: "rgba(207,99,87,0.08)",
+            color: "#ffd4cc", fontFamily: "var(--mono)", fontSize: "0.82rem", lineHeight: 1.5,
+          }}
+        >
           {submitError}
         </div>
       )}
-    </div>
+    </form>
   );
 }
 
@@ -277,15 +352,14 @@ export default function HomePage() {
   const [searchBeds, setSearchBeds] = useState("");
 
   useEffect(() => {
-    // Fetch live listing count for the stats strip
+    // Abort in-flight fetches if the user navigates away (Next.js client nav).
+    let cancelled = false;
     fetchListings({ limit: 1 }).then(({ total }) => {
+      if (cancelled) return;
       if (typeof total === "number" && total > 0) setLiveCount(total);
     }).catch(() => {});
-  }, []);
-
-  useEffect(() => {
     fetchListings({ limit: 20 }).then(({ listings }) => {
-      if (!listings || listings.length === 0) return;
+      if (cancelled || !listings || listings.length === 0) return;
       const idx = Math.floor(Date.now() / 86_400_000) % listings.length;
       const l = listings[idx];
       setFeatured({
@@ -300,6 +374,7 @@ export default function HomePage() {
         photo: l.photos?.[0] || FEATURED.photo,
       });
     }).catch(() => { /* keep fallback */ });
+    return () => { cancelled = true; };
   }, []);
 
   function handleSearch() {
@@ -317,31 +392,43 @@ export default function HomePage() {
 
   return (
     <div style={{ minHeight: "100vh", color: "var(--text)", background: "transparent" }}>
+      <a href="#main" className="skip-link">Skip to main content</a>
       <TopNav active="How It Works" />
 
       {/* ── Ticker ── */}
-      <div style={{
-        position: "sticky", top: 64, zIndex: 30,
-        borderBottom: "1px solid var(--border)",
-        background: "color-mix(in srgb, var(--bg) 92%, transparent)",
-        padding: "9px 0", overflow: "hidden",
-      }}>
-        <div style={{
-          display: "flex", gap: 56, whiteSpace: "nowrap",
-          animation: "ticker 45s linear infinite",
-          fontFamily: "var(--mono)", fontSize: "0.68rem",
-          color: "var(--text-mute)", letterSpacing: "0.04em",
-        }}>
+      <div
+        role="region"
+        aria-label="Market ticker — recent GTA activity"
+        style={{
+          position: "sticky", top: 64, zIndex: 30,
+          borderBottom: "1px solid var(--border)",
+          background: "color-mix(in srgb, var(--bg) 92%, transparent)",
+          padding: "9px 0", overflow: "hidden",
+        }}
+      >
+        <div
+          className="ticker-track"
+          tabIndex={0}
+          aria-live="off"
+          style={{
+            display: "flex", gap: 56, whiteSpace: "nowrap",
+            animation: "ticker 45s linear infinite",
+            fontFamily: "var(--mono)", fontSize: "0.74rem",
+            color: "var(--text-mute)", letterSpacing: "0.04em",
+          }}
+        >
           {ticker.map((t, i) => (
-            <span key={i}><span style={{ color: "var(--accent)", marginRight: 8 }}>◆</span>{t}</span>
+            <span key={i}><span aria-hidden="true" style={{ color: "var(--accent)", marginRight: 8 }}>◆</span>{t}</span>
           ))}
         </div>
       </div>
 
+      <main id="main">
+
       {/* ── Hero ── */}
-      <section style={{ position: "relative", width: "100%", minHeight: 580, overflow: "hidden", borderBottom: "1px solid var(--border)" }}>
+      <section aria-label="Hero" style={{ position: "relative", width: "100%", minHeight: 580, overflow: "hidden", borderBottom: "1px solid var(--border)" }}>
         {/* Readability overlay: strong left → transparent right */}
-        <div style={{ position: "absolute", inset: 0, zIndex: 1, background: "linear-gradient(to right, rgba(5,6,10,0.90) 0%, rgba(5,6,10,0.65) 55%, rgba(5,6,10,0.22) 100%)" }} />
+        <div aria-hidden="true" style={{ position: "absolute", inset: 0, zIndex: 1, background: "linear-gradient(to right, rgba(5,6,10,0.90) 0%, rgba(5,6,10,0.65) 55%, rgba(5,6,10,0.22) 100%)" }} />
 
         {/* Hero content */}
         <div className="page-hero-content" style={{ position: "relative", zIndex: 2, maxWidth: 1320, margin: "0 auto", padding: "80px 56px 72px" }}>
@@ -363,29 +450,40 @@ export default function HomePage() {
           </p>
 
           {/* Trust badges */}
-          <div style={{ display: "flex", gap: 28, marginBottom: 32, flexWrap: "wrap" }}>
+          <ul aria-label="Trust signals" style={{ display: "flex", gap: 28, marginBottom: 32, flexWrap: "wrap", listStyle: "none", padding: 0, margin: "0 0 32px" }}>
             {([["✓", "Verified Listings"], ["↻", "Scanned every 30 min"], ["◎", "Free to start"]] as [string, string][]).map(([icon, label]) => (
-              <div key={label} style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--mono)", fontSize: "0.68rem", letterSpacing: "0.08em", color: "rgba(255,255,255,0.60)" }}>
-                <span style={{ color: "var(--accent)", fontSize: "0.8rem" }}>{icon}</span> {label}
-              </div>
+              <li key={label} style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--mono)", fontSize: "0.78rem", letterSpacing: "0.08em", color: "rgba(255,255,255,0.70)" }}>
+                <span aria-hidden="true" style={{ color: "var(--accent)", fontSize: "0.9rem" }}>{icon}</span> {label}
+              </li>
             ))}
-          </div>
+          </ul>
 
           {/* Search bar */}
-          <div className="hero-search-bar" style={{
-            display: "grid",
-            gridTemplateColumns: "1fr auto auto auto auto",
-            gap: 0,
-            background: "rgba(5,6,10,0.75)",
-            backdropFilter: "blur(16px)",
-            border: "1px solid rgba(255,176,0,0.40)",
-            maxWidth: 880,
-            overflow: "hidden",
-          }}>
+          <form
+            role="search"
+            aria-label="Find a listing"
+            onSubmit={(e) => { e.preventDefault(); handleSearch(); }}
+            className="hero-search-bar"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr auto auto auto auto",
+              gap: 0,
+              background: "rgba(5,6,10,0.75)",
+              backdropFilter: "blur(16px)",
+              border: "1px solid rgba(255,176,0,0.40)",
+              maxWidth: 880,
+              overflow: "hidden",
+            }}
+          >
+            <label htmlFor="hero-search-city" className="sr-only">City or neighbourhood</label>
             <input
+              id="hero-search-city"
+              name="city"
+              type="search"
+              inputMode="search"
+              autoComplete="off"
               value={searchCity}
               onChange={e => setSearchCity(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleSearch()}
               placeholder="City or neighbourhood (e.g. Yorkville, Mississauga...)"
               style={{
                 padding: "16px 18px",
@@ -393,15 +491,17 @@ export default function HomePage() {
                 border: "none",
                 color: "#fff",
                 fontFamily: "var(--mono)",
-                fontSize: "0.82rem",
-                outline: "none",
+                fontSize: "0.92rem",
                 minWidth: 0,
               }}
             />
+            <label htmlFor="hero-search-type" className="sr-only">Property type</label>
             <select
+              id="hero-search-type"
+              name="propertyType"
               value={searchType}
               onChange={e => setSearchType(e.target.value)}
-              style={{ padding: "16px 14px", background: "rgba(5,6,10,0.90)", border: "none", borderLeft: "1px solid rgba(255,176,0,0.22)", color: "#fff", fontFamily: "var(--mono)", fontSize: "0.76rem", cursor: "pointer", outline: "none", whiteSpace: "nowrap" }}
+              style={{ padding: "16px 14px", background: "rgba(5,6,10,0.90)", border: "none", borderLeft: "1px solid rgba(255,176,0,0.22)", color: "#fff", fontFamily: "var(--mono)", fontSize: "0.82rem", cursor: "pointer", whiteSpace: "nowrap" }}
             >
               <option value="">Any Type</option>
               <option value="Condo">Condo</option>
@@ -409,10 +509,13 @@ export default function HomePage() {
               <option value="House">House / Detached</option>
               <option value="Townhouse">Townhouse</option>
             </select>
+            <label htmlFor="hero-search-price" className="sr-only">Price range</label>
             <select
+              id="hero-search-price"
+              name="priceRange"
               value={searchPrice}
               onChange={e => setSearchPrice(e.target.value)}
-              style={{ padding: "16px 14px", background: "rgba(5,6,10,0.90)", border: "none", borderLeft: "1px solid rgba(255,176,0,0.22)", color: "#fff", fontFamily: "var(--mono)", fontSize: "0.76rem", cursor: "pointer", outline: "none", whiteSpace: "nowrap" }}
+              style={{ padding: "16px 14px", background: "rgba(5,6,10,0.90)", border: "none", borderLeft: "1px solid rgba(255,176,0,0.22)", color: "#fff", fontFamily: "var(--mono)", fontSize: "0.82rem", cursor: "pointer", whiteSpace: "nowrap" }}
             >
               <option value="">Price</option>
               <option value="300000-600000">$300K – $600K</option>
@@ -421,10 +524,13 @@ export default function HomePage() {
               <option value="1300000-2000000">$1.3M – $2M</option>
               <option value="2000000-99999999">$2M+</option>
             </select>
+            <label htmlFor="hero-search-beds" className="sr-only">Minimum bedrooms</label>
             <select
+              id="hero-search-beds"
+              name="bedrooms"
               value={searchBeds}
               onChange={e => setSearchBeds(e.target.value)}
-              style={{ padding: "16px 14px", background: "rgba(5,6,10,0.90)", border: "none", borderLeft: "1px solid rgba(255,176,0,0.22)", color: "#fff", fontFamily: "var(--mono)", fontSize: "0.76rem", cursor: "pointer", outline: "none" }}
+              style={{ padding: "16px 14px", background: "rgba(5,6,10,0.90)", border: "none", borderLeft: "1px solid rgba(255,176,0,0.22)", color: "#fff", fontFamily: "var(--mono)", fontSize: "0.82rem", cursor: "pointer" }}
             >
               <option value="">Beds</option>
               <option value="1">1+</option>
@@ -434,26 +540,34 @@ export default function HomePage() {
               <option value="5">5+</option>
             </select>
             <button
-              onClick={handleSearch}
-              style={{ padding: "16px 26px", background: "var(--accent)", border: "none", color: "var(--bg)", fontFamily: "var(--mono)", fontWeight: 700, fontSize: "0.82rem", letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer", whiteSpace: "nowrap" }}
+              type="submit"
+              style={{ padding: "16px 26px", minHeight: 48, background: "var(--accent)", border: "none", color: "var(--bg)", fontFamily: "var(--mono)", fontWeight: 700, fontSize: "0.82rem", letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer", whiteSpace: "nowrap" }}
             >
               Search →
             </button>
-          </div>
+          </form>
 
           {/* Popular searches */}
-          <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ fontFamily: "var(--mono)", fontSize: "0.58rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", marginRight: 4 }}>Popular:</span>
+          <nav aria-label="Popular searches" style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontFamily: "var(--mono)", fontSize: "0.68rem", letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.55)", marginRight: 4 }}>Popular:</span>
             {["Downtown Toronto", "Mississauga", "Vaughan", "Etobicoke", "North York", "Scarborough"].map(city => (
               <Link
                 key={city}
                 href={`/dashboard?city=${encodeURIComponent(city)}`}
-                style={{ fontFamily: "var(--mono)", fontSize: "0.68rem", color: "rgba(255,255,255,0.60)", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", padding: "5px 12px", textDecoration: "none", borderRadius: 2 }}
+                style={{
+                  fontFamily: "var(--mono)", fontSize: "0.78rem",
+                  color: "rgba(255,255,255,0.72)",
+                  background: "rgba(255,255,255,0.07)",
+                  border: "1px solid rgba(255,255,255,0.14)",
+                  padding: "10px 14px", minHeight: 36,
+                  display: "inline-flex", alignItems: "center",
+                  textDecoration: "none", borderRadius: 2,
+                }}
               >
                 {city}
               </Link>
             ))}
-          </div>
+          </nav>
         </div>
       </section>
 
@@ -636,6 +750,8 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+
+      </main>
 
       <FooterBar />
     </div>

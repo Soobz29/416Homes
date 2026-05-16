@@ -1,7 +1,24 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Syne, Cormorant_Garamond, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { GlobalBackground } from "@/components/ui/global-background";
+
+/**
+ * Explicit viewport config — Next 14+ requires the dedicated `viewport` export.
+ * Without this, iOS Safari falls back to a 980px-wide viewport which makes
+ * every page require zoom to be usable.
+ *
+ *  - width = device-width keeps content inside the safe viewport
+ *  - initialScale 1 stops auto-zoom on landscape rotation
+ *  - viewportFit "cover" lets us draw under the notch + use env(safe-area-inset-*)
+ *  - themeColor matches the Terminal Broker bg so the iOS chrome blends in
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#05060A",
+};
 
 const cormorant = Cormorant_Garamond({
   subsets: ["latin"],

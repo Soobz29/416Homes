@@ -11,6 +11,7 @@ export function DropdownSelect({
   placeholder = "Select…",
   className = "",
   id,
+  ariaLabel,
 }: {
   options: DropdownOption[];
   value: string;
@@ -18,20 +19,34 @@ export function DropdownSelect({
   placeholder?: string;
   className?: string;
   id?: string;
+  ariaLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
+    function handlePointerOutside(e: MouseEvent | TouchEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setOpen(false);
       }
     }
-    if (open) {
-      document.addEventListener("mousedown", handleClickOutside);
+    function handleEsc(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
     }
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    if (open) {
+      document.addEventListener("mousedown", handlePointerOutside);
+      document.addEventListener("touchstart", handlePointerOutside);
+      document.addEventListener("keydown", handleEsc);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handlePointerOutside);
+      document.removeEventListener("touchstart", handlePointerOutside);
+      document.removeEventListener("keydown", handleEsc);
+    };
   }, [open]);
 
   const selected = options.find((o) => o.value === value);
@@ -40,38 +55,50 @@ export function DropdownSelect({
   return (
     <div ref={ref} className={`relative ${className}`} id={id}>
       <button
+        ref={triggerRef}
         type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={ariaLabel || label}
         onClick={() => setOpen((o) => !o)}
-        className="w-full border border-[rgba(212,175,55,0.2)] bg-[rgba(10,10,8,0.8)] px-3 py-2 text-left font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] flex items-center justify-between gap-2"
+        className="w-full min-h-[40px] border border-[rgba(212,175,55,0.2)] bg-[rgba(10,10,8,0.8)] px-3 py-2 text-left font-['DM_Mono',monospace] text-[0.92rem] text-[#f5f4ef] flex items-center justify-between gap-2 cursor-pointer"
       >
         <span>{label}</span>
-        <span className="text-[0.6rem] opacity-70">{open ? "▲" : "▼"}</span>
+        <span aria-hidden="true" className="text-[0.6rem] opacity-70">{open ? "▲" : "▼"}</span>
       </button>
 
       {open && (
-        <div
+        <ul
           role="listbox"
-          className="absolute left-0 top-full z-50 mt-1 max-h-60 w-full overflow-y-auto rounded border border-[rgba(212,175,55,0.35)] bg-[#141410] shadow-2xl"
+          aria-label={ariaLabel || label}
+          className="absolute left-0 top-full z-50 mt-1 max-h-60 w-full overflow-y-auto rounded border border-[rgba(212,175,55,0.35)] bg-[#141410] shadow-2xl list-none m-0 p-0"
         >
           {options.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              role="option"
-              aria-selected={opt.value === value}
-              onMouseDown={(e) => {
-                e.preventDefault(); // prevent blur on trigger before click registers
-                onChange(opt.value);
-                setOpen(false);
-              }}
-              className={`block w-full px-3 py-2 text-left font-['DM_Mono',monospace] text-[0.82rem] text-[#f5f4ef] hover:bg-[rgba(212,175,55,0.12)] focus:outline-none ${
-                opt.value === value ? "bg-[rgba(212,175,55,0.18)] text-[#D4AF37]" : ""
-              }`}
-            >
-              {opt.label}
-            </button>
+            <li key={opt.value} role="option" aria-selected={opt.value === value}>
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault(); // prevent blur on trigger before click registers
+                  onChange(opt.value);
+                  setOpen(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onChange(opt.value);
+                    setOpen(false);
+                    triggerRef.current?.focus();
+                  }
+                }}
+                className={`block w-full min-h-[40px] px-3 py-2 text-left font-['DM_Mono',monospace] text-[0.92rem] text-[#f5f4ef] hover:bg-[rgba(212,175,55,0.12)] cursor-pointer ${
+                  opt.value === value ? "bg-[rgba(212,175,55,0.18)] text-[#D4AF37]" : ""
+                }`}
+              >
+                {opt.label}
+              </button>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );
