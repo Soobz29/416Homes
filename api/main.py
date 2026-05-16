@@ -749,8 +749,26 @@ async def get_listings(
             "milton":        ["Milton"],
             "hamilton":      ["Hamilton"],
         }
+        # `cities_filter` resolves the user's input to canonical DB city values
+        # via CITY_ALIASES. If the input is NOT a known GTA city (e.g. a
+        # neighbourhood like "Yorkville", "King West", "Liberty Village"), we
+        # treat it as a free-text neighbourhood query and ILIKE the address
+        # column instead — see `neighbourhood_query` below. This makes every
+        # search populate listings instead of returning 0 results.
+        neighbourhood_query: Optional[str] = None
         if city_filter:
-            cities_filter: Optional[List[str]] = CITY_ALIASES.get(city_filter.lower(), [city_filter])
+            alias_match = CITY_ALIASES.get(city_filter.lower())
+            if alias_match is not None:
+                cities_filter: Optional[List[str]] = alias_match
+            else:
+                # Unknown "city" — probably a neighbourhood. Drop the strict
+                # city filter and search the address column instead.
+                cities_filter = None
+                neighbourhood_query = city_filter.strip()
+                logger.info(
+                    "Unknown city '%s' — treating as neighbourhood ILIKE query",
+                    city_filter,
+                )
         else:
             cities_filter = None
 
@@ -763,15 +781,44 @@ async def get_listings(
             try:
                 min_beds = float(bedrooms) if bedrooms and str(bedrooms).strip() else None
                 min_baths = float(bathrooms) if bathrooms and str(bathrooms).strip() else None
-                rows = await memory_store.get_listings(
-                    city=city_filter if not cities_filter else None,
-                    cities=cities_filter,
-                    limit=1000,
-                    min_price=min_price,
-                    max_price=max_price,
-                    min_beds=min_beds,
-                    min_baths=min_baths,
-                )
+
+                if neighbourhood_query:
+                    # Free-text neighbourhood — ILIKE address column directly.
+                    # Returns all GTA rows whose address contains the query.
+                    try:
+                        query = supabase_client.table("listings").select("*")
+                        query = query.ilike("address", f"%{neighbourhood_query}%")
+                        if min_price:
+                            query = query.gte("price", min_price)
+                        if max_price:
+                            query = query.lte("price", max_price)
+                        if min_beds:
+                            query = query.gte("bedrooms", min_beds)
+                        if min_baths:
+                            query = query.gte("bathrooms", min_baths)
+                        result = query.order("scraped_at", desc=True).range(0, 999).execute()
+                        rows = result.data or []
+                        # Apply centralised GTA filter so non-GTA partial-match
+                        # rows (if any sneak in) still get dropped.
+                        from memory.store import _is_gta_listing
+                        rows = [r for r in rows if _is_gta_listing(r)]
+                        logger.info(
+                            "Neighbourhood search '%s' → %d address-match rows",
+                            neighbourhood_query, len(rows),
+                        )
+                    except Exception as e:
+                        logger.warning("Neighbourhood ILIKE query failed: %s", e)
+                        rows = []
+                else:
+                    rows = await memory_store.get_listings(
+                        city=city_filter if not cities_filter else None,
+                        cities=cities_filter,
+                        limit=1000,
+                        min_price=min_price,
+                        max_price=max_price,
+                        min_beds=min_beds,
+                        min_baths=min_baths,
+                    )
                 if rows:
                     scan_at = (rows[0].get("scraped_at") or "").strip() or None
                     logger.info(
