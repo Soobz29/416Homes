@@ -275,7 +275,7 @@ class VideoRenderer:
 
         y_expr = "ih/2-ih/zoom/2"   # always vertically centred
 
-        src_w, src_h = w * 2, h * 2   # 2× source for zoom headroom
+        src_w, src_h = int(w * 1.5), int(h * 1.5)   # 1.5× source for zoom headroom (less RAM than 2×)
         vf = (
             f"scale={src_w}:{src_h}:force_original_aspect_ratio=increase,"
             f"crop={src_w}:{src_h},"
