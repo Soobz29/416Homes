@@ -124,29 +124,38 @@ class VideoRenderer:
                     # Write file
                     filepath.write_bytes(resp.content)
 
-                    # Verify it's a valid image using ffprobe
-                    probe_cmd = [
-                        "ffprobe",
-                        "-v",
-                        "error",
-                        "-select_streams",
-                        "v:0",
-                        "-show_entries",
-                        "stream=codec_name,width,height",
-                        "-of",
-                        "default=noprint_wrappers=1",
-                        str(filepath),
-                    ]
-                    probe_result = subprocess.run(probe_cmd, capture_output=True, text=True, timeout=5)
-
-                    if probe_result.returncode != 0:
+                    # Validate with magic bytes (JPEG: FF D8 FF, PNG: 89 50 4E 47, WEBP: RIFF...WEBP)
+                    # This replaces ffprobe which is not guaranteed to be installed on all workers.
+                    data = resp.content
+                    is_jpeg = data[:3] == b"\xff\xd8\xff"
+                    is_png = data[:4] == b"\x89PNG"
+                    is_webp = data[:4] == b"RIFF" and data[8:12] == b"WEBP"
+                    if not (is_jpeg or is_png or is_webp):
                         logger.warning(
-                            "Skipping scene %d: ffprobe failed - %s",
+                            "Skipping scene %d: unrecognised image magic bytes %s",
                             idx,
-                            (probe_result.stderr or "")[:200],
+                            data[:4].hex(),
                         )
                         filepath.unlink(missing_ok=True)
                         continue
+
+                    # Try ffprobe for extra validation only if available — never fail on its absence
+                    try:
+                        probe_cmd = [
+                            "ffprobe", "-v", "error",
+                            "-select_streams", "v:0",
+                            "-show_entries", "stream=codec_name,width,height",
+                            "-of", "default=noprint_wrappers=1",
+                            str(filepath),
+                        ]
+                        probe_result = subprocess.run(probe_cmd, capture_output=True, text=True, timeout=5)
+                        if probe_result.returncode != 0:
+                            logger.warning(
+                                "ffprobe rejected scene %d (%s) — keeping anyway (magic bytes OK)",
+                                idx, (probe_result.stderr or "")[:120],
+                            )
+                    except FileNotFoundError:
+                        pass  # ffprobe not installed — magic bytes check is sufficient
 
                     logger.info(
                         "✅ Downloaded valid image: %s (%d bytes, %s)",
