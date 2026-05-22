@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 from memory.store import memory_store
 from .photo_classifier import PhotoClassifier
 from .scene_planner import ScenePlanner
-from .renderer import VideoRenderer
+from .renderer import VideoRenderer, _ffmpeg
 from .veo_renderer import VeoRenderer
 from .listing_photos import extract_expcloud_photo_urls_from_html
 
@@ -936,7 +936,7 @@ class VideoJobManager:
                 ):
                     muxed = work_dir / f"{job_id}_final.mp4"
                     mux_cmd = [
-                        "ffmpeg",
+                        _ffmpeg(),
                         "-y",
                         "-i",
                         str(video_path),
@@ -972,7 +972,7 @@ class VideoJobManager:
                         err_tail = (mux_res.stderr or mux_res.stdout or "")[-2000:]
                         logger.warning("Voiceover mux failed (rc=%s): %s", mux_res.returncode, err_tail)
                         mux_cmd_alt = [
-                            "ffmpeg",
+                            _ffmpeg(),
                             "-y",
                             "-i",
                             str(video_path),
