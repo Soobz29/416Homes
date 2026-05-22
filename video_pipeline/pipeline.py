@@ -747,6 +747,9 @@ class VideoJobManager:
             # Step 6–7: ElevenLabs voiceover (inside job temp dir), render, mux audio
             video_renderer = (os.getenv("VIDEO_RENDERER") or "ffmpeg").strip().lower()
             vertex_creds = (os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON") or "").strip()
+            gemini_api_key = (os.getenv("GEMINI_API_KEY") or "").strip()
+            # Veo is available via both Vertex AI (service account) and Gemini Developer API (api key)
+            _veo_available = bool(vertex_creds or gemini_api_key)
 
             # Checkpoint: reuse audio_url from a previous run attempt if already stored.
             # This avoids redundant TTS calls when the job was killed mid-render and requeued.
@@ -904,13 +907,15 @@ class VideoJobManager:
                 )
                 await self.update_job_status(job_id, "generating_video", 80)
 
-                if video_renderer == "veo" and vertex_creds:
-                    logger.info("Using Veo renderer (service account credentials found)")
+                if video_renderer == "veo" and _veo_available:
+                    auth_method = "service_account" if vertex_creds else "api_key"
+                    logger.info("Using Veo renderer (auth=%s)", auth_method)
                     renderer: Any = VeoRenderer(work_dir=work_dir)
                 else:
                     if video_renderer == "veo":
                         logger.warning(
-                            "VIDEO_RENDERER=veo but GOOGLE_APPLICATION_CREDENTIALS_JSON not set; "
+                            "VIDEO_RENDERER=veo but no credentials found "
+                            "(need GOOGLE_APPLICATION_CREDENTIALS_JSON or GEMINI_API_KEY); "
                             "falling back to ffmpeg"
                         )
                     renderer = VideoRenderer(work_dir)
@@ -918,7 +923,7 @@ class VideoJobManager:
                 logger.info(
                     "Rendering video for job %s (backend=%s)",
                     job_id,
-                    "veo" if video_renderer == "veo" and vertex_creds else "ffmpeg",
+                    "veo" if video_renderer == "veo" and _veo_available else "ffmpeg",
                 )
 
                 logger.info("scene_plan count before render_video: %d", len(scene_plan))

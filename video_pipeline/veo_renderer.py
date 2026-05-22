@@ -211,26 +211,31 @@ def _mime_from_image_bytes(data: bytes) -> str:
     return "image/jpeg"
 
 
-def _veo_generation_config() -> "types.GenerateVideosConfig":
-    """Veo request config. Output resolution is not set — Vertex / Veo chooses the default."""
-    comp_raw = (os.getenv("VEO_COMPRESSION") or "optimized").strip().lower()
-    compression = (
-        types.VideoCompressionQuality.LOSSLESS
-        if comp_raw in ("lossless", "high", "best")
-        else types.VideoCompressionQuality.OPTIMIZED
-    )
+def _veo_generation_config(use_vertex: bool = False) -> "types.GenerateVideosConfig":
+    """Veo request config.
+
+    ``compression_quality`` and ``fps`` are Vertex-only parameters — the Gemini
+    Developer API rejects them with a 400 error.  Only include them when using
+    a service-account / Vertex AI client.
+    """
     # Many Vertex Veo deployments reject 30 fps (code 3). Omit fps unless set explicitly.
-    fps_kw: Dict[str, int] = {}
-    fps_s = (os.getenv("VEO_FPS") or "").strip()
-    if fps_s.isdigit():
-        fps_kw["fps"] = max(24, min(60, int(fps_s)))
+    extra_kw: Dict[str, Any] = {}
+    if use_vertex:
+        comp_raw = (os.getenv("VEO_COMPRESSION") or "optimized").strip().lower()
+        extra_kw["compression_quality"] = (
+            types.VideoCompressionQuality.LOSSLESS
+            if comp_raw in ("lossless", "high", "best")
+            else types.VideoCompressionQuality.OPTIMIZED
+        )
+        fps_s = (os.getenv("VEO_FPS") or "").strip()
+        if fps_s.isdigit():
+            extra_kw["fps"] = max(24, min(60, int(fps_s)))
     return types.GenerateVideosConfig(
         number_of_videos=1,
         duration_seconds=CLIP_DURATION_SECONDS,
         enhance_prompt=False,
         aspect_ratio="16:9",
-        compression_quality=compression,
-        **fps_kw,
+        **extra_kw,
     )
 
 
@@ -385,17 +390,26 @@ def _log_veo_empty_response(idx: int, op: Any) -> None:
 
 
 class VeoRenderer:
-    """Render animated property videos using Vertex Veo (google-genai + service account)."""
+    """Render animated property videos using Google Veo.
+
+    Auth priority:
+    1. GOOGLE_APPLICATION_CREDENTIALS_JSON  — Vertex AI service account (enterprise)
+    2. GEMINI_API_KEY                        — Gemini Developer API key (simpler, no SA needed)
+
+    Both use the same google-genai SDK; only the client init differs.
+    """
 
     def __init__(self, work_dir: Path) -> None:
         self.work_dir = Path(work_dir)
         self.work_dir.mkdir(parents=True, exist_ok=True)
 
         creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+        api_key = os.environ.get("GEMINI_API_KEY", "").strip()
         project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
         location = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
 
         if creds_json:
+            # Vertex AI path — write SA JSON to temp file, set env var
             creds_dict = json.loads(creds_json)
             self._creds_file = tempfile.NamedTemporaryFile(
                 mode="w",
@@ -409,16 +423,25 @@ class VeoRenderer:
             finally:
                 self._creds_file.close()
             os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = self._creds_file.name
-            logger.info("Loaded service account credentials for Vertex/Veo")
+            self.client = genai.Client(
+                vertexai=True,
+                project=project_id,
+                location=location,
+            )
+            self.project_id = project_id
+            self.use_vertex = True
+            logger.info("VeoRenderer: using Vertex AI service account (project=%s)", project_id)
+        elif api_key:
+            # Gemini Developer API path — no service account needed
+            self.client = genai.Client(api_key=api_key)
+            self.project_id = None
+            self.use_vertex = False
+            logger.info("VeoRenderer: using Gemini Developer API key")
         else:
-            raise RuntimeError("GOOGLE_APPLICATION_CREDENTIALS_JSON not set")
-
-        self.client = genai.Client(
-            vertexai=True,
-            project=project_id,
-            location=location,
-        )
-        self.project_id = project_id
+            raise RuntimeError(
+                "VeoRenderer requires either GOOGLE_APPLICATION_CREDENTIALS_JSON "
+                "(Vertex AI) or GEMINI_API_KEY (Gemini Developer API)"
+            )
 
     async def render_video(
         self,
@@ -533,7 +556,7 @@ class VeoRenderer:
                     prompt=prompt,
                     image=image,
                 ),
-                config=_veo_generation_config(),
+                config=_veo_generation_config(use_vertex=self.use_vertex),
             )
 
         try:
