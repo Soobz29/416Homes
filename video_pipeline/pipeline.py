@@ -867,8 +867,23 @@ class VideoJobManager:
                             logger.warning("Could not get voiceover public URL: %s", url_e)
                 elif vo_text and audio_url:
                     # Checkpoint: audio already generated in a prior run — skip TTS entirely.
+                    # Download the existing audio so the mux step below can embed it.
                     logger.info("Skipping TTS (audio_url already set): %s", audio_url)
                     await self.update_job_status(job_id, "generating_audio", 72)
+                    try:
+                        audio_path = work_dir / "voiceover.mp3"
+                        async with httpx.AsyncClient(follow_redirects=True, timeout=30) as _ac:
+                            _r = await _ac.get(audio_url)
+                            _r.raise_for_status()
+                            audio_path.write_bytes(_r.content)
+                        logger.info(
+                            "Downloaded existing voiceover for mux: %d bytes", audio_path.stat().st_size
+                        )
+                    except Exception as _dl_err:
+                        logger.warning(
+                            "Failed to download existing audio for mux: %s — will render silent", _dl_err
+                        )
+                        audio_path = None
                 else:
                     logger.warning(
                         "Skipping voiceover job=%s: voiceover_script empty after script generation",
