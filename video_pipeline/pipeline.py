@@ -540,12 +540,20 @@ class VideoJobManager:
         """Upload rendered video file to Supabase Storage and return public URL."""
 
         path = f"{job_id}.mp4"
-        with video_path.open("rb") as f:
-            self.supabase.storage.from_("videos").upload(  # type: ignore[attr-defined]
-                path,
-                f,
-                file_options={"content-type": "video/mp4"},
-            )
+        try:
+            with video_path.open("rb") as f:
+                self.supabase.storage.from_("videos").upload(  # type: ignore[attr-defined]
+                    path,
+                    f,
+                    file_options={"content-type": "video/mp4"},
+                )
+        except Exception as upload_err:
+            err_str = str(upload_err)
+            if "409" in err_str or "Duplicate" in err_str or "already exists" in err_str.lower():
+                # File already in storage from a previous attempt — reuse it.
+                logger.info("Video already in storage (409 Duplicate) — reusing: %s", path)
+            else:
+                raise
         pub = (
             self.supabase.storage.from_("videos")  # type: ignore[attr-defined]
             .get_public_url(path)
