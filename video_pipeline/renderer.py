@@ -227,6 +227,140 @@ class VideoRenderer:
 
         return audio_path
 
+    # ------------------------------------------------------------------
+    # Ken Burns helpers
+    # ------------------------------------------------------------------
+
+    def _make_ken_burns_clip(
+        self,
+        photo_path: Path,
+        duration: float,
+        zoom_dir: str,
+        pan_dir: str,
+        output_path: Path,
+        w: int,
+        h: int,
+        fps: int,
+        enc: str,
+        enc_opts: List[str],
+    ) -> None:
+        """Render a single Ken Burns clip with smooth zoom + pan from a still photo.
+
+        Strategy
+        --------
+        1. Pre-scale the photo to 2× the output size (2560×1440 for 1280×720 output)
+           so the zoompan filter has headroom to zoom in up to 1.5× without
+           exceeding the source boundaries.
+        2. Apply ``zoompan`` with per-frame zoom/pan expressions.
+        3. Encode at the requested resolution / codec.
+        """
+        frames = max(int(duration * fps), 1)
+        z_step = round(0.35 / frames, 8)   # 1.0 → 1.35 (or reverse) over clip
+
+        # Zoom expressions ---------------------------------------------------
+        if zoom_dir == "in":
+            z_expr = f"min(zoom+{z_step},1.35)"
+        else:  # "out"
+            # seed to 1.35 on frame 1, then shrink back to 1.0
+            z_expr = f"if(eq(on,1),1.35,max(zoom-{z_step},1.0))"
+
+        # Pan expressions (2 px/frame drift on 2× source = very subtle) ------
+        px = 2
+        if pan_dir == "right":
+            x_expr = f"min(iw-iw/zoom,max(0,iw/2-iw/zoom/2+{px}*on))"
+        elif pan_dir == "left":
+            x_expr = f"min(iw-iw/zoom,max(0,iw/2-iw/zoom/2-{px}*on))"
+        else:  # center — gentle vertical drift only
+            x_expr = "iw/2-iw/zoom/2"
+
+        y_expr = "ih/2-ih/zoom/2"   # always vertically centred
+
+        src_w, src_h = w * 2, h * 2   # 2× source for zoom headroom
+        vf = (
+            f"scale={src_w}:{src_h}:force_original_aspect_ratio=increase,"
+            f"crop={src_w}:{src_h},"
+            f"zoompan=z='{z_expr}':x='{x_expr}':y='{y_expr}'"
+            f":d={frames}:s={w}x{h}:fps={fps},"
+            f"format=yuv420p"
+        )
+
+        cmd: List[str] = [
+            _ffmpeg(), "-y",
+            "-loop", "1",
+            "-framerate", str(fps),
+            "-t", f"{duration + 0.5:.3f}",   # slight overrun so zoompan has input
+            "-i", str(photo_path),
+            "-vf", vf,
+            "-c:v", enc, *enc_opts,
+            "-r", str(fps),
+            "-t", f"{duration:.3f}",
+            str(output_path),
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"Ken Burns clip {output_path.name} failed "
+                f"(rc={result.returncode}): {(result.stderr or '')[-600:]}"
+            )
+
+    def _xfade_concat(
+        self,
+        clip_paths: List[Path],
+        clip_dur: float,
+        fade_dur: float,
+        output_path: Path,
+        fps: int,
+        enc: str,
+        enc_opts: List[str],
+    ) -> None:
+        """Concatenate pre-rendered clips with xfade crossfade transitions.
+
+        Each clip overlaps the next by ``fade_dur`` seconds, so the total
+        output duration = N * clip_dur - (N-1) * fade_dur ≈ 30 s.
+        """
+        n = len(clip_paths)
+        if n < 2:
+            raise ValueError("Need ≥ 2 clips for xfade concat")
+
+        # Build filter_complex -----------------------------------------------
+        parts: List[str] = []
+
+        # Normalise PTS for each input stream
+        for i in range(n):
+            parts.append(f"[{i}:v]setpts=PTS-STARTPTS[v{i}]")
+
+        # Chain xfades: [v0][v1]→[x0], [x0][v2]→[x1], …, [x_{n-3}][v_{n-1}]→[vout]
+        prev = "v0"
+        for k in range(n - 1):
+            offset = round((k + 1) * (clip_dur - fade_dur), 4)
+            out_label = "vout" if k == n - 2 else f"x{k}"
+            parts.append(
+                f"[{prev}][v{k+1}]"
+                f"xfade=transition=fade:duration={fade_dur:.3f}:offset={offset:.4f}"
+                f"[{out_label}]"
+            )
+            prev = out_label
+
+        filter_complex = ";".join(parts)
+
+        cmd: List[str] = [_ffmpeg(), "-y"]
+        for cp in clip_paths:
+            cmd += ["-i", str(cp)]
+        cmd += [
+            "-filter_complex", filter_complex,
+            "-map", "[vout]",
+            "-c:v", enc, *enc_opts,
+            "-r", str(fps),
+            "-t", "30",
+            str(output_path),
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"xfade concat failed (rc={result.returncode}): "
+                f"{(result.stderr or '')[-800:]}"
+            )
+
     def _render_slideshow(
         self,
         photo_paths: List[Path],
@@ -235,82 +369,114 @@ class VideoRenderer:
         headline: str,
         output_path: Path,
     ) -> None:
-        """Render slideshow in a single FFmpeg pass using the image concat demuxer."""
+        """Render a professional Ken Burns video with smooth zoom/pan + xfade transitions.
 
-        _ = scene_plan, headline  # reserved for overlays / future use
-
+        Each photo gets a unique zoom direction (in/out alternating) and pan direction
+        (right/left/center cycling) driven by the scene_plan ``ken_burns`` field.
+        Clips are then crossfaded together with a 0.5-second dissolve.
+        """
         if not photo_paths:
             raise ValueError("photo_paths must not be empty")
 
-        # Pad photos so we always have at least 6 scenes for a full 30-second video.
+        fps    = 25
+        fade   = 0.5    # crossfade duration between clips (seconds)
+        total  = 30.0   # target output duration
+
+        # ── Pad to ≥ 6 photos ────────────────────────────────────────────────
         padded = list(photo_paths)
         while len(padded) < 6:
-            padded.extend(photo_paths)  # cycle through existing photos
-        padded = padded[:max(6, len(photo_paths))]
+            padded.extend(photo_paths)
+        padded = padded[: max(6, len(photo_paths))]
+        n = len(padded)
 
-        duration_per_photo = 30.0 / len(padded)
+        # Duration of each source clip (includes fade overlap with neighbour)
+        clip_dur = (total + (n - 1) * fade) / n
 
-        # Absolute paths avoid concat demuxer path bugs under /tmp and Windows.
+        # Pad scene_plan to match
+        plan: List[Dict[str, Any]] = list(scene_plan or [])
+        while len(plan) < n:
+            plan.append({})
+        plan = plan[:n]
+
+        w   = int(os.getenv("VIDEO_OUTPUT_WIDTH",  "1280"))
+        h   = int(os.getenv("VIDEO_OUTPUT_HEIGHT", "720"))
+        enc = self._choose_video_encoder()
+        enc_opts: List[str] = (
+            _libx264_quality_args() if enc == "libx264"
+            else ["-preset", "veryfast", "-crf", "23"]
+        )
+
+        # ── Step 1: Ken Burns per-clip ────────────────────────────────────────
+        clip_paths: List[Path] = []
         abs_photos = [p.resolve() for p in padded]
 
-        images_txt = self.work_dir / "images.txt"
-        with open(images_txt, "w", encoding="utf-8") as f:
-            for photo in abs_photos:
-                f.write(f"file '{photo.as_posix()}'\n")
-                f.write(f"duration {duration_per_photo:.3f}\n")
-            # FFmpeg concat demuxer requires the last file repeated without duration.
-            f.write(f"file '{abs_photos[-1].as_posix()}'\n")
+        for i, (photo, scene) in enumerate(zip(abs_photos, plan)):
+            cp  = self.work_dir / f"clip_{i:03d}.mp4"
+            kb  = (scene or {}).get("ken_burns", {})
+            # Fall back to alternating zoom + cycling pan when not specified
+            zoom_dir = (kb.get("zoom") or ("in" if i % 2 == 0 else "out")).lower()
+            pan_dir  = (kb.get("pan")  or ["right", "left", "center"][i % 3]).lower()
+            self._make_ken_burns_clip(
+                photo, clip_dur, zoom_dir, pan_dir,
+                cp, w, h, fps, enc, enc_opts,
+            )
+            clip_paths.append(cp)
+            logger.info("Ken Burns clip %d/%d done (%s/%s): %s", i + 1, n, zoom_dir, pan_dir, cp.name)
 
-        # Audio: pad TTS to exactly 30s with silence so video always runs the full duration.
-        if audio_path:
-            # apad filter appends silence until the total reaches 30 s
-            audio_inputs = ["-i", str(audio_path)]
-            audio_filter = ["-af", "apad=whole_dur=30"]
+        # ── Step 2: Concatenate with xfade ───────────────────────────────────
+        if n == 1:
+            combined = clip_paths[0]
+        else:
+            combined = self.work_dir / "combined.mp4"
+            try:
+                self._xfade_concat(clip_paths, clip_dur, fade, combined, fps, enc, enc_opts)
+            except Exception as exc:
+                # xfade unavailable (older ffmpeg build) → fall back to hard cuts
+                logger.warning("xfade failed (%s) — using hard-cut fallback", exc)
+                combined = self.work_dir / "combined_hc.mp4"
+                clips_txt = self.work_dir / "clips.txt"
+                with open(clips_txt, "w", encoding="utf-8") as f:
+                    for cp in clip_paths:
+                        f.write(f"file '{cp.resolve().as_posix()}'\n")
+                res = subprocess.run(
+                    [_ffmpeg(), "-y", "-f", "concat", "-safe", "0",
+                     "-i", str(clips_txt), "-c:v", enc, *enc_opts,
+                     "-r", str(fps), "-t", "30", str(combined)],
+                    capture_output=True, text=True, timeout=300,
+                )
+                if res.returncode != 0:
+                    raise RuntimeError(f"Hard-cut fallback failed: {res.stderr[-500:]}")
+
+        # ── Step 3: Add audio track (real or silent) ─────────────────────────
+        if audio_path and audio_path.exists() and audio_path.stat().st_size > 1000:
+            audio_inputs: List[str] = ["-i", str(audio_path)]
+            audio_filter: List[str] = ["-af", "apad=whole_dur=30"]
         else:
             audio_inputs = ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"]
             audio_filter = []
-        audio_map = ["-map", "1:a"]
-
-        enc = self._choose_video_encoder()
-        if enc == "libx264":
-            enc_opts: List[str] = _libx264_quality_args()
-        else:
-            enc_opts = ["-preset", "veryfast", "-crf", "23"]
 
         aac_br = (os.getenv("VIDEO_AAC_BITRATE") or "192k").strip()
-
         cmd: List[str] = [
-            _ffmpeg(),
-            "-y",
-            "-f", "concat",
-            "-safe", "0",
-            "-i", str(images_txt),
+            _ffmpeg(), "-y",
+            "-i", str(combined),
             *audio_inputs,
             "-map", "0:v:0",
-            *audio_map,
+            "-map", "1:a",
             *audio_filter,
-            # 720p to keep peak RAM well under 512 MB on constrained workers (0.5 GB DO instances).
-            # Override with VIDEO_OUTPUT_WIDTH / VIDEO_OUTPUT_HEIGHT env vars for local 1080p builds.
-            "-vf", f"scale={os.getenv('VIDEO_OUTPUT_WIDTH','1280')}:{os.getenv('VIDEO_OUTPUT_HEIGHT','720')}:force_original_aspect_ratio=increase,crop={os.getenv('VIDEO_OUTPUT_WIDTH','1280')}:{os.getenv('VIDEO_OUTPUT_HEIGHT','720')},format=yuv420p",
-            "-c:v", enc,
-            *enc_opts,
-            "-c:a", "aac",
-            "-b:a", aac_br,
-            "-r", "25",
+            "-c:v", "copy",          # video is already encoded — just remux
+            "-c:a", "aac", "-b:a", aac_br,
             "-t", "30",
             str(output_path),
         ]
-
-        logger.info("Rendering single-pass slideshow (%d photos, encoder=%s)", len(photo_paths), enc)
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
         if result.returncode != 0:
-            logger.error(
-                "FFmpeg failed (rc=%s): cmd=%s stderr_tail=%s",
-                result.returncode,
-                " ".join(cmd),
-                (result.stderr or "")[-2000:],
+            logger.warning(
+                "Audio-add step failed (rc=%s) — using combined directly: %s",
+                result.returncode, (result.stderr or "")[-600:],
             )
-            raise RuntimeError(f"FFmpeg failed (rc={result.returncode})")
+            import shutil
+            shutil.copy(str(combined), str(output_path))
+        else:
+            logger.info("✅ Ken Burns video rendered: %s", output_path)
 
         logger.info("✅ Video rendered: %s", output_path)
