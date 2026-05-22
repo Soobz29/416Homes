@@ -52,9 +52,13 @@ def _ffmpeg() -> str:
 
 
 def _libx264_quality_args() -> List[str]:
-    """H.264 quality for slideshow output (tune via VIDEO_H264_PRESET / VIDEO_H264_CRF)."""
-    preset = (os.getenv("VIDEO_H264_PRESET") or "medium").strip()
-    crf_s = (os.getenv("VIDEO_H264_CRF") or "20").strip()
+    """H.264 quality for slideshow output (tune via VIDEO_H264_PRESET / VIDEO_H264_CRF).
+
+    Default preset is 'veryfast' to keep peak RAM under ~300 MB on constrained workers
+    (0.5 GB DO instances).  Override with VIDEO_H264_PRESET=medium for local/higher-RAM builds.
+    """
+    preset = (os.getenv("VIDEO_H264_PRESET") or "veryfast").strip()
+    crf_s = (os.getenv("VIDEO_H264_CRF") or "23").strip()
     try:
         crf = max(0, min(51, int(crf_s)))
     except ValueError:
@@ -285,7 +289,9 @@ class VideoRenderer:
             "-map", "0:v:0",
             *audio_map,
             *audio_filter,
-            "-vf", "scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,format=yuv420p",
+            # 720p to keep peak RAM well under 512 MB on constrained workers (0.5 GB DO instances).
+            # Override with VIDEO_OUTPUT_WIDTH / VIDEO_OUTPUT_HEIGHT env vars for local 1080p builds.
+            "-vf", f"scale={os.getenv('VIDEO_OUTPUT_WIDTH','1280')}:{os.getenv('VIDEO_OUTPUT_HEIGHT','720')}:force_original_aspect_ratio=increase,crop={os.getenv('VIDEO_OUTPUT_WIDTH','1280')}:{os.getenv('VIDEO_OUTPUT_HEIGHT','720')},format=yuv420p",
             "-c:v", enc,
             *enc_opts,
             "-c:a", "aac",
@@ -296,7 +302,7 @@ class VideoRenderer:
         ]
 
         logger.info("Rendering single-pass slideshow (%d photos, encoder=%s)", len(photo_paths), enc)
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
 
         if result.returncode != 0:
             logger.error(
