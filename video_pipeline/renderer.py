@@ -63,7 +63,19 @@ def _libx264_quality_args() -> List[str]:
         crf = max(0, min(51, int(crf_s)))
     except ValueError:
         crf = 20
-    return ["-preset", preset, "-crf", str(crf)]
+    # Flags required for browser-playable H.264:
+    #   -pix_fmt yuv420p  → avoids yuvj444p ("High 4:4:4 Predictive") that browsers reject
+    #   -profile:v high   → explicit H.264 High profile (not High 4:4:4)
+    #   -level:v 4.1      → compatible with all modern browsers + mobile
+    #   -movflags +faststart → moov atom at front for instant web streaming
+    return [
+        "-preset", preset,
+        "-crf", str(crf),
+        "-pix_fmt", "yuv420p",
+        "-profile:v", "high",
+        "-level:v", "4.1",
+        "-movflags", "+faststart",
+    ]
 
 
 class VideoRenderer:
@@ -228,7 +240,7 @@ class VideoRenderer:
         return audio_path
 
     # ------------------------------------------------------------------
-    # Ken Burns helpers
+    # Single-pass Ken Burns renderer (original approach — most reliable)
     # ------------------------------------------------------------------
 
     def _make_ken_burns_clip(
@@ -403,7 +415,7 @@ class VideoRenderer:
         enc = self._choose_video_encoder()
         enc_opts: List[str] = (
             _libx264_quality_args() if enc == "libx264"
-            else ["-preset", "veryfast", "-crf", "23"]
+            else ["-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p"]
         )
 
         # ── Step 1: Ken Burns per-clip ────────────────────────────────────────
@@ -466,6 +478,7 @@ class VideoRenderer:
             "-c:v", "copy",          # video is already encoded — just remux
             "-c:a", "aac", "-b:a", aac_br,
             "-t", "30",
+            "-movflags", "+faststart",  # moov atom at front for web streaming
             str(output_path),
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
