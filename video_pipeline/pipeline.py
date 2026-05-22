@@ -742,7 +742,12 @@ class VideoJobManager:
             video_renderer = (os.getenv("VIDEO_RENDERER") or "ffmpeg").strip().lower()
             vertex_creds = (os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON") or "").strip()
 
-            audio_url: Optional[str] = None
+            # Checkpoint: reuse audio_url from a previous run attempt if already stored.
+            # This avoids redundant TTS calls when the job was killed mid-render and requeued.
+            audio_url: Optional[str] = (job.get("audio_url") or "").strip() or None
+            if audio_url:
+                logger.info("Reusing existing audio_url from previous run (checkpoint): %s", audio_url)
+
             loop = asyncio.get_running_loop()
 
             with tempfile.TemporaryDirectory() as tmpdir:
@@ -768,25 +773,30 @@ class VideoJobManager:
 
                 audio_path: Optional[Path] = None
                 logger.info(
-                    "Voiceover precheck job=%s: script_chars=%d",
+                    "Voiceover precheck job=%s: script_chars=%d existing_audio_url=%s",
                     job_id,
                     len(vo_text),
+                    bool(audio_url),
                 )
 
-                if vo_text:
+                if vo_text and not audio_url:
+                    # No cached audio — generate it now.
                     await self.update_job_status(job_id, "generating_audio", 72)
                     audio_path = work_dir / "voiceover.mp3"
 
                     # 1. Google Cloud TTS (primary — uses existing service account)
                     try:
-                        await loop.run_in_executor(
-                            None,
-                            functools.partial(
-                                _generate_google_tts_audio,
-                                vo_text,
-                                google_voice_name,
-                                audio_path,
+                        await asyncio.wait_for(
+                            loop.run_in_executor(
+                                None,
+                                functools.partial(
+                                    _generate_google_tts_audio,
+                                    vo_text,
+                                    google_voice_name,
+                                    audio_path,
+                                ),
                             ),
+                            timeout=60,
                         )
                         logger.info("Voiceover generated via Google TTS: %d bytes", audio_path.stat().st_size)
                     except Exception as e:
@@ -797,28 +807,34 @@ class VideoJobManager:
                     if audio_path is None and elevenlabs_key:
                         try:
                             audio_path = work_dir / "voiceover.mp3"
-                            await loop.run_in_executor(
-                                None,
-                                functools.partial(
-                                    _generate_elevenlabs_audio,
-                                    vo_text,
-                                    elevenlabs_voice_id,
-                                    elevenlabs_key,
-                                    audio_path,
+                            await asyncio.wait_for(
+                                loop.run_in_executor(
+                                    None,
+                                    functools.partial(
+                                        _generate_elevenlabs_audio,
+                                        vo_text,
+                                        elevenlabs_voice_id,
+                                        elevenlabs_key,
+                                        audio_path,
+                                    ),
                                 ),
+                                timeout=60,
                             )
                             logger.info("Voiceover generated via ElevenLabs: %d bytes", audio_path.stat().st_size)
                         except Exception as e:
                             logger.warning("ElevenLabs voiceover failed: %s — trying gTTS", e)
                             audio_path = None
 
-                    # 3. gTTS last resort
+                    # 3. gTTS last resort (60 s timeout — it calls Google Translate over the network)
                     if audio_path is None:
                         try:
                             audio_path = work_dir / "voiceover.mp3"
-                            await loop.run_in_executor(
-                                None,
-                                functools.partial(_generate_gtts_audio, vo_text, audio_path),
+                            await asyncio.wait_for(
+                                loop.run_in_executor(
+                                    None,
+                                    functools.partial(_generate_gtts_audio, vo_text, audio_path),
+                                ),
+                                timeout=60,
                             )
                             logger.info("Voiceover generated via gTTS: %d bytes", audio_path.stat().st_size)
                         except Exception as e:
@@ -833,13 +849,26 @@ class VideoJobManager:
                                     af,
                                     file_options={"content-type": "audio/mpeg"},
                                 )
+                            logger.info("Voiceover uploaded to storage")
+                        except Exception as up_e:
+                            err_str = str(up_e)
+                            if "409" in err_str or "Duplicate" in err_str or "already exists" in err_str.lower():
+                                logger.info("Voiceover already in storage (409 Duplicate) — reusing existing")
+                            else:
+                                logger.warning("Voiceover storage upload failed: %s", up_e)
+                        # Get public URL whether we just uploaded or reused an existing file
+                        try:
                             pub = self.supabase.storage.from_("videos").get_public_url(  # type: ignore[attr-defined]
                                 f"{job_id}_voiceover.mp3"
                             )
                             audio_url = pub.get("publicUrl") if isinstance(pub, dict) else pub
-                            logger.info("Voiceover uploaded: %s", audio_url)
-                        except Exception as up_e:
-                            logger.warning("Voiceover storage upload failed: %s", up_e)
+                            logger.info("Voiceover URL: %s", audio_url)
+                        except Exception as url_e:
+                            logger.warning("Could not get voiceover public URL: %s", url_e)
+                elif vo_text and audio_url:
+                    # Checkpoint: audio already generated in a prior run — skip TTS entirely.
+                    logger.info("Skipping TTS (audio_url already set): %s", audio_url)
+                    await self.update_job_status(job_id, "generating_audio", 72)
                 else:
                     logger.warning(
                         "Skipping voiceover job=%s: voiceover_script empty after script generation",
