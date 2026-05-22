@@ -1,6 +1,7 @@
 """FFmpeg-based video renderer with Ken Burns-style effects and optional audio."""
 
 import os
+import shutil
 import subprocess
 import logging
 from pathlib import Path
@@ -9,6 +10,45 @@ from typing import List, Dict, Any, Optional
 import httpx
 
 logger = logging.getLogger(__name__)
+
+
+def _find_ffmpeg() -> str:
+    """Return the path to an ffmpeg executable.
+
+    Search order:
+    1. FFMPEG_PATH env var (explicit override)
+    2. System PATH (shutil.which)
+    3. imageio-ffmpeg bundled binary (pip-installed, no apt needed)
+    """
+    override = os.getenv("FFMPEG_PATH", "").strip()
+    if override:
+        return override
+
+    system = shutil.which("ffmpeg")
+    if system:
+        return system
+
+    try:
+        import imageio_ffmpeg  # type: ignore
+        exe = imageio_ffmpeg.get_ffmpeg_exe()
+        logger.info("Using imageio-ffmpeg bundled binary: %s", exe)
+        return exe
+    except Exception as e:
+        logger.warning("imageio-ffmpeg not available: %s", e)
+
+    # Last resort — let the subprocess raise a clear error
+    return "ffmpeg"
+
+
+_FFMPEG_EXE: Optional[str] = None
+
+
+def _ffmpeg() -> str:
+    """Cached ffmpeg executable path."""
+    global _FFMPEG_EXE
+    if _FFMPEG_EXE is None:
+        _FFMPEG_EXE = _find_ffmpeg()
+    return _FFMPEG_EXE
 
 
 def _libx264_quality_args() -> List[str]:
@@ -43,7 +83,7 @@ class VideoRenderer:
         for enc in candidates:
             try:
                 # `-h encoder=NAME` returns 0 if encoder exists, non-0 otherwise.
-                p = self._run_ffmpeg_probe(["ffmpeg", "-hide_banner", "-h", f"encoder={enc}"], timeout_sec=5)
+                p = self._run_ffmpeg_probe([_ffmpeg(), "-hide_banner", "-h", f"encoder={enc}"], timeout_sec=5)
                 if p.returncode == 0:
                     self._encoder_cache = enc
                     return enc
@@ -236,7 +276,7 @@ class VideoRenderer:
         aac_br = (os.getenv("VIDEO_AAC_BITRATE") or "192k").strip()
 
         cmd: List[str] = [
-            "ffmpeg",
+            _ffmpeg(),
             "-y",
             "-f", "concat",
             "-safe", "0",
