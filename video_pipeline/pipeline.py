@@ -454,17 +454,25 @@ class VideoJobManager:
                     path = f"{job_id}/frame_{idx:03d}.jpg"
                     logger.info("Uploading to listing-photos/%s", path)
 
-                    self.supabase.storage.from_("listing-photos").upload(  # type: ignore[attr-defined]
-                        path,
-                        response.content,
-                        file_options={"content-type": "image/jpeg"},
-                    )
+                    try:
+                        self.supabase.storage.from_("listing-photos").upload(  # type: ignore[attr-defined]
+                            path,
+                            response.content,
+                            file_options={"content-type": "image/jpeg"},
+                        )
+                        logger.info("Successfully uploaded photo %d", idx + 1)
+                    except Exception as upload_err:
+                        err_str = str(upload_err)
+                        if "409" in err_str or "Duplicate" in err_str or "already exists" in err_str:
+                            # File already in storage from a previous attempt — reuse it
+                            logger.info("Photo %d already in storage (409 Duplicate) — reusing", idx + 1)
+                        else:
+                            raise
 
                     pub = self.supabase.storage.from_("listing-photos").get_public_url(path)  # type: ignore[attr-defined]
                     public_url = pub.get("publicUrl") if isinstance(pub, dict) else pub
                     if public_url:
                         uploaded_urls.append(public_url)
-                    logger.info("Successfully uploaded photo %d", idx + 1)
                 except Exception as e:
                     logger.error("Failed to upload photo %d from %s: %s", idx, url, e)
 
@@ -504,11 +512,18 @@ class VideoJobManager:
                     len(paths),
                     path,
                 )
-                self.supabase.storage.from_("listing-photos").upload(  # type: ignore[attr-defined]
-                    path,
-                    data,
-                    file_options={"content-type": ctype},
-                )
+                try:
+                    self.supabase.storage.from_("listing-photos").upload(  # type: ignore[attr-defined]
+                        path,
+                        data,
+                        file_options={"content-type": ctype},
+                    )
+                except Exception as upload_err:
+                    err_str = str(upload_err)
+                    if "409" in err_str or "Duplicate" in err_str or "already exists" in err_str:
+                        logger.info("Local photo %d already in storage — reusing", idx + 1)
+                    else:
+                        raise
                 pub = self.supabase.storage.from_("listing-photos").get_public_url(path)  # type: ignore[attr-defined]
                 public_url = pub.get("publicUrl") if isinstance(pub, dict) else pub
                 if public_url:
