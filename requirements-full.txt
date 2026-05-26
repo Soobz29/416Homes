@@ -33,7 +33,7 @@ playwright
 patchright
 msgspec>=0.18.0
 beautifulsoup4>=4.12.3
-DrissionPage==4.1.1.2
+DrissionPage==4.1.1.3
 browserforge>=0.11.0
 
 # Scheduling
