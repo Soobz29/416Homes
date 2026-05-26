@@ -15,11 +15,14 @@ jobs:
   retrain:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    
+    permissions:
+      contents: write
+      issues: write
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
@@ -28,50 +31,56 @@ jobs:
     - name: Install dependencies
       run: |
         pip install -r requirements-full.txt
-        
+
     - name: Verify data availability
+      id: data_check
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
       run: |
         echo "Checking data availability for retraining..."
         python -c "
-        import os
-        import asyncio
-        from supabase import create_client
-        
-        client = create_client(os.environ.get('SUPABASE_URL'), os.environ.get('SUPABASE_KEY'))
-        
-        async def check_data():
-            try:
-                # Check sold comps
-                sold_result = client.table('sold_comps').select('count', count='*').execute()
-                sold_count = len(sold_result.data) if sold_result.data else 0
-                print(f'Sold comps available: {sold_count}')
-                
-                # Check listings
-                listings_result = client.table('listings').select('count', count='*').execute()
-                listings_count = len(listings_result.data) if listings_result.data else 0
-                print(f'Listings available: {listings_count}')
-                
-                if sold_count < 100:
-                    print('WARNING: Insufficient sold comps for retraining')
-                    exit(1)
-                if listings_count < 50:
-                    print('WARNING: Insufficient listings for retraining')
-                    exit(1)
-                    
-                print('Data verification passed')
-                exit(0)
-                
-            except Exception as e:
-                print(f'Data verification failed: {e}')
-                exit(1)
-        
-        asyncio.run(check_data())
-        "
-        
+        import os, sys
+
+        try:
+            from supabase import create_client
+            client = create_client(os.environ.get('SUPABASE_URL'), os.environ.get('SUPABASE_KEY'))
+
+            sold_result = client.table('sold_comps').select('id', count='exact').execute()
+            sold_count = sold_result.count if hasattr(sold_result, 'count') and sold_result.count else len(sold_result.data or [])
+            print(f'Sold comps available: {sold_count}')
+
+            listings_result = client.table('listings').select('id', count='exact').execute()
+            listings_count = listings_result.count if hasattr(listings_result, 'count') and listings_result.count else len(listings_result.data or [])
+            print(f'Listings available: {listings_count}')
+
+            if sold_count < 100:
+                print('SKIP: Insufficient sold comps for retraining (need >= 100, have', sold_count, ')')
+                print('sufficient=false')
+                sys.exit(0)
+            if listings_count < 50:
+                print('SKIP: Insufficient listings for retraining (need >= 50, have', listings_count, ')')
+                print('sufficient=false')
+                sys.exit(0)
+
+            print('sufficient=true')
+            print('Data verification passed')
+
+        except Exception as e:
+            print(f'Data verification error: {e}')
+            print('sufficient=false')
+            sys.exit(0)
+        " | tee /tmp/data_check_out.txt
+
+        if grep -q "sufficient=true" /tmp/data_check_out.txt; then
+          echo "sufficient=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "sufficient=false" >> "$GITHUB_OUTPUT"
+          echo "::notice::Skipping model retraining — insufficient training data. Run scraper first."
+        fi
+
     - name: Fetch fresh sold comps
+      if: steps.data_check.outputs.sufficient == 'true'
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
@@ -80,8 +89,9 @@ jobs:
         echo "Fetching fresh sold comps for retraining..."
         python -m scraper.run_all --source housesigma --area gta --days-back 90
         echo "Sold comps fetch completed"
-        
+
     - name: Train valuation model
+      if: steps.data_check.outputs.sufficient == 'true'
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
@@ -90,8 +100,9 @@ jobs:
         echo "Training LightGBM valuation model..."
         python valuation/model.py
         echo "Model training completed"
-        
+
     - name: Evaluate model performance
+      if: steps.data_check.outputs.sufficient == 'true'
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
@@ -114,7 +125,7 @@ jobs:
             print(f'⚠️ Could not load model artefacts: {e}')
             sys.exit(0)
 
-        # Fetch held-out sold comps from Supabase (most recent 200, unseen by training if using daily splits)
+        # Fetch held-out sold comps from Supabase (most recent 200)
         client = create_client(os.environ.get('SUPABASE_URL'), os.environ.get('SUPABASE_KEY'))
         result = client.table('sold_comps').select('*').order('sold_date', desc=True).limit(200).execute()
 
@@ -162,9 +173,9 @@ jobs:
             print('⚠️ Model performance needs improvement (MAPE >= 15%)')
             sys.exit(1)
         "
-        
+
     - name: Commit and push trained model
-      if: success()
+      if: steps.data_check.outputs.sufficient == 'true' && success()
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -172,95 +183,96 @@ jobs:
         git diff --cached --quiet && echo "No model changes to commit" || \
           git commit -m "chore: update trained valuation model [skip ci]"
         git push origin main
-        
+
     - name: Send retraining notification
-      if: success()
+      if: steps.data_check.outputs.sufficient == 'true' && success()
+      continue-on-error: true
       uses: dawidd6/action-send-mail@v3
       with:
         server_address: smtp.gmail.com
         server_port: 587
         username: ${{ secrets.EMAIL_USERNAME }}
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: "🤖 416Homes Model Retraining Completed"
+        subject: "416Homes Model Retraining Completed"
         to: ${{ secrets.AGENT_EMAIL }}
         from: "416Homes Bot <noreply@416homes.ca>"
         body: |
           The 416Homes valuation model has been successfully retrained.
-          
+
           Time: Workflow run time
           Workflow: ${{ github.workflow }}
           Run ID: ${{ github.run_id }}
-          
+
           Model performance metrics and validation results are available in the workflow logs.
-          
+
           View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          
+
           This is an automated notification from the 416Homes ML system.
-        
+
     - name: Send failure notification
       if: failure()
+      continue-on-error: true
       uses: dawidd6/action-send-mail@v3
       with:
         server_address: smtp.gmail.com
         server_port: 587
         username: ${{ secrets.EMAIL_USERNAME }}
         password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: "🚨 416Homes Model Retraining Failed"
+        subject: "416Homes Model Retraining Failed"
         to: ${{ secrets.AGENT_EMAIL }}
         from: "416Homes Bot <noreply@416homes.ca>"
         body: |
           The 416Homes model retraining has failed.
-          
+
           Workflow: ${{ github.workflow }}
           Run ID: ${{ github.run_id }}
           Time: Workflow run time
           Repository: ${{ github.repository }}
-          
+
           Please check the GitHub Actions logs for details:
           ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          
+
           This is an automated alert from the 416Homes ML system.
-        
+
     - name: Create issue on critical failure
       if: failure()
+      continue-on-error: true
       uses: actions/github-script@v6
       with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
           const issue = {
-            title: '🚨 Critical Model Retraining Failure',
+            title: 'Critical Model Retraining Failure',
             body: `
               ## 416Homes Model Retraining Critical Failure
-              
+
               **Workflow**: ${{ github.workflow }}
               **Run ID**: ${{ github.run_id }}
-              **Time**: ${{ github.event.head_commit.timestamp }}
               **Repository**: ${{ github.repository }}
-              
+
               ### What Happened
               The weekly model retraining workflow has encountered a critical failure.
-              
+
               ### Immediate Actions Required
               1. Review the [workflow logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
               2. Check data availability and quality
               3. Verify model training pipeline
               4. Validate model performance metrics
-              5. Check deployment process
-              
+
               ### Investigation Checklist
               - [ ] Review error logs
               - [ ] Check data pipeline integrity
               - [ ] Verify model convergence
               - [ ] Check validation metrics
               - [ ] Test model predictions manually
-              
+
               This issue was automatically created due to a critical failure in the ML pipeline.
             `,
             labels: ['bug', 'critical', 'ml', 'model-failure']
           };
-          
+
           github.rest.issues.create({
             owner: context.repo.owner,
             repo: context.repo.repo,
             ...issue
           });
-        github-token: ${{ secrets.GITHUB_TOKEN }}

@@ -64,6 +64,8 @@ jobs:
   train-model:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Non-fatal: insufficient sold_comps in Supabase shouldn't break the pipeline
+    continue-on-error: true
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v4
@@ -119,11 +121,15 @@ jobs:
     runs-on: ubuntu-latest
     needs: [scrape, train-model, agent]
     if: always()
+    permissions:
+      issues: write
     steps:
     - name: Create issue on critical failure
       if: ${{ needs.scrape.result == 'failure' || needs.agent.result == 'failure' }}
+      continue-on-error: true
       uses: actions/github-script@v6
       with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
           const issue = {
             title: '🚨 Critical Nightly Scraper Failure',
@@ -161,4 +167,3 @@ jobs:
             repo: context.repo.repo,
             ...issue
           });
-        github-token: ${{ secrets.GITHUB_TOKEN }}

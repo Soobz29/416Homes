@@ -73,34 +73,56 @@ async def main():
             logger.info(f"... and {len(listings) - 5} more")
         
         # Store to database if available
+        regular_count = 0
+        sold_count = 0
+        failed_sources: list = []
         try:
             from memory.store import embed_and_store_listings, store_sold_comps
-            
+
             # Separate housesigma (sold comps) from regular listings
             regular_listings = []
             sold_comps = []
-            
+
             for listing in listings:
                 if listing.get('source') == 'housesigma' or 'sold_price' in listing:
                     sold_comps.append(listing)
                 else:
                     regular_listings.append(listing)
-            
+
             # Store regular listings
             if regular_listings:
                 regular_count = await embed_and_store_listings(regular_listings)
                 logger.info(f"Stored {regular_count}/{len(regular_listings)} listings to database")
-            
+
             # Store sold comps
             if sold_comps:
                 sold_count = await store_sold_comps(sold_comps)
                 logger.info(f"Stored {sold_count}/{len(sold_comps)} sold comps to database")
-                
+
         except ImportError:
             logger.warning("Database storage not available - skipping")
         except Exception as e:
             logger.error(f"Failed to store to database: {e}")
-        
+
+        # Write run summary for GitHub Actions verification step
+        import json, os, pathlib
+        summary = {
+            "total_listings": len(listings),
+            "regular_listings": len([l for l in listings if l.get('source') != 'housesigma' and 'sold_price' not in l]),
+            "sold_comps": len([l for l in listings if l.get('source') == 'housesigma' or 'sold_price' in l]),
+            "stored_listings": regular_count,
+            "stored_comps": sold_count,
+            "source": args.source,
+            "area": args.area,
+            "failed_sources": failed_sources,
+        }
+        summary_path = pathlib.Path(__file__).parent / "last_run_summary.json"
+        try:
+            summary_path.write_text(json.dumps(summary, indent=2))
+            logger.info(f"Run summary written to {summary_path}")
+        except Exception as e:
+            logger.warning(f"Could not write run summary: {e}")
+
     except KeyboardInterrupt:
         logger.info("Scraping interrupted by user")
         sys.exit(0)
