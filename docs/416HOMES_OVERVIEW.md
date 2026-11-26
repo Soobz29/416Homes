@@ -11,27 +11,28 @@
 
 ---
 
-## The problem
+## The problem I chose
 
 A small business owner's time is the bottleneck. In real estate, an independent agent or a buyer has to watch many listing sites by hand, and by the time they spot a good one it's often gone. The work is repetitive and easy to miss, and it takes hours that the owner would rather spend with clients.
 
-## Why I built 416Homes
+## Why I chose it
 
-It started as a side project. My sister was looking to buy a home, and I wanted to help her. Watching the listing sites by hand was slow, and it was easy to miss a good one. So I built something to do the watching for her, and it grew into 416Homes.
+It started as a side project. My sister was looking to buy a home, and I wanted to help her. Watching the listing sites by hand was slow, and it was easy to miss a good one. It was also the kind of work software is good at: repetitive, rule-based, and needing constant attention. So I built something to do the watching for her, and it grew into 416Homes.
 
-## My approach
+## My approach to solving it
 
 I treated it as a watching problem, not a search problem. 416Homes is built to check five listing sources on a schedule (Realtor.ca, Zoocasa, Kijiji, Condos.ca and Redfin) and remove duplicates. It prices each new home against sold comparables, so it can flag ones that look underpriced and label each match with an estimated market value. Then it alerts matching buyers and drafts outreach to listing agents, so people only hear about homes that fit them.
 
-## What I decided and why
-
-I automated the part that wastes the most time, which is checking sites and comparing prices, and left the human part (talking to clients, deciding to buy) to people. I also kept the system running on its own, with scheduled scraping jobs and automatic retraining of the pricing model, so it doesn't need daily attention. The status section below is candid about where it still needs monitoring.
+I automated the part that wastes the most time, which is checking sites and comparing prices, and left the human part (talking to clients, deciding to buy) to people. I also kept the system running on its own, with scheduled scraping jobs and automatic retraining of the pricing model, so it doesn't need daily attention. The supporting detail that follows is candid about where it still needs monitoring.
 
 ## What I'd do next
 
 Relay's mission is helping owners spend less time on admin. The same idea would apply to a business's money and paperwork: watch it automatically, and surface only what needs a person.
 
-It's live at https://416-homes.vercel.app
+## Links to my work
+
+- **Live product:** https://416-homes.vercel.app
+- **Source code:** https://github.com/Soobz29/416Homes
 
 ---
 
