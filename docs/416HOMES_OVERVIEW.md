@@ -17,7 +17,7 @@ A small business owner's time is the bottleneck. In real estate, an independent 
 
 ## Why I built 416Homes
 
-[Add your real reason here, in one or two plain sentences: what pushed you to build it, whether it was your own house search, someone you know, or something else.]
+It started as a side project. My sister was looking to buy a home, and I wanted to help her. Watching the listing sites by hand was slow, and it was easy to miss a good one. So I built something to do the watching for her, and it grew into 416Homes.
 
 ## My approach
 
